@@ -2043,7 +2043,23 @@ function getReportFilteredData() {
         status: 'all'
     };
     
-    // 1. Filtrar Datasets por Ano/Mes
+    const hasLinhas = window.datasets.some(d => d.linhas && d.linhas.length > 0);
+    
+    if (hasLinhas) {
+        let linhas = [];
+        window.datasets.forEach(d => {
+            if (f.mes !== 'all' && d.competencia.split('/')[0] !== f.mes) return;
+            if (f.ano !== 'all' && String(d.ano) !== String(f.ano) && (!d.competencia || !d.competencia.endsWith('/' + f.ano))) return;
+            if (d.linhas) linhas = linhas.concat(d.linhas);
+        });
+
+        if (f.unidade !== 'all') linhas = linhas.filter(l => l.uId === f.unidade);
+
+        const agg = aggregateLinhas(linhas, window.datasets[0].competencia, window.datasets[0].ano);
+        return agg;
+    }
+    
+    // Fallback original (dados demo / legados sem linhas)
     let dts = window.datasets;
     if (f.mes !== 'all') {
         dts = dts.filter(d => {
@@ -2052,12 +2068,9 @@ function getReportFilteredData() {
         });
     }
     if (f.ano !== 'all') {
-        dts = dts.filter(d => {
-            return d.ano === f.ano || (d.competencia && d.competencia.endsWith('/' + f.ano));
-        });
+        dts = dts.filter(d => d.ano === f.ano || (d.competencia && d.competencia.endsWith('/' + f.ano)));
     }
     
-    // 2. Re-agrupar os datasets filtrados
     let agg = buildAggregatedData(dts);
     if (!agg) {
         agg = { ...APP_STATE.data, unidades: [], faturamentoMensal: [], procedimentos: [], cbos: [], resumo: { qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0, valApresentado: 0, valAprovado: 0, valGlosado: 0, pctAprovacaoQtd: 0, pctGlosaQtd: 0, totalUnidades: 0 }};
@@ -2068,14 +2081,27 @@ function getReportFilteredData() {
     let procedimentos = [...agg.procedimentos];
     let cbos = [...(agg.cbos || [])];
 
-    // 3. Filtro por Unidade
     if (f.unidade !== 'all') {
-        unidades = unidades.filter(u => u.id === f.unidade);
+        const uId = f.unidade;
+        unidades = unidades.filter(u => u.id === uId);
+        
+        faturamento = faturamento.map(m => {
+            const val = m.valoresPorUnidade && m.valoresPorUnidade[uId] ? m.valoresPorUnidade[uId] : { valApresentado: 0, valAprovado: 0, valGlosado: 0, qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0 };
+            return { ...m, ...val, pctAprovado: val.valApresentado > 0 ? (val.valAprovado / val.valApresentado * 100) : 0 };
+        });
+
+        procedimentos = procedimentos.map(p => {
+            const val = p.valoresPorUnidade && p.valoresPorUnidade[uId] ? p.valoresPorUnidade[uId] : { valAprovado: 0, qtdAprovada: 0 };
+            return { ...p, ...val };
+        }).filter(p => p.valAprovado > 0 || p.qtdAprovada > 0).sort((a,b) => b.valAprovado - a.valAprovado);
+
+        cbos = cbos.map(c => {
+            const val = c.valoresPorUnidade && c.valoresPorUnidade[uId] ? c.valoresPorUnidade[uId] : { valAprovado: 0, qtdAprovada: 0 };
+            return { ...c, ...val };
+        }).filter(c => c.valAprovado > 0 || c.qtdAprovada > 0).sort((a,b) => b.valAprovado - a.valAprovado);
     }
 
-    // 5. Recalcular o resumo com as unidades resultantes
     const resumo = calcularResumo(unidades, faturamento);
-
     return { ...agg, unidades, faturamentoMensal: faturamento, procedimentos, cbos, resumo };
 }
 

@@ -1,4 +1,0 @@
-01Ambulatorial                                                                                        202606
-02Hospitalar                                                                                          202606
-03Hospital Dia                                                                                        202606
-06Atenção Domiciliar                                                                                  202606

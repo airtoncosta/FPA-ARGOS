@@ -33,11 +33,24 @@ const PDFExport = {
 
                 let y = 10;
                 
+                // Helper para controlar quebras de página
+                let currentPageHasContent = false;
+                const ensureNewPage = () => {
+                    if (currentPageHasContent) {
+                        doc.addPage();
+                        y = 15;
+                        currentPageHasContent = false;
+                    }
+                };
+
+                // ── PÁGINA 1: CAPA, RESUMO GERAL (KPIs) E FATURAMENTO MENSAL ──
+                
                 // ── TÍTULO E HEADER BOX (Capa / Identificação) ──
                 const chkCapa = document.getElementById('chkCapa')?.checked ?? true;
                 if (chkCapa) {
                     await this.drawUnifiedHeader(doc, d, 'RELATÓRIO EXECUTIVO DE PRODUÇÃO E FATURAMENTO AMBULATORIAL', pageW, margin);
                     y = 36;
+                    currentPageHasContent = true;
                 } else {
                     y = 15;
                 }
@@ -46,12 +59,18 @@ const PDFExport = {
                 const chkResumo = document.getElementById('chkResumo')?.checked ?? true;
                 if (chkResumo) {
                     y = this.drawCards(doc, d, y, pageW, margin);
+                    currentPageHasContent = true;
                 }
 
                 // ── FATURAMENTO POR MÊS ──
                 const chkFaturamento = document.getElementById('chkFaturamento')?.checked ?? true;
                 if (chkFaturamento && d.faturamentoMensal.length > 0) {
-                    if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
+                    if (y > pageH - 45) { 
+                        doc.addPage(); 
+                        y = 15; 
+                    } else { 
+                        y += 6; 
+                    }
                     y += 10;
                     
                     const getMesExtenso = (mm_aaaa) => {
@@ -102,47 +121,13 @@ const PDFExport = {
                     });
 
                     y = doc.lastAutoTable.finalY + 8;
+                    currentPageHasContent = true;
                 }
 
-                // ── EFICIÊNCIA / UNIDADES EXECUTADORAS ──
+                // ── PÁGINA 2: EFICIÊNCIA DE FATURAMENTO POR UNIDADE (Rank e todas as unidades) ──
                 const chkEficiencia = document.getElementById('chkEficiencia')?.checked ?? true;
                 if (chkEficiencia && d.unidades.length > 0) {
-                    // Tabela Unidades Executadoras
-                    if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
-                    y += 10;
-
-                    const topUnidades = [...d.unidades]
-                        .sort((a,b) => b.valAprovado - a.valAprovado)
-                        .map((u, i) => [
-                            (i+1) + 'º',
-                            this.cleanPCL(u.nome),
-                            this.formatN(u.qtdAprovada),
-                            this.formatM(u.valAprovado),
-                            this.formatP(u.pctDoTotal),
-                            this.formatN(u.qtdGlosada),
-                            this.formatM(u.valGlosado),
-                            this.formatP(u.pctAprovacaoVal)
-                        ]);
-
-                    doc.autoTable({
-                        startY: y,
-                        margin: { left: margin, right: margin },
-                        head: [['Rank', 'Unidade de Saúde', 'Qtd. Aprovada', 'Valor Aprovado', '% Total', 'Qtd. Glosada', 'Valor Glosado', '% Aprovada']],
-                        body: topUnidades,
-                        styles: { fontSize: 7.5, halign: 'center', lineWidth: 0, textColor: 0 },
-                        headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
-                        columnStyles: {
-                            0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 },
-                            1: { halign: 'left', cellWidth: 90 }
-                        },
-                        alternateRowStyles: { fillColor: [235, 240, 246] },
-                        didDrawPage: data => this.drawTableCard(doc, data, 'UNIDADES EXECUTADORAS')
-                    });
-
-                    y = doc.lastAutoTable.finalY + 8;
-
-                    // Tabela Eficiência por Unidade
-                    if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
+                    ensureNewPage();
                     y += 10;
 
                     const rowsEf = [...d.unidades]
@@ -150,31 +135,46 @@ const PDFExport = {
                         .map((u, i) => {
                             const s = classificarStatus(u.pctAprovacaoVal);
                             return [
+                                (i + 1) + 'º',
                                 this.cleanPCL(u.nome),
                                 this.formatN(u.qtdApresentada),
                                 this.formatN(u.qtdAprovada),
                                 this.formatP(u.pctAprovacaoQtd),
                                 this.formatM(u.valApresentado),
                                 this.formatM(u.valAprovado),
+                                this.formatM(u.valGlosado),
                                 this.formatP(u.pctAprovacaoVal),
                                 s.status
                             ];
                         });
 
+                    const rowCount = rowsEf.length;
+                    const useCompact = rowCount > 20;
+                    const fontSize = useCompact ? (rowCount > 30 ? 6.0 : 6.8) : 7.5;
+                    const cellPadding = useCompact ? (rowCount > 30 ? 1.0 : 1.5) : 2.2;
+
                     doc.autoTable({
                         startY: y,
                         margin: { left: margin, right: margin },
-                        head: [['Unidade de Saúde', 'Qtd. Apresentada', 'Qtd. Aprovada', '% Qtd.', 'Valor Apresentado', 'Valor Aprovado', '% Fin.', 'Status']],
+                        head: [['Rank', 'Unidade de Saúde', 'Qtd. Apresentada', 'Qtd. Aprovada', '% Qtd.', 'Valor Apresentado', 'Valor Aprovado', 'Glosa (R$)', '% Fin.', 'Status']],
                         body: rowsEf,
-                        styles: { fontSize: 7, halign: 'center', lineWidth: 0, textColor: 0 },
+                        styles: { fontSize: fontSize, cellPadding: cellPadding, halign: 'center', lineWidth: 0, textColor: 0 },
                         headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
                         columnStyles: {
-                            0: { halign: 'left', cellWidth: 90 },
-                            7: { halign: 'center', fontStyle: 'bold' }
+                            0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 },
+                            1: { halign: 'left', cellWidth: 80 },
+                            2: { halign: 'right', cellWidth: 22 },
+                            3: { halign: 'right', cellWidth: 22 },
+                            4: { halign: 'center', cellWidth: 18 },
+                            5: { halign: 'right', cellWidth: 27 },
+                            6: { halign: 'right', cellWidth: 27 },
+                            7: { halign: 'right', cellWidth: 22 },
+                            8: { halign: 'center', cellWidth: 18 },
+                            9: { halign: 'center', fontStyle: 'bold', cellWidth: 23 }
                         },
                         alternateRowStyles: { fillColor: [235, 240, 246] },
                         didParseCell: data => {
-                            if (data.column.index === 7 && data.section === 'body') {
+                            if (data.column.index === 9 && data.section === 'body') {
                                 const val = data.cell.raw;
                                 if (val === 'EXCELENTE') { data.cell.styles.textColor = [27, 94, 32]; data.cell.styles.fontStyle = 'bold'; }
                                 else if (val === 'BOA') { data.cell.styles.textColor = [2, 119, 189]; data.cell.styles.fontStyle = 'bold'; }
@@ -186,81 +186,112 @@ const PDFExport = {
                     });
 
                     y = doc.lastAutoTable.finalY + 8;
+                    currentPageHasContent = true;
                 }
 
-                // ── TOP PROCEDIMENTOS ──
+                // ── PÁGINA 3: TOP PROCEDIMENTOS E CBO (Um acima do outro, na mesma página) ──
                 const chkProcedimentos = document.getElementById('chkProcedimentos')?.checked ?? true;
-                if (chkProcedimentos && d.procedimentos.length > 0) {
-                    if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
-                    y += 10;
-
-                    const rowsProc = d.procedimentos.slice(0, 15).map((p, i) => [
-                        i + 1,
-                        p.codigo,
-                        p.descricao,
-                        this.formatN(p.qtdAprovada),
-                        this.formatM(p.valAprovado),
-                        p.valUnitario ? this.formatM(p.valUnitario) : '—'
-                    ]);
-
-                    doc.autoTable({
-                        startY: y,
-                        margin: { left: margin, right: margin },
-                        head: [['#', 'Código', 'Descrição', 'Qtd. Aprovada', 'Valor Aprovado', 'Valor Unitário']],
-                        body: rowsProc,
-                        styles: { fontSize: 7.5, halign: 'center', lineWidth: 0, textColor: 0 },
-                        headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
-                        columnStyles: {
-                            0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 },
-                            1: { halign: 'center', cellWidth: 25 },
-                            2: { halign: 'left', cellWidth: 110 }
-                        },
-                        alternateRowStyles: { fillColor: [235, 240, 246] },
-                        didDrawPage: data => this.drawTableCard(doc, data, 'TOP PROCEDIMENTOS')
-                    });
-
-                    y = doc.lastAutoTable.finalY + 8;
-                }
-
-                // ── OCUPAÇÕES E PROFISSÕES (CBO) ──
                 const chkCbo = document.getElementById('chkCbo')?.checked ?? true;
-                if (chkCbo && d.cbos && d.cbos.length > 0) {
-                    if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
+
+                const hasProc = chkProcedimentos && d.procedimentos && d.procedimentos.length > 0;
+                const hasCbo = chkCbo && d.cbos && d.cbos.length > 0;
+
+                if (hasProc || hasCbo) {
+                    ensureNewPage();
                     y += 10;
 
-                    const rowsCbo = d.cbos.slice(0, 15).map((c, i) => [
-                        i + 1,
-                        c.codigo,
-                        c.descricao,
-                        this.formatN(c.qtdAprovada),
-                        this.formatM(c.valAprovado)
-                    ]);
+                    const tableWidth = pageW - 2 * margin; // Largura total
+                    let finalY1 = y;
+                    let finalY2 = y;
+                    
+                    const bothActive = hasProc && hasCbo;
+                    
+                    // Se ambas as tabelas estiverem ativas, usamos um estilo mais compacto (font 6.5, padding 1.0)
+                    // para garantir que caibam juntas sem estourar. Caso contrário, usamos tamanho normal.
+                    const fontSize = bothActive ? 6.5 : 7.5;
+                    const cellPadding = bothActive ? 1.1 : 2.0;
+                    const spacing = bothActive ? 12 : 8;
 
-                    doc.autoTable({
-                        startY: y,
-                        margin: { left: margin, right: margin },
-                        head: [['#', 'Código CBO', 'Descrição/Profissão', 'Qtd. Aprovada', 'Valor Aprovado']],
-                        body: rowsCbo,
-                        styles: { fontSize: 7.5, halign: 'center', lineWidth: 0, textColor: 0 },
-                        headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
-                        columnStyles: {
-                            0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 },
-                            1: { halign: 'center', cellWidth: 30 },
-                            2: { halign: 'left', cellWidth: 110 }
-                        },
-                        alternateRowStyles: { fillColor: [235, 240, 246] },
-                        didDrawPage: data => this.drawTableCard(doc, data, 'OCUPAÇÕES E PROFISSÕES (CBO)')
-                    });
+                    // Top 15 Procedimentos
+                    if (hasProc) {
+                        const rowsProc = d.procedimentos.slice(0, 15).map((p, i) => [
+                            i + 1,
+                            p.codigo,
+                            p.descricao,
+                            this.formatN(p.qtdAprovada),
+                            this.formatM(p.valAprovado),
+                            p.valUnitario ? this.formatM(p.valUnitario) : '—'
+                        ]);
 
-                    y = doc.lastAutoTable.finalY + 8;
+                        doc.autoTable({
+                            startY: y,
+                            margin: { left: margin, right: margin },
+                            tableWidth: tableWidth,
+                            head: [['#', 'Código', 'Descrição', 'Qtd. Aprovada', 'Valor Aprovado', 'Valor Unitário']],
+                            body: rowsProc,
+                            styles: { fontSize: fontSize, cellPadding: cellPadding, halign: 'center', lineWidth: 0, textColor: 0 },
+                            headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                            columnStyles: {
+                                0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 },
+                                1: { halign: 'center', cellWidth: 25 },
+                                2: { halign: 'left', cellWidth: 144 },
+                                3: { halign: 'right', cellWidth: 25 },
+                                4: { halign: 'right', cellWidth: 35 },
+                                5: { halign: 'right', cellWidth: 30 }
+                            },
+                            alternateRowStyles: { fillColor: [235, 240, 246] },
+                            didDrawPage: data => this.drawTableCard(doc, data, 'TOP PROCEDIMENTOS')
+                        });
+
+                        finalY1 = doc.lastAutoTable.finalY;
+                        y = finalY1 + spacing;
+                    }
+
+                    // Top 15 CBOs
+                    if (hasCbo) {
+                        const rowsCbo = d.cbos.slice(0, 15).map((c, i) => [
+                            i + 1,
+                            c.codigo,
+                            c.descricao,
+                            this.formatN(c.qtdAprovada),
+                            this.formatM(c.valAprovado)
+                        ]);
+
+                        doc.autoTable({
+                            startY: y,
+                            margin: { left: margin, right: margin },
+                            tableWidth: tableWidth,
+                            head: [['#', 'Código CBO', 'Descrição/Profissão', 'Qtd. Aprovada', 'Valor Aprovado']],
+                            body: rowsCbo,
+                            styles: { fontSize: fontSize, cellPadding: cellPadding, halign: 'center', lineWidth: 0, textColor: 0 },
+                            headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                            columnStyles: {
+                                0: { halign: 'center', fontStyle: 'bold', cellWidth: 10 },
+                                1: { halign: 'center', cellWidth: 30 },
+                                2: { halign: 'left', cellWidth: 159 },
+                                3: { halign: 'right', cellWidth: 30 },
+                                4: { halign: 'right', cellWidth: 40 }
+                            },
+                            alternateRowStyles: { fillColor: [235, 240, 246] },
+                            didDrawPage: data => this.drawTableCard(doc, data, 'OCUPAÇÕES E PROFISSÕES (CBO)')
+                        });
+
+                        finalY2 = doc.lastAutoTable.finalY;
+                    }
+
+                    y = Math.max(finalY1, finalY2) + 8;
+                    currentPageHasContent = true;
                 }
+
+                // ── PÁGINA 4 E SEGUINTES: GLOSAS, AUDITORIA, REGULAÇÃO ──
+                let hasPage4Content = false;
 
                 // ── MÓDULO DE GLOSAS ──
                 const chkGlosas = document.getElementById('chkGlosas')?.checked ?? true;
                 if (chkGlosas) {
                     const comGlosa = d.unidades.filter(u => u.valGlosado > 0);
                     if (comGlosa.length > 0) {
-                        if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
+                        if (!hasPage4Content) { ensureNewPage(); hasPage4Content = true; }
                         y += 10;
 
                         const sortedGlosas = [...comGlosa].sort((a,b) => b.valGlosado - a.valGlosado);
@@ -294,6 +325,7 @@ const PDFExport = {
                         });
 
                         y = doc.lastAutoTable.finalY + 8;
+                        currentPageHasContent = true;
                     }
                 }
 
@@ -302,7 +334,8 @@ const PDFExport = {
                 if (chkAuditoria) {
                     const alertas = gerarAlertasAuditoria(d);
                     if (alertas.length > 0) {
-                        if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
+                        if (!hasPage4Content) { ensureNewPage(); hasPage4Content = true; }
+                        else if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
                         y += 10;
 
                         const rowsAudit = alertas.map(a => [
@@ -332,13 +365,15 @@ const PDFExport = {
                         });
 
                         y = doc.lastAutoTable.finalY + 8;
+                        currentPageHasContent = true;
                     }
                 }
 
                 // ── REGULAÇÃO (SCAAR) ──
                 const chkRegulacao = document.getElementById('chkRegulacao')?.checked ?? true;
                 if (chkRegulacao && d.unidades.length > 0) {
-                    if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
+                    if (!hasPage4Content) { ensureNewPage(); hasPage4Content = true; }
+                    else if (y > pageH - 45) { doc.addPage(); y = 15; } else { y += 6; }
                     y += 10;
 
                     const rowsReg = [...d.unidades]
@@ -374,6 +409,7 @@ const PDFExport = {
                     });
 
                     y = doc.lastAutoTable.finalY + 8;
+                    currentPageHasContent = true;
                 }
 
                 // ── RODAPÉ ──
