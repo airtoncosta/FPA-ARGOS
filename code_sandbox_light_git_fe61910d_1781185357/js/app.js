@@ -2030,6 +2030,10 @@ function bindReports() {
     document.getElementById('btnExportUnidadesPDF')?.addEventListener('click', () => {
         PDFExport.exportUnidadesPDF();
     });
+
+    document.getElementById('btnExportEficienciaPDF')?.addEventListener('click', () => {
+        PDFExport.exportEficienciaPDF();
+    });
 }
 
 function getReportFilteredData() {

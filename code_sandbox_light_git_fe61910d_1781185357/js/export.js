@@ -830,6 +830,156 @@ const PDFExport = {
         }, 800);
     },
 
+    exportEficienciaPDF() {
+        const d = APP_STATE.filteredData || APP_STATE.data;
+        if (!d) { showToast('⚠️ Carregue os dados antes de exportar.', 'warn'); return; }
+
+        showLoading('Gerando PDF de Eficiência...');
+
+        setTimeout(async () => {
+            try {
+                const scaarImg = window.SCAAR_LOGO_BASE64 || null;
+                const { jsPDF } = window.jspdf;
+
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const pageW = doc.internal.pageSize.getWidth();
+                const pageH = doc.internal.pageSize.getHeight();
+                const margin = 14;
+
+                await this.drawUnifiedHeader(doc, d, 'Relatório de Eficiência de Faturamento por Unidade', pageW, margin);
+
+                const rows = [];
+                const rowsDOM = document.querySelectorAll('#tableEficiencia tbody tr');
+                
+                let totalQtdApres = 0, totalQtdAprov = 0, totalValApres = 0, totalValAprov = 0, totalGlosado = 0;
+
+                const parseQtd = (str) => parseInt(str.replace(/\./g, '')) || 0;
+                const parseMoeda = (str) => parseFloat(str.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+
+                rowsDOM.forEach((row) => {
+                    if (row.style.display === 'none') return;
+                    
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 10) {
+                        const qtdApres = parseQtd(cells[2].textContent.trim());
+                        const qtdAprov = parseQtd(cells[3].textContent.trim());
+                        const valApres = parseMoeda(cells[5].textContent.trim());
+                        const valAprov = parseMoeda(cells[6].textContent.trim());
+                        const glosado = parseMoeda(cells[8].textContent.trim());
+                        
+                        const cleanStatusText = cells[9].textContent.trim()
+                            .replace(/[✅✔️⚠️❌]+/g, '')
+                            .trim();
+
+                        const strongEl = cells[1].querySelector('strong');
+                        let nameOnly = strongEl ? strongEl.textContent.trim() : cells[1].textContent.trim().split('·')[0].trim();
+                        let cnesMatch = cells[1].textContent.match(/CNES:\s*(\d+)/i);
+                        let cnes = cnesMatch ? cnesMatch[1] : '';
+
+                        totalQtdApres += qtdApres;
+                        totalQtdAprov += qtdAprov;
+                        totalValApres += valApres;
+                        totalValAprov += valAprov;
+                        totalGlosado += glosado;
+
+                        rows.push([
+                            cells[0].textContent.trim(),
+                            cnes,
+                            nameOnly,
+                            cells[2].textContent.trim(),
+                            cells[3].textContent.trim(),
+                            cells[4].textContent.trim(),
+                            cells[5].textContent.trim(),
+                            cells[6].textContent.trim(),
+                            cells[7].textContent.trim(),
+                            cells[8].textContent.trim(),
+                            cleanStatusText
+                        ]);
+                    }
+                });
+
+                // Adicionar linha de total
+                const totalPctQtd = totalQtdApres > 0 ? (totalQtdAprov / totalQtdApres * 100) : 0;
+                const totalPctFin = totalValApres > 0 ? (totalValAprov / totalValApres * 100) : 0;
+
+                rows.push([
+                    { content: 'TOTAL', colSpan: 3, styles: { halign: 'center' } },
+                    totalQtdApres.toLocaleString('pt-BR'),
+                    totalQtdAprov.toLocaleString('pt-BR'),
+                    totalPctQtd.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%',
+                    'R$ ' + totalValApres.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                    'R$ ' + totalValAprov.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                    totalPctFin.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%',
+                    'R$ ' + totalGlosado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                    ''
+                ]);
+
+                const rowCount = rows.length;
+                const useCompactLayout = rowCount > 15;
+                const dynamicFontSize = rowCount > 25 ? 6.0 : (useCompactLayout ? 6.5 : 7.5);
+                const dynamicCellPadding = rowCount > 25 ? 0.8 : (useCompactLayout ? 1.0 : 2.0);
+
+                doc.autoTable({
+                    startY: 45,
+                    margin: { left: margin, right: margin },
+                    head: [['RANK', 'CNES', 'Unidade de Saúde', 'Qtd. Apresentada', 'Qtd. Aprovada', '% Qtd.', 'Valor Apresentado', 'Valor Aprovado', '% Fin.', 'Glosa (R$)', 'Status']],
+                    body: rows,
+                    styles: { 
+                        fontSize: dynamicFontSize, 
+                        cellPadding: dynamicCellPadding, 
+                        halign: 'center', 
+                        lineWidth: 0, 
+                        textColor: 0 
+                    },
+                    headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                    columnStyles: {
+                        0: { cellWidth: 12, fontStyle: 'bold' },
+                        1: { cellWidth: 16 },
+                        2: { }, // Auto width
+                        3: { cellWidth: 22 },
+                        4: { cellWidth: 22 },
+                        5: { cellWidth: 15 },
+                        6: { cellWidth: 26 },
+                        7: { cellWidth: 26 },
+                        8: { cellWidth: 15 },
+                        9: { cellWidth: 20 },
+                        10: { cellWidth: 22, fontStyle: 'bold' }
+                    },
+                    alternateRowStyles: { fillColor: [235, 240, 246] },
+                    didParseCell: data => {
+                        if (data.row.index === rows.length - 1) {
+                            data.cell.styles.fillColor = [30, 64, 175];
+                            data.cell.styles.textColor = 255;
+                            data.cell.styles.fontStyle = 'bold';
+                            data.cell.styles.fontSize = useCompactLayout ? 10.0 : 11.5;
+                        } else if (data.column.index === 10 && data.section === 'body') {
+                            const val = data.cell.raw;
+                            if (val === 'EXCELENTE') { data.cell.styles.textColor = [27, 94, 32]; data.cell.styles.fontStyle = 'bold'; }
+                            else if (val === 'BOA') { data.cell.styles.textColor = [2, 119, 189]; data.cell.styles.fontStyle = 'bold'; }
+                            else if (val === 'REGULAR') { data.cell.styles.textColor = [230, 81, 0]; data.cell.styles.fontStyle = 'bold'; }
+                            else if (val === 'CRITICA') { data.cell.styles.textColor = [183, 28, 28]; data.cell.styles.fontStyle = 'bold'; }
+                        }
+                    },
+                    didDrawPage: data => this.drawTableCard(doc, data, 'EFICIÊNCIA DE FATURAMENTO POR UNIDADE')
+                });
+
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    this.addFooter(doc, pageW, pageH, i, totalPages, scaarImg);
+                }
+
+                doc.save(`ARGOS_Eficiencia_${d.municipio}_${d.ano || '2026'}.pdf`);
+                showToast('✅ PDF de Eficiência exportado com sucesso!', 'success');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ Erro ao gerar PDF de Eficiência: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }, 800);
+    },
+
     drawCards(doc, d, y, pageW, margin) {
         const gap = 4;
         const totalW = pageW - 2 * margin;
