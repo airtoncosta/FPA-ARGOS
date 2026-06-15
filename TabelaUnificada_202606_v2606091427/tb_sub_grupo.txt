@@ -1,0 +1,68 @@
+0401Pequenas cirurgias e cirurgias de pele, tecido subcutâneo e mucosa                                  202606
+0901Atenção em Oncologia                                                                                202606
+0201Coleta de material                                                                                  202606
+0101Ações coletivas/individuais em saúde                                                                202606
+0301Consultas / Atendimentos / Acompanhamentos                                                          202606
+0701Órteses, próteses e materiais especiais não relacionados ao ato cirúrgico                           202606
+0601Medicamentos de dispensação excepcional                                                             202606
+0501Coleta e exames para fins de doação de orgãos, tecidos e células e de transplante                   202606
+0801Ações relacionadas ao estabelecimento                                                               202606
+0302Fisioterapia                                                                                        202606
+0202Diagnóstico em laboratório clínico                                                                  202606
+0102Vigilância em saúde                                                                                 202606
+0902Atenção em Cardiologia                                                                              202606
+0802Ações relacionadas ao atendimento                                                                   202606
+0702Órteses, próteses e materiais especiais relacionados ao ato cirúrgico                               202606
+0602Medicamentos estratégicos                                                                           202606
+0502Avaliação de morte encefálica                                                                       202606
+0402Cirurgia de glândulas endócrinas                                                                    202606
+0803Autorização / regulação                                                                             202606
+0503Ações relacionadas à doação de orgãos e tecidos para transplante                                    202606
+0603Medicamentos de âmbito hospitalar e urgência                                                        202606
+0203Diagnóstico por anatomia patológica e citopatologia                                                 202606
+0303Tratamentos clínicos (outras especialidades)                                                        202606
+0403Cirurgia do sistema nervoso central e periférico                                                    202606
+0903Atenção em Ortopedia                                                                                202606
+0204Diagnóstico por radiologia                                                                          202606
+0604Componente especializado da assistência farmacêutica                                                202606
+0804Telessaúde                                                                                          202606
+0504Processamento de tecidos para transplante                                                           202606
+0904Atenção em Otorrinolaringologia                                                                     202606
+0404Cirurgia das vias aéreas superiores, da face, da cabeça e do pescoço                                202606
+0304Tratamento em oncologia                                                                             202606
+0905Atenção em Oftalmologia                                                                             202606
+0205Diagnóstico por ultrasonografia                                                                     202606
+0505Transplante de orgãos, tecidos e células                                                            202606
+0405Cirurgia do aparelho da visão                                                                       202606
+0305Tratamento em nefrologia                                                                            202606
+0906Atenção em Saúde Mulher                                                                             202606
+0206Diagnóstico por tomografia                                                                          202606
+0306Hemoterapia                                                                                         202606
+0406Cirurgia do aparelho circulatório                                                                   202606
+0506Acompanhamento e intercorrências no pré e pós-transplante                                           202606
+0207Diagnóstico por ressonância magnética                                                               202606
+0307Tratamentos odontológicos                                                                           202606
+0407Cirurgia do aparelho digestivo, orgãos anexos e parede abdominal                                    202606
+0907Atenção à Saúde Bucal                                                                               202606
+0308Tratamento de lesões, envenenamentos e outros, decorrentes de causas externas                       202606
+0408Cirurgia do sistema osteomuscular                                                                   202606
+0208Diagnóstico por medicina nuclear in vivo                                                            202606
+0209Diagnóstico por endoscopia                                                                          202606
+0309Terapias especializadas                                                                             202606
+0409Cirurgia do aparelho geniturinário                                                                  202606
+0210Diagnóstico por radiologia intervencionista                                                         202606
+0310Parto e nascimento                                                                                  202606
+0410Cirurgia de mama                                                                                    202606
+0211Métodos diagnósticos em especialidades                                                              202606
+0311Cuidados Paliativos                                                                                 202606
+0411Cirurgia obstétrica                                                                                 202606
+0412Cirurgia torácica                                                                                   202606
+0212Diagnóstico e procedimentos especiais em hemoterapia                                                202606
+0213Diagnóstico em vigilância epidemiológica e ambiental                                                202606
+0413Cirurgia reparadora                                                                                 202606
+0414Bucomaxilofacial                                                                                    202606
+0214Diagnóstico por teste rápido                                                                        202606
+0415Outras cirurgias                                                                                    202606
+0416Cirurgia em oncologia                                                                               202606
+0417Anestesiologia                                                                                      202606
+0418Cirurgia em nefrologia                                                                              202606

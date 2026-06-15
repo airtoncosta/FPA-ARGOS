@@ -1,0 +1,74 @@
+100Serviço de Atenção a Saúde no Sistema Penitenciário                                                                     202606
+101Estratégia de Saúde da Família                                                                                          202606
+102Estratégias de Agentes Comunitário de Saúde                                                                             202606
+103Serviço de Atendimento Móvel de Urgências                                                                               202606
+104Regulação Assistêncial dos Serviços de Saúde                                                                            202606
+105Serviço de Atenção em Neurologia/ Neurocirurgia                                                                         202606
+106Serviço de Atenção a DST/HIV/AIDS                                                                                       202606
+107Atenção à Saúde Auditiva                                                                                                202606
+108Atenção a Saúde do Trabalhador                                                                                          202606
+109Serviço de Atenção a Saúde dos Adolecentes em Conflito com a Lei, em Regime de Internação e Internação Provisória       202606
+110Serviço de Atenção a Saúde Reprodutiva                                                                                  202606
+111Serviço de Atenção ao Paciente com Tuberculose                                                                          202606
+112Serviço de Atenção ao Pré-Natal e Nascimento                                                                            202606
+113Serviço de Atenção Domiciliar                                                                                           202606
+114Serviço de Atenção em Saúde Bucal                                                                                       202606
+115Serviço de Atenção Psicossocial                                                                                         202606
+116Serviço de Atenção Cardiovascular/Cardiologia                                                                           202606
+117Serviço de Cirurgia Reparadora                                                                                          202606
+118Serviço de Cirurgia Torácica                                                                                            202606
+119Serviço de Controle de Tabagismo                                                                                        202606
+120Serviço de Diagnóstico por Anatomia Patológica e/ou Citopatologia                                                       202606
+121Diagnóstico por Imagem                                                                                                  202606
+122Serviço de Diagnóstico por Métodos Gráficos/Dinâmicos                                                                   202606
+123Serviço de Dispensação de Órteses, Próteses e Materiais Especiais                                                       202606
+124Serviço de Endocrinologia                                                                                               202606
+125Serviço de Farmácia                                                                                                     202606
+126Serviço de Fisioterapia                                                                                                 202606
+127Serviço de Atenção à Obesidade                                                                                          202606
+128Serviço de Hemoterapia                                                                                                  202606
+129Servico de Laboratório de Histocompatibilidade                                                                          202606
+130Atenção à Doença Renal Crônica                                                                                          202606
+131Serviço de Oftalmologia                                                                                                 202606
+132Serviço de Oncologia                                                                                                    202606
+133Serviço de Pneumologia                                                                                                  202606
+134Serviço de Práticas Integrativas e Complementares                                                                       202606
+135Serviço de Reabilitação                                                                                                 202606
+136Serviço de Suporte Nutricional                                                                                          202606
+137Serviço de Telemedicina                                                                                                 202606
+138Serviço de Traumato-Ortopedia                                                                                           202606
+139Serviço de Triagem Neonatal                                                                                             202606
+140Serviço de Urgência e Emergência                                                                                        202606
+141Serviço de Vigilância em Saúde                                                                                          202606
+142Serviço de Endoscopia                                                                                                   202606
+143Serviço Móvel de Urgência (exceto SAMU)                                                                                 202606
+144Serviço Posto de Coleta de Materiais Biológicos                                                                         202606
+145Serviço de Diagnóstico por Laboratório Clínico                                                                          202606
+146Serviço de Videolaparoscopia                                                                                            202606
+147Serviço de Apoio a Saúde da Família                                                                                     202606
+148Hospital-Dia                                                                                                            202606
+149Transplante                                                                                                             202606
+150Cirurgia Vascular                                                                                                       202606
+151Medicina Nuclear                                                                                                        202606
+152Atenção à Saúde da População Indígena                                                                                   202606
+153Atenção Especializada no Processo Transexualizador                                                                      202606
+154Serviço de Banco de Tecidos                                                                                             202606
+155Serviço de Traumatologia  Ortopedia                                                                                     202606
+157Serviço de Laboratorio de Protese Dentaria                                                                              202606
+158Serviço de Atenção Integral em Hanseniase                                                                               202606
+159Atenção Primária                                                                                                        202606
+160Teleconsultoria                                                                                                         202606
+161Consultório na Rua                                                                                                      202606
+162Serviço de Terapia Intensiva                                                                                            202606
+163Serviço de Cuidados Intermediários                                                                                      202606
+164Serviço de Órteses,Próteses e Materiais Especiais em Reabilitação                                                       202606
+165Atenção às Pessoas em Situação de Violência Sexual                                                                      202606
+166Serviço de  Análise Laboratorial  de Produtos Sujeitos á  Vigilância Sanitária                                          202606
+167Atendimento Itinerante de Asistência e Ensino em Saúde                                                                  202606
+168Atenção Às Pessoas com Doenças Raras                                                                                    202606
+169Serviço de Atenção em Urologia                                                                                          202606
+170Comissões e Comitês                                                                                                     202606
+171Cuidados Paliativos                                                                                                     202606
+172Atenção ao Luto Materno e Parental                                                                                      202606
+173Logística de Imunobiológicos                                                                                            202606
+174Imunização                                                                                                              202606
