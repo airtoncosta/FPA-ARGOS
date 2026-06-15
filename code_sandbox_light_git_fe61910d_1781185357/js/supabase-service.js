@@ -360,15 +360,35 @@ const SupabaseService = {
         if (!this.init()) return null;
 
         try {
-            const { data, error } = await this.client
-                .from('procedimentos')
-                .select('codigo, descricao');
+            let allData = [];
+            let from = 0;
+            const batchSize = 1000;
+            let hasMore = true;
 
-            if (error) throw error;
-            if (!data || data.length === 0) return null;
+            while (hasMore) {
+                const { data, error } = await this.client
+                    .from('procedimentos')
+                    .select('codigo, descricao')
+                    .range(from, from + batchSize - 1);
+
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    hasMore = false;
+                } else {
+                    allData = allData.concat(data);
+                    if (data.length < batchSize) {
+                        hasMore = false;
+                    } else {
+                        from += batchSize;
+                    }
+                }
+            }
+
+            if (allData.length === 0) return null;
 
             const map = {};
-            data.forEach(p => {
+            allData.forEach(p => {
                 map[p.codigo] = p.descricao;
             });
             return map;
