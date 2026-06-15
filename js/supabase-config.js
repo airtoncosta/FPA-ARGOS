@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — supabase-config.js
+ * FPA ARGOS — supabase-config.js
  * Configuração e inicialização do cliente Supabase
  */
 

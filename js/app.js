@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — app.js
+ * FPA ARGOS Analytics V3 — app.js
  * Lógica principal da aplicação — SIA/SUS Bacabal-MA
  */
 
@@ -25,63 +25,48 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.SIGTAP = { ...(window.SIGTAP || {}), ...savedSigtap };
         }
 
-        // Se conectado ao Supabase, tenta sincronizar SIGTAP e Logo antes de carregar o faturamento local
+        let loadedFromCloud = false;
+        
+        // Verifica se o Supabase está configurado e tenta baixar
         if (SupabaseConfig.isConnected()) {
             try {
-                showToast('🔄 Sincronizando dados do Supabase...', 'info');
-                
-                // 1. Carregar Logo do Supabase
-                const cloudLogo = await SupabaseService.loadLogo();
-                if (cloudLogo) {
-                    localStorage.setItem('argos_custom_logo', cloudLogo);
-                    updateLogoPreview();
-                }
-
-                // 2. Carregar SIGTAP do Supabase
-                const cloudSigtap = await SupabaseService.loadSigtap();
-                if (cloudSigtap && Object.keys(cloudSigtap).length > 0) {
-                    window.SIGTAP = { ...(window.SIGTAP || {}), ...cloudSigtap };
-                    await AppDB.setItem('SIGTAP_DB', window.SIGTAP);
+                showToast('🔄 Conectando ao Supabase...', 'info');
+                const cloudDatasets = await SupabaseService.downloadAllDatasets();
+                if (cloudDatasets && cloudDatasets.length > 0) {
+                    window.datasets = cloudDatasets;
+                    const agg = buildAggregatedData(window.datasets);
+                    loadData(agg);
+                    showToast(`☁️ ${window.datasets.length} competência(s) carregada(s) do Supabase!`, 'success');
+                    loadedFromCloud = true;
                     
-                    const sigtapMeta = await AppDB.getItem('sigtap_meta') || { fileName: 'Nuvem Supabase', importDate: 'Sincronizado' };
-                    await AppDB.setItem('sigtap_meta', sigtapMeta);
-                }
-
-                // Indica que o Supabase está conectado e ativo mudando a aparência do botão
-                const btnCloud = document.getElementById('btnConfigSupabase');
-                if (btnCloud) {
-                    btnCloud.style.backgroundColor = 'rgba(62, 207, 142, 0.15)';
-                    btnCloud.style.borderColor = '#3ecf8e';
+                    // Atualiza a borda do botão do Supabase para verde preenchido para indicar conexão ativa
+                    const btnCloud = document.getElementById('btnConfigSupabase');
+                    if (btnCloud) {
+                        btnCloud.style.backgroundColor = 'rgba(62, 207, 142, 0.15)';
+                    }
+                } else {
+                    showToast('💡 Supabase conectado, mas sem dados cadastrados.', 'info');
                 }
             } catch (cloudErr) {
-                console.error("Erro de sincronização inicial com Supabase:", cloudErr);
-                showToast('⚠️ Erro ao sincronizar dados da nuvem. Usando local...', 'warn');
+                console.error("Erro ao baixar dados do Supabase:", cloudErr);
+                showToast('⚠️ Erro de conexão com Supabase. Carregando dados locais...', 'warn');
             }
         }
 
-        // Carregar Faturamento do Banco Local (IndexedDB) obrigatoriamente
-        const savedDatasets = await AppDB.getItem('datasets');
-        if (savedDatasets && savedDatasets.length > 0) {
-            window.datasets = savedDatasets;
-            const agg = buildAggregatedData(window.datasets);
-            loadData(agg);
-            showToast(`✅ ${window.datasets.length} competência(s) carregada(s) do banco local!`, 'success');
-        } else {
-            window.datasets = [];
-            loadData(getEmptyData());
-            
-            // Só exibe o modal de importar se o usuário não for um Visitante (leitura apenas)
-            const userSession = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || 'null');
-            const isVisitor = userSession && userSession.role === 'VISITANTE';
-            if (!isVisitor) {
+        if (!loadedFromCloud) {
+            const savedDatasets = await AppDB.getItem('datasets');
+            if (savedDatasets && savedDatasets.length > 0) {
+                window.datasets = savedDatasets;
+                const agg = buildAggregatedData(window.datasets);
+                loadData(agg);
+                showToast(`✅ ${window.datasets.length} competência(s) carregada(s) do banco local!`, 'success');
+            } else {
+                window.datasets = [];
+                loadData(getEmptyData());
                 showModal('modalImportar');
                 showToast('💡 Nenhum dado salvo. Importe um arquivo ou carregue os dados de demonstração.', 'info');
-            } else {
-                showToast('💡 Nenhum dado de faturamento foi encontrado no banco de dados local.', 'info');
             }
         }
-
-        await renderArquivosManager();
     } catch(e) {
         console.error(e);
         showToast('⚠️ Erro ao acessar o banco de dados local.', 'warn');
@@ -96,15 +81,6 @@ function bindLimparDados() {
             APP_STATE.data = null;
             APP_STATE.filteredData = null;
             
-            try {
-                const imports = await AppDB.getItem('imported_files') || [];
-                const sigtapOnly = imports.filter(i => i.type === 'SIGTAP');
-                await AppDB.setItem('imported_files', sigtapOnly);
-                await renderArquivosManager();
-            } catch (err) {
-                console.error("Erro ao limpar histórico:", err);
-            }
-            
             loadData(getEmptyData());
             showModal('modalImportar');
             showToast('Dados de faturamento limpos! A tabela SIGTAP foi mantida.', 'info');
@@ -114,80 +90,50 @@ function bindLimparDados() {
 
 function updateLogoPreview() {
     const customLogo = localStorage.getItem('argos_custom_logo');
-    const previewBox = document.getElementById('logoPreviewBox');
-    const placeholder = document.getElementById('logoPreviewPlaceholder');
-    const previewImg = document.getElementById('logoPreviewImage');
+    const btn = document.getElementById('btnConfigurarLogo');
+    if (!btn) return;
     
-    if (previewBox && placeholder && previewImg) {
-        if (customLogo) {
-            previewImg.src = customLogo;
-            previewImg.classList.remove('hidden');
-            placeholder.classList.add('hidden');
-        } else {
-            previewImg.src = '';
-            previewImg.classList.add('hidden');
-            placeholder.classList.remove('hidden');
+    let imgEl = btn.querySelector('.custom-logo-preview');
+    const iconEl = btn.querySelector('i');
+    
+    if (customLogo) {
+        if (!imgEl) {
+            imgEl = document.createElement('img');
+            imgEl.className = 'custom-logo-preview';
+            imgEl.style.width = '18px';
+            imgEl.style.height = '18px';
+            imgEl.style.objectFit = 'contain';
+            imgEl.style.borderRadius = '2px';
+            imgEl.style.marginRight = '8px';
+            imgEl.style.verticalAlign = 'middle';
+            btn.insertBefore(imgEl, btn.firstChild);
         }
+        imgEl.src = customLogo;
+        if (iconEl) iconEl.style.display = 'none';
+    } else {
+        if (imgEl) imgEl.remove();
+        if (iconEl) iconEl.style.display = '';
     }
 }
 
 function bindLogoUpload() {
-    const btnUpload = document.getElementById('btnUploadLogo');
-    const btnExcluir = document.getElementById('btnExcluirLogo');
+    const btn = document.getElementById('btnConfigurarLogo');
     const input = document.getElementById('fileLogoInput');
-    if (!input) return;
+    if (!btn || !input) return;
 
     updateLogoPreview();
 
-    btnUpload?.addEventListener('click', () => input.click());
-
-    btnExcluir?.addEventListener('click', async () => {
-        if (confirm('Tem certeza que deseja excluir a logomarca do PDF?')) {
-            localStorage.removeItem('argos_custom_logo');
-            updateLogoPreview();
-
-            if (SupabaseConfig.isConnected()) {
-                try {
-                    await SupabaseService.deleteLogo();
-                    const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
-                    if (user.username) {
-                        await SupabaseService.logAction(user.username, 'ARQUIVOS', 'EXCLUSAO_LOGO', 'Logomarca do PDF excluída.');
-                    }
-                } catch (err) {
-                    console.error("Erro ao excluir logo no Supabase:", err);
-                }
-            }
-
-            showToast('✅ Logomarca removida com sucesso!', 'success');
-        }
-    });
+    btn.addEventListener('click', () => input.click());
 
     input.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = async (event) => {
+        reader.onload = (event) => {
             try {
                 localStorage.setItem('argos_custom_logo', event.target.result);
                 updateLogoPreview();
-
-                if (SupabaseConfig.isConnected()) {
-                    showLoading('Salvando logomarca na nuvem...');
-                    try {
-                        await SupabaseService.saveLogo(event.target.result);
-                        const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
-                        if (user.username) {
-                            await SupabaseService.logAction(user.username, 'ARQUIVOS', 'UPLOAD_LOGO', 'Nova logomarca do PDF enviada.');
-                        }
-                    } catch (err) {
-                        console.error("Erro ao salvar logo no Supabase:", err);
-                        showToast('⚠️ Salvo localmente, erro ao enviar para nuvem.', 'warn');
-                    } finally {
-                        hideLoading();
-                    }
-                }
-
                 showToast('✅ Logomarca salva com sucesso! O próximo PDF já usará sua logo.', 'success');
             } catch(err) {
                 console.error(err);
@@ -224,16 +170,6 @@ function navigateTo(section) {
 
     APP_STATE.activeSection = section;
 
-    // Ocultar ou Mostrar a barra de filtros dependendo da seção
-    const filterBar = document.getElementById('filter-bar');
-    if (filterBar) {
-        if (section === 'minha-conta' || section === 'usuarios') {
-            filterBar.style.display = 'none';
-        } else {
-            filterBar.style.display = 'flex';
-        }
-    }
-
     // Re-renderizar gráficos se necessário
     if (APP_STATE.data) {
         const d = getFilteredData();
@@ -248,9 +184,6 @@ function navigateTo(section) {
         }
         if (section === 'cbo') {
             setTimeout(() => ChartModule.renderCbo(d), 50);
-        }
-        if (section === 'arquivos') {
-            setTimeout(() => renderArquivosManager(), 50);
         }
     }
 }
@@ -514,8 +447,6 @@ function renderAll(data) {
     const d = data || getFilteredData();
     if (!d) return;
 
-    APP_STATE.filteredData = d;
-
     renderDashboardExecutivo(d);
     renderDashboardFaturamento(d);
     renderDashboardEficiencia(d);
@@ -727,16 +658,6 @@ function bindEficienciaStatusFilter() {
 /* =========================================================
    DASHBOARD UNIDADES
    ========================================================= */
-let UNIDADES_SORT_ORDER = 'valAprovado';
-
-window.toggleSortUnidades = function(field) {
-    UNIDADES_SORT_ORDER = field;
-    const d = APP_STATE.filteredData || APP_STATE.data;
-    if (d) {
-        renderDashboardUnidades(d);
-    }
-};
-
 function renderDashboardUnidades(d) {
     const grid = document.getElementById('unidadeCardGrid');
     if (!grid) return;
@@ -762,62 +683,13 @@ function renderDashboardUnidades(d) {
         </div>`;
     }).join('');
 
-    const tbody = document.getElementById('tbodyUnidadesMenu');
-    if (tbody) {
-        // Atualizar visual do cabeçalho ativo
-        const thAprovado = document.getElementById('thUnidadeValAprovado');
-        const thPctAprov = document.getElementById('thUnidadePctAprovacao');
-        if (thAprovado && thPctAprov) {
-            const iconAprovado = thAprovado.querySelector('i');
-            const iconPctAprov = thPctAprov.querySelector('i');
-            
-            if (UNIDADES_SORT_ORDER === 'pctAprovacao') {
-                if (iconPctAprov) iconPctAprov.style.opacity = '1';
-                if (iconAprovado) iconAprovado.style.opacity = '0.3';
-                thPctAprov.style.color = '#1565C0';
-                thAprovado.style.color = '';
-            } else {
-                if (iconPctAprov) iconPctAprov.style.opacity = '0.3';
-                if (iconAprovado) iconAprovado.style.opacity = '1';
-                thPctAprov.style.color = '';
-                thAprovado.style.color = '#1565C0';
-            }
-        }
-
-        let sortedTable = [...d.unidades];
-        if (UNIDADES_SORT_ORDER === 'pctAprovacao') {
-            sortedTable.sort((a, b) => (b.pctAprovacaoVal || 0) - (a.pctAprovacaoVal || 0));
-        } else {
-            sortedTable.sort((a, b) => b.valAprovado - a.valAprovado);
-        }
-
-        tbody.innerHTML = sortedTable.map((u, i) => {
-            const s = classificarStatus(u.pctAprovacaoVal);
-            return `<tr onclick="abrirUnidadeDetalhe('${u.id}')" style="cursor: pointer;">
-                <td class="text-center fw-bold">${i+1}</td>
-                <td><strong>${u.nome}</strong></td>
-                <td class="text-right mono">${fmt.numero(u.qtdAprovada)}</td>
-                <td class="text-right mono fw-bold">${fmt.moeda(u.valAprovado)}</td>
-                <td class="text-right mono ${u.pctAprovacaoVal < 95 ? 'text-red fw-bold' : u.pctAprovacaoVal >= 99 ? 'text-green' : ''}">${fmt.pct(u.pctAprovacaoVal)}</td>
-                <td class="text-center"><span class="status-badge-cell ${s.cls}">${s.label}</span></td>
-            </tr>`;
-        }).join('');
-    }
-
     // Busca nas unidades
     const search = document.getElementById('searchUnidade');
     if (search) {
-        // Clone node para limpar listeners anteriores
-        const newSearch = search.cloneNode(true);
-        search.parentNode.replaceChild(newSearch, search);
-
-        newSearch.addEventListener('input', () => {
-            const q = newSearch.value.toLowerCase();
+        search.addEventListener('input', () => {
+            const q = search.value.toLowerCase();
             document.querySelectorAll('.unidade-card').forEach(card => {
                 card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
-            });
-            document.querySelectorAll('#tbodyUnidadesMenu tr').forEach(row => {
-                row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
             });
         });
     }
@@ -875,51 +747,13 @@ window.toggleProcDetails = function(procCode) {
     }
 };
 
-let PROCEDIMENTO_SORT_ORDER = 'valAprovado';
-
-window.toggleSortProcedimentos = function(field) {
-    PROCEDIMENTO_SORT_ORDER = field;
-    const d = APP_STATE.filteredData || APP_STATE.data;
-    if (d) {
-        renderDashboardProcedimentos(d);
-    }
-};
-
 function renderDashboardProcedimentos(d) {
     const tbody = document.getElementById('tbodyProcedimentos');
     if (!tbody || !d.procedimentos.length) return;
 
-    // Atualizar visual do cabeçalho ativo
-    const thAprovado = document.getElementById('thValAprovado');
-    const thUnitario = document.getElementById('thValUnitario');
-    if (thAprovado && thUnitario) {
-        const iconAprovado = thAprovado.querySelector('i');
-        const iconUnitario = thUnitario.querySelector('i');
-        
-        if (PROCEDIMENTO_SORT_ORDER === 'valUnitario') {
-            if (iconUnitario) iconUnitario.style.opacity = '1';
-            if (iconAprovado) iconAprovado.style.opacity = '0.3';
-            thUnitario.style.color = '#1565C0';
-            thAprovado.style.color = '';
-        } else {
-            if (iconUnitario) iconUnitario.style.opacity = '0.3';
-            if (iconAprovado) iconAprovado.style.opacity = '1';
-            thUnitario.style.color = '';
-            thAprovado.style.color = '#1565C0';
-        }
-    }
+    const total = d.procedimentos.reduce((s, p) => s + p.valAprovado, 0);
 
-    // Ordenar cópia do array
-    let sortedProcs = [...d.procedimentos];
-    if (PROCEDIMENTO_SORT_ORDER === 'valUnitario') {
-        sortedProcs.sort((a, b) => (b.valUnitario || 0) - (a.valUnitario || 0));
-    } else {
-        sortedProcs.sort((a, b) => b.valAprovado - a.valAprovado);
-    }
-
-    const total = sortedProcs.reduce((s, p) => s + p.valAprovado, 0);
-
-    tbody.innerHTML = sortedProcs.map((p, i) => {
+    tbody.innerHTML = d.procedimentos.map((p, i) => {
         const pct = total > 0 ? (p.valAprovado / total * 100) : 0;
         const barW = Math.min(pct * 3, 100);
 
@@ -1026,20 +860,17 @@ function renderDashboardCbo(d) {
                                 <th style="padding: 6px 12px; text-align: left; background: #e2e8f0; color: #1e293b;">Procedimento</th>
                                 <th style="padding: 6px 12px; text-align: right; background: #e2e8f0; color: #1e293b;">Quantidade Aprovada</th>
                                 <th style="padding: 6px 12px; text-align: right; background: #e2e8f0; color: #1e293b;">Valor Aprovado</th>
-                                <th style="padding: 6px 12px; text-align: right; background: #e2e8f0; color: #1e293b;">Valor Unitário</th>
                                 <th style="padding: 6px 12px; text-align: right; background: #e2e8f0; color: #1e293b;">% do Faturamento do CBO</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${c.procedimentos.map(p => {
                                 const procPct = c.valAprovado > 0 ? (p.valAprovado / c.valAprovado * 100) : 0;
-                                const valUnit = p.qtdAprovada > 0 ? (p.valAprovado / p.qtdAprovada) : 0;
                                 return `
                                 <tr style="border-bottom: 1px solid #f1f5f9;">
                                     <td style="padding: 6px 12px; text-align: left;"><strong style="white-space: nowrap;">${p.codigo}</strong> — ${p.descricao}</td>
                                     <td style="padding: 6px 12px; text-align: right;" class="mono">${fmt.numero(p.qtdAprovada)}</td>
                                     <td style="padding: 6px 12px; text-align: right;" class="mono fw-bold">${fmt.moeda(p.valAprovado)}</td>
-                                    <td style="padding: 6px 12px; text-align: right;" class="mono">${fmt.moeda(valUnit)}</td>
                                     <td style="padding: 6px 12px; text-align: right;" class="mono">${fmt.pct(procPct)}</td>
                                 </tr>
                                 `;
@@ -1415,11 +1246,8 @@ function populateFilterMesAno() {
    IMPORTAÇÃO
    ========================================================= */
 function bindImport() {
-    // Botões importar
+    // Botão importar
     document.getElementById('btnImportar')?.addEventListener('click', () => {
-        showModal('modalImportar');
-    });
-    document.getElementById('btnImportarArquivosPage')?.addEventListener('click', () => {
         showModal('modalImportar');
     });
 
@@ -1449,7 +1277,7 @@ function bindImport() {
     document.getElementById('btnProcessarManual')?.addEventListener('click', () => {
         const txt = document.getElementById('txtManualInput')?.value;
         if (!txt || !txt.trim()) { showToast('⚠️ Nenhum texto informado.', 'warn'); return; }
-        processContent(txt, 'Entrada Manual');
+        processContent(txt);
     });
 
     // Demo
@@ -1468,7 +1296,6 @@ function bindImport() {
             
             window.datasets.push(DEMO_DATA);
             await AppDB.setItem('datasets', window.datasets);
-            await registerImport('Dados de Demonstração', 'SIA/SUS', DEMO_DATA.competencia);
             const agg = buildAggregatedData(window.datasets);
             loadData(agg);
             hideModal('modalImportar');
@@ -1492,11 +1319,11 @@ function bindImport() {
 }
 
 function bindImportSigtap() {
-    const btn = document.getElementById('btnUploadSigtap');
+    const btn = document.getElementById('btnImportarSigtap');
     const input = document.getElementById('fileSigtapInput');
-    if (!input) return;
+    if (!btn || !input) return;
 
-    btn?.addEventListener('click', () => input.click());
+    btn.addEventListener('click', () => input.click());
 
     input.addEventListener('change', e => {
         const file = e.target.files[0];
@@ -1519,25 +1346,6 @@ function bindImportSigtap() {
             
             window.SIGTAP = { ...(window.SIGTAP || {}), ...sigtapMap };
             await AppDB.setItem('SIGTAP_DB', window.SIGTAP);
-            
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            await AppDB.setItem('sigtap_meta', { fileName: file.name, importDate: dateStr });
-            await registerImport(file.name, 'SIGTAP', 'Tabela Oficial');
-
-            if (SupabaseConfig.isConnected()) {
-                showLoading('Sincronizando SIGTAP na nuvem...');
-                try {
-                    await SupabaseService.uploadSigtap(window.SIGTAP, (msg) => showLoading(msg));
-                    const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
-                    if (user.username) {
-                        await SupabaseService.logAction(user.username, 'ARQUIVOS', 'IMPORTACAO_SIGTAP', `Tabela SIGTAP (${file.name}) sincronizada na nuvem.`);
-                    }
-                } catch (err) {
-                    console.error("Erro ao sincronizar SIGTAP no Supabase:", err);
-                    showToast('⚠️ SIGTAP salvo localmente, erro ao sincronizar nuvem.', 'warn');
-                }
-            }
             
             hideLoading();
             showToast(`✅ Tabela SIGTAP carregada com ${Object.keys(sigtapMap).length} itens!`, 'success');
@@ -1579,25 +1387,25 @@ function processContent(content, fileName = 'arquivo') {
                 window.datasets.push(parsed);
                 await AppDB.setItem('datasets', window.datasets);
                 
-                // Se conectado ao Supabase, apenas registramos o log de importação na auditoria (sem enviar as linhas)
+                // Se conectado ao Supabase, envia para a nuvem
                 if (SupabaseConfig.isConnected()) {
+                    showLoading('Sincronizando faturamento com o Supabase...');
                     try {
-                        const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
-                        if (user.username) {
-                            await SupabaseService.logAction(user.username, 'ARQUIVOS', 'IMPORTACAO_SIA', `Arquivo faturamento ${fileName} (${parsed.competencia}) carregado localmente.`);
-                        }
+                        await SupabaseService.uploadDataset(parsed, (msg) => {
+                            showLoading(`Nuvem: ${msg}`);
+                        });
+                        showToast('☁️ Dados sincronizados com o Supabase com sucesso!', 'success');
                     } catch (cloudErr) {
-                        console.error('Erro ao registrar auditoria de importação no Supabase:', cloudErr);
+                        console.error('Erro ao salvar no Supabase:', cloudErr);
+                        showToast('⚠️ Salvo localmente, mas erro ao sincronizar nuvem: ' + cloudErr.message, 'warn');
                     }
                 }
                 
                 const agg = buildAggregatedData(window.datasets);
                 loadData(agg);
                 
-                await registerImport(fileName, 'SIA/SUS', parsed.competencia);
-                
                 hideModal('modalImportar');
-                showToast(`✅ ${parsed.competencia} adicionada localmente! Agora temos ${window.datasets.length} competência(s) no IndexedDB!`, 'success');
+                showToast(`✅ ${parsed.competencia} adicionada! Agora temos ${window.datasets.length} mês(es) no banco!`, 'success');
             } else {
                 showToast('⚠️ Não foi possível reconhecer o formato do arquivo.', 'warn');
             }
@@ -1868,58 +1676,6 @@ function gerarAnaliseArgos() {
 function bindModals() {
     document.getElementById('btnFecharImportar')?.addEventListener('click', () => hideModal('modalImportar'));
     document.getElementById('btnFecharArgos')?.addEventListener('click', () => hideModal('modalArgosIA'));
-    
-    // Novo modal de exclusão
-    document.getElementById('btnFecharConfirmarExclusao')?.addEventListener('click', () => hideModal('modalConfirmarExclusao'));
-    document.getElementById('btnConfirmarExclusaoCancelar')?.addEventListener('click', () => hideModal('modalConfirmarExclusao'));
-    
-    document.getElementById('btnConfirmarExclusaoOk')?.addEventListener('click', async () => {
-        if (!window.pendingDelete) return;
-        const { id, fileName, competencia } = window.pendingDelete;
-        
-        hideModal('modalConfirmarExclusao');
-        showLoading('Excluindo faturamento...');
-        
-        try {
-            let imports = await AppDB.getItem('imported_files') || [];
-            imports = imports.filter(i => i.id !== id);
-            await AppDB.setItem('imported_files', imports);
-            
-            if (window.datasets) {
-                window.datasets = window.datasets.filter(d => d.competencia !== competencia);
-                await AppDB.setItem('datasets', window.datasets);
-            }
-
-            if (SupabaseConfig.isConnected()) {
-                try {
-                    const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
-                    if (user.username) {
-                        await SupabaseService.logAction(user.username, 'ARQUIVOS', 'EXCLUSAO_SIA', `Competência de faturamento ${competencia} excluída localmente.`);
-                    }
-                } catch (cloudErr) {
-                    console.error("Erro ao salvar log de exclusão no Supabase:", cloudErr);
-                }
-            }
-            
-            if (!window.datasets || window.datasets.length === 0) {
-                window.datasets = [];
-                loadData(getEmptyData());
-                showModal('modalImportar');
-            } else {
-                const agg = buildAggregatedData(window.datasets);
-                loadData(agg);
-            }
-            
-            showToast(`✅ Arquivo ${fileName} excluído com sucesso!`, 'success');
-        } catch (err) {
-            console.error("Erro ao excluir arquivo:", err);
-            showToast('❌ Erro ao excluir faturamento.', 'error');
-        } finally {
-            hideLoading();
-            window.pendingDelete = null;
-            await renderArquivosManager();
-        }
-    });
 
     document.querySelectorAll('.modal-overlay').forEach(m => {
         m.addEventListener('click', e => {
@@ -1964,12 +1720,6 @@ function capitalize(str) {
 }
 
 function showToast(msg, type = '') {
-    const loginContainer = document.getElementById('login-container');
-    if (loginContainer && !loginContainer.classList.contains('hidden')) {
-        // Ignora toasts de carregamento de fundo se a tela de login estiver visível
-        return;
-    }
-
     const toast = document.getElementById('toast');
     if (!toast) return;
     toast.textContent = msg;
@@ -2012,19 +1762,6 @@ function bindReports() {
     // Evento de clique para o botão Excel do Relatório
     document.getElementById('btnReportExcel')?.addEventListener('click', () => {
         ExcelExport.export();
-    });
-
-    // Eventos de clique para exportação PDF de tabelas específicas
-    document.getElementById('btnExportProcPDF')?.addEventListener('click', () => {
-        PDFExport.exportProcedimentosPDF();
-    });
-
-    document.getElementById('btnExportCboPDF')?.addEventListener('click', () => {
-        PDFExport.exportCboPDF();
-    });
-
-    document.getElementById('btnExportUnidadesPDF')?.addEventListener('click', () => {
-        PDFExport.exportUnidadesPDF();
     });
 }
 
@@ -2167,118 +1904,3 @@ function bindSupabase() {
         setTimeout(() => window.location.reload(), 800);
     });
 }
-
-/* =========================================================
-   HISTÓRICO DE IMPORTAÇÕES - CENTRAL DE ARQUIVOS
-   ========================================================= */
-async function registerImport(fileName, type, competencia) {
-    try {
-        let imports = await AppDB.getItem('imported_files') || [];
-        
-        // Evitar duplicados no histórico para o mesmo arquivo e competência
-        imports = imports.filter(i => !(i.fileName === fileName && i.competencia === competencia));
-        
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' +
-                        now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        
-        imports.unshift({
-            id: type.toLowerCase() + '_' + Date.now(),
-            fileName,
-            importDate: dateStr,
-            type,
-            competencia
-        });
-        
-        // Limitar histórico a 15 itens
-        if (imports.length > 15) {
-            imports = imports.slice(0, 15);
-        }
-        
-        await AppDB.setItem('imported_files', imports);
-        await renderArquivosManager();
-    } catch (e) {
-        console.error("Erro ao registrar importação no histórico:", e);
-    }
-}
-
-async function renderArquivosManager() {
-    updateLogoPreview();
-    
-    // Status do SIGTAP
-    const lblBadge = document.getElementById('lblSigtapStatusBadge');
-    const lblDate = document.getElementById('lblSigtapStatusDate');
-    if (lblBadge && lblDate) {
-        const savedSigtap = await AppDB.getItem('SIGTAP_DB');
-        const sigtapMeta = await AppDB.getItem('sigtap_meta');
-        
-        if (savedSigtap && Object.keys(savedSigtap).length > 0) {
-            lblBadge.className = 'sigtap-status-badge loaded';
-            lblBadge.innerHTML = `<i class="fas fa-check-circle"></i> Carregada (${Object.keys(savedSigtap).length} itens)`;
-            lblDate.textContent = sigtapMeta && sigtapMeta.importDate 
-                ? `Importada em ${sigtapMeta.importDate} (${sigtapMeta.fileName})`
-                : 'Tabela importada e ativa';
-        } else {
-            lblBadge.className = 'sigtap-status-badge missing';
-            lblBadge.innerHTML = `<i class="fas fa-times-circle"></i> Não Carregada`;
-            lblDate.textContent = 'Importe o arquivo TXT da tabela SIGTAP';
-        }
-    }
-
-    // Tabela de Histórico de Arquivos de Faturamento SIA/SUS
-    const tbody = document.getElementById('tbodyHistoricoArquivos');
-    if (tbody) {
-        const imports = await AppDB.getItem('imported_files') || [];
-        const faturamentos = imports.filter(i => i.type === 'SIA/SUS');
-        
-        if (faturamentos.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding: 15px;">Nenhum arquivo de faturamento importado</td></tr>`;
-        } else {
-            tbody.innerHTML = faturamentos.map(item => {
-                let totalQtd = '—';
-                let totalVal = 'R$ —';
-                
-                if (window.datasets) {
-                    const ds = window.datasets.find(d => d.competencia === item.competencia);
-                    if (ds && ds.resumo) {
-                        totalQtd = ds.resumo.qtdAprovada.toLocaleString('pt-BR');
-                        totalVal = 'R$ ' + ds.resumo.valAprovado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    }
-                }
-                
-                // Ocultar botão de exclusão para o Visitante (leitura apenas)
-                const userSession = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || 'null');
-                const isVisitor = userSession && userSession.role === 'VISITANTE';
-                const deleteBtnHtml = isVisitor ? '' : `
-                    <button class="btn-delete-file" onclick="confirmDeleteImport('${item.id}', '${item.fileName.replace(/'/g, "\\'")}', '${item.importDate}', '${item.competencia}')" title="Excluir arquivo">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                `;
-                
-                return `
-                    <tr>
-                        <td><strong>${item.fileName}</strong></td>
-                        <td class="mono">${item.importDate}</td>
-                        <td><span class="status-badge-cell badge-boa" style="font-size: 0.68rem; padding: 2px 6px;">${item.competencia}</span></td>
-                        <td class="text-right mono">${totalQtd}</td>
-                        <td class="text-right mono fw-bold text-green">${totalVal}</td>
-                        <td class="text-center">
-                            ${deleteBtnHtml}
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
-    }
-}
-
-window.confirmDeleteImport = function(id, fileName, importDate, competencia) {
-    window.pendingDelete = { id, fileName, importDate, competencia };
-    
-    const nameEl = document.getElementById('delConfirmName');
-    const dateEl = document.getElementById('delConfirmDate');
-    if (nameEl) nameEl.textContent = fileName;
-    if (dateEl) dateEl.textContent = importDate;
-    
-    showModal('modalConfirmarExclusao');
-};

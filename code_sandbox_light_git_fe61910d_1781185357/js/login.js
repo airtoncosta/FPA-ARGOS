@@ -153,7 +153,7 @@ const LoginModule = {
         }
     },
 
-    handleLogin() {
+    async handleLogin() {
         const usernameInput = document.getElementById('login-username');
         const passwordInput = document.getElementById('login-password');
         const rememberCheckbox = document.getElementById('login-remember');
@@ -171,11 +171,81 @@ const LoginModule = {
             return;
         }
 
+        // --- MODO ONLINE: Supabase Conectado ---
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            const btnSubmit = document.getElementById('btn-login-submit');
+            if (btnSubmit) {
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
+            }
+
+            try {
+                const res = await window.SupabaseService.authLogin(loginVal, passwordVal);
+                
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar no Sistema';
+                }
+
+                if (!res.success) {
+                    if (res.isPasswordWrong && res.user) {
+                        // Incrementar tentativas falhas no Supabase via Relação Local/Remota
+                        let failedAttempts = parseInt(localStorage.getItem('failed_attempts_' + res.user.username) || '0');
+                        failedAttempts++;
+                        
+                        if (failedAttempts >= 5) {
+                            await window.SupabaseService.updateUserStatus(res.user.username, 'BLOQUEADO');
+                            localStorage.removeItem('failed_attempts_' + res.user.username);
+                            this.showToast('⛔ CONTA BLOQUEADA: Você excedeu o limite de 5 tentativas inválidas. Contate o Administrador.', 'error');
+                        } else {
+                            localStorage.setItem('failed_attempts_' + res.user.username, failedAttempts);
+                            this.showToast(`❌ Senha incorreta. Tentativa ${failedAttempts} de 5.`, 'error');
+                        }
+                    } else {
+                        this.showToast(res.message, 'error');
+                    }
+                    return;
+                }
+
+                // Login Sucesso
+                const user = res.user;
+                localStorage.removeItem('failed_attempts_' + user.username);
+                
+                const sessionUser = {
+                    username: user.username,
+                    email: user.email,
+                    name: user.name,
+                    role: user.role
+                };
+
+                if (rememberMe) {
+                    localStorage.setItem('argos_user', JSON.stringify(sessionUser));
+                } else {
+                    sessionStorage.setItem('argos_user', JSON.stringify(sessionUser));
+                }
+
+                // Registrar a auditoria no Supabase
+                await this.logAction(user.username, 'LOGIN');
+                this.showToast(`🔑 Acesso concedido via Nuvem! Bem-vindo(a), ${user.name}.`, 'success');
+                this.loginUI(sessionUser);
+                return;
+            } catch (err) {
+                console.error("Erro no login via Supabase:", err);
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar no Sistema';
+                }
+                this.showToast('⚠️ Erro ao conectar ao Supabase. Tentando login em Modo Local...', 'warn');
+                // Fallback para o modo local abaixo
+            }
+        }
+
+        // --- MODO OFFLINE: Fallback Local ---
         let dbUsers = [];
         try { dbUsers = JSON.parse(localStorage.getItem('argos_users_db') || '[]'); } catch(e){}
         if(dbUsers.length === 0) dbUsers = ARGOS_USERS; // fallback
 
-        // 2. Buscar o usuário pelo username ou pelo e-mail
+        // Buscar o usuário pelo username ou pelo e-mail
         const user = dbUsers.find(u => 
             u.username.toLowerCase() === loginVal || 
             u.email.toLowerCase() === loginVal
@@ -192,7 +262,7 @@ const LoginModule = {
             return;
         }
 
-        // 3. Validar a senha correspondente
+        // Validar a senha correspondente
         if (user.password !== passwordVal) {
             user.failedAttempts = (user.failedAttempts || 0) + 1;
             if (user.failedAttempts >= 5) {
@@ -206,7 +276,7 @@ const LoginModule = {
             return;
         }
 
-        // 4. Sucesso no login - resetar falhas e salvar sessão
+        // Sucesso no login local
         user.failedAttempts = 0;
         localStorage.setItem('argos_users_db', JSON.stringify(dbUsers));
         const sessionUser = {
@@ -222,11 +292,8 @@ const LoginModule = {
             sessionStorage.setItem('argos_user', JSON.stringify(sessionUser));
         }
 
-        this.logAction(user.username, 'LOGIN');
-
-        this.showToast(`🔑 Acesso concedido! Bem-vindo(a), ${user.name}.`, 'success');
-        
-        // Ativar interface e ocultar tela de login
+        await this.logAction(user.username, 'LOGIN');
+        this.showToast(`🔑 Acesso concedido localmente! Bem-vindo(a), ${user.name}.`, 'success');
         this.loginUI(sessionUser);
     },
 
@@ -272,7 +339,7 @@ const LoginModule = {
         const btnUploadSigtap = document.getElementById('btnUploadSigtap');
         const navMenuAdmin = document.getElementById('navMenuAdmin'); // Container do Menu Administração
 
-        // ADM (Airton) -> Acesso a tudo
+        // ADM -> Acesso a tudo
         if (role === 'ADM') {
             if (btnLimpar) btnLimpar.classList.remove('hidden');
             if (btnSupabase) btnSupabase.classList.remove('hidden');
@@ -327,12 +394,12 @@ const LoginModule = {
         this.updateRequirementUI('req-special', false);
     },
 
-    handleLogout() {
+    async handleLogout() {
         const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
         if (userStr) {
             try {
                 const user = JSON.parse(userStr);
-                this.logAction(user.username, 'LOGOUT');
+                await this.logAction(user.username, 'LOGOUT');
             } catch(e) {}
         }
         
@@ -342,7 +409,19 @@ const LoginModule = {
         this.showLoginUI();
     },
 
-    logAction(username, action) {
+    async logAction(username, action) {
+        const desc = action === 'LOGIN' ? 'Login realizado' : 'Logout realizado';
+        
+        // Registrar na nuvem (Supabase) se conectado
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            try {
+                await window.SupabaseService.logAction(username, action, 'SISTEMA', desc);
+            } catch (err) {
+                console.error("Erro ao salvar log no Supabase:", err);
+            }
+        }
+
+        // Salvar localmente como fallback
         let history = [];
         try { 
             history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); 
@@ -353,10 +432,10 @@ const LoginModule = {
             user: username,
             action: action,
             module: 'SISTEMA',
-            desc: action === 'LOGIN' ? 'Login realizado' : 'Logout realizado'
+            desc: desc
         });
         
-        // Manter os últimos 100 registros para evitar sobrecarga de localStorage
+        // Manter os últimos 100 registros locais
         if(history.length > 100) history = history.slice(0, 100);
         localStorage.setItem('argos_user_history', JSON.stringify(history));
     },

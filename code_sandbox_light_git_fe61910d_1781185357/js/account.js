@@ -4,25 +4,24 @@
  */
 
 const AccountModule = {
-    init() {
-        this.renderProfileData();
-        this.renderActionHistory();
+    async init() {
+        await this.refreshAccountView();
 
         // Sempre que clicar no footer (botão do perfil), atualiza a view para dados em tempo real
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', async (e) => {
             const footerUser = e.target.closest('#headerUser');
             if (footerUser) {
-                this.refreshAccountView();
+                await this.refreshAccountView();
             }
         });
     },
 
-    refreshAccountView() {
-        this.renderProfileData();
-        this.renderActionHistory();
+    async refreshAccountView() {
+        await this.renderProfileData();
+        await this.renderActionHistory();
     },
 
-    renderProfileData() {
+    async renderProfileData() {
         const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
         if (!userStr) return;
 
@@ -45,7 +44,16 @@ const AccountModule = {
 
             // Busca último login do histórico do usuário
             let history = [];
-            try { history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); } catch(e){}
+            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+                try {
+                    history = await window.SupabaseService.getUserActionHistory(user.username);
+                } catch (err) {
+                    console.error("Erro ao carregar log no Supabase, usando local:", err);
+                    history = JSON.parse(localStorage.getItem('argos_user_history') || '[]');
+                }
+            } else {
+                try { history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); } catch(e){}
+            }
             
             const logins = history.filter(h => h.action === 'LOGIN' && h.user === user.username);
             if(elLastLogin) {
@@ -60,21 +68,33 @@ const AccountModule = {
         }
     },
 
-    renderActionHistory() {
+    async renderActionHistory() {
         const tbody = document.getElementById('historyTableBody');
         if (!tbody) return;
-
-        let history = [];
-        try { history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); } catch(e){}
 
         const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
         if (!userStr) return;
         
         let currentUser = null;
         try { currentUser = JSON.parse(userStr).username; } catch(e){}
+        if (!currentUser) return;
 
-        // Filtrar apenas histórico do usuário atual
-        const userHistory = history.filter(h => h.user === currentUser);
+        let userHistory = [];
+
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            try {
+                userHistory = await window.SupabaseService.getUserActionHistory(currentUser);
+            } catch (err) {
+                console.error("Erro ao buscar logs do Supabase, usando local:", err);
+                let history = [];
+                try { history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); } catch(e){}
+                userHistory = history.filter(h => h.user === currentUser);
+            }
+        } else {
+            let history = [];
+            try { history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); } catch(e){}
+            userHistory = history.filter(h => h.user === currentUser);
+        }
 
         if (userHistory.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;">Nenhum registro de ação encontrado.</td></tr>';
@@ -86,7 +106,8 @@ const AccountModule = {
             const tr = document.createElement('tr');
             
             const dateStr = this.formatDateStr(reg.date);
-            const badgeClass = reg.action === 'LOGIN' ? 'badge-login' : 'badge-logout';
+            const badgeClass = reg.action === 'LOGIN' ? 'badge-login' : 
+                               reg.action === 'LOGOUT' ? 'badge-logout' : 'badge-general';
 
             tr.innerHTML = `
                 <td>${dateStr}</td>
@@ -118,3 +139,5 @@ const AccountModule = {
 document.addEventListener('DOMContentLoaded', () => {
     AccountModule.init();
 });
+
+window.AccountModule = AccountModule;

@@ -12,17 +12,22 @@ const UsersModule = {
         this.bindEvents();
     },
 
-    loadUsers() {
+    async loadUsers() {
         try {
-            this.users = JSON.parse(localStorage.getItem(this.dbKey) || '[]');
+            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+                this.users = await window.SupabaseService.getUsers();
+            } else {
+                this.users = JSON.parse(localStorage.getItem(this.dbKey) || '[]');
+            }
         } catch(e) {
+            console.error("Erro ao carregar usuários:", e);
             this.users = [];
         }
         this.renderKPIs();
         this.renderTable(this.users);
     },
 
-    saveUsers() {
+    saveUsersLocal() {
         localStorage.setItem(this.dbKey, JSON.stringify(this.users));
         this.loadUsers();
     },
@@ -45,7 +50,7 @@ const UsersModule = {
                 const filtered = this.users.filter(u => 
                     u.name.toLowerCase().includes(term) || 
                     u.username.toLowerCase().includes(term) ||
-                    u.email.toLowerCase().includes(term)
+                    (u.email && u.email.toLowerCase().includes(term))
                 );
                 this.renderTable(filtered);
             });
@@ -110,12 +115,14 @@ const UsersModule = {
             const isMe = currentUser && currentUser.username === u.username;
             const nameHtml = isMe ? `${u.name} <span style="background:#e0f2f1;color:#00796b;font-size:0.6rem;padding:2px 6px;border-radius:10px;margin-left:5px;">Você</span>` : u.name;
 
+            const registerDate = u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : (u.createdAt ? u.createdAt.split(',')[0] : '-');
+
             tr.innerHTML = `
                 <td style="font-weight:600;">${nameHtml}</td>
                 <td>${u.email}</td>
                 <td>${roleBadge}</td>
                 <td>${statusBadge}</td>
-                <td>${u.createdAt || '-'}</td>
+                <td>${registerDate}</td>
                 <td>${lastLogin}</td>
                 <td style="text-align:right;">
                     ${this.getActionButtons(u, isMe)}
@@ -185,7 +192,7 @@ const UsersModule = {
             document.getElementById('userEmail').value = user.email;
             document.getElementById('userRole').value = user.role;
             
-            // Ocultar campo de senha na edição (senha é feita por botão específico)
+            // Ocultar campo de senha na edição
             divPassword.style.display = 'none';
             passInput.removeAttribute('required');
         } else {
@@ -202,7 +209,7 @@ const UsersModule = {
         document.getElementById('modalUser').classList.add('hidden');
     },
 
-    handleSaveUser(e) {
+    async handleSaveUser(e) {
         e.preventDefault();
         
         const originalLogin = document.getElementById('userOriginalLogin').value;
@@ -210,11 +217,14 @@ const UsersModule = {
         const email = document.getElementById('userEmail').value.trim();
         const role = document.getElementById('userRole').value;
         
-        // Simular username baseado no email para o sistema
+        // O username será baseado no email
         const username = email;
 
+        const isOnline = window.SupabaseConfig && window.SupabaseConfig.isConnected();
+        const loggedUser = this.getCurrentUser();
+
         if (originalLogin) {
-            // Edição
+            // --- EDIÇÃO ---
             const userIndex = this.users.findIndex(u => u.username === originalLogin);
             if (userIndex > -1) {
                 // Verificar se novo email já existe em outro user
@@ -224,17 +234,35 @@ const UsersModule = {
                     return;
                 }
 
-                this.users[userIndex].name = name;
-                this.users[userIndex].email = email;
-                this.users[userIndex].username = username;
-                this.users[userIndex].role = role;
-                
-                this.saveUsers();
+                const updatedUser = {
+                    ...this.users[userIndex],
+                    name: name,
+                    email: email,
+                    username: username,
+                    role: role
+                };
+
+                if (isOnline) {
+                    try {
+                        await window.SupabaseService.upsertUser(updatedUser);
+                        if (loggedUser) {
+                            await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'EDICAO_USUARIO', `Usuário ${name} (${username}) editado.`);
+                        }
+                    } catch (err) {
+                        alert("Erro ao salvar no Supabase: " + err.message);
+                        return;
+                    }
+                } else {
+                    this.users[userIndex] = updatedUser;
+                    this.saveUsersLocal();
+                }
+
+                await this.loadUsers();
                 if (window.LoginModule) LoginModule.showToast('Usuário atualizado com sucesso!', 'success');
                 this.closeModal();
             }
         } else {
-            // Novo
+            // --- NOVO USUÁRIO ---
             const password = document.getElementById('userPassword').value;
             
             // Validar regras de senha
@@ -263,8 +291,22 @@ const UsersModule = {
                 createdAt: created
             };
 
-            this.users.unshift(newUser);
-            this.saveUsers();
+            if (isOnline) {
+                try {
+                    await window.SupabaseService.upsertUser(newUser);
+                    if (loggedUser) {
+                        await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'CADASTRO_USUARIO', `Novo usuário ${name} (${username}) cadastrado.`);
+                    }
+                } catch (err) {
+                    alert("Erro ao salvar no Supabase: " + err.message);
+                    return;
+                }
+            } else {
+                this.users.unshift(newUser);
+                this.saveUsersLocal();
+            }
+
+            await this.loadUsers();
             if (window.LoginModule) LoginModule.showToast('Usuário criado com sucesso!', 'success');
             this.closeModal();
         }
@@ -274,36 +316,74 @@ const UsersModule = {
         this.openModal(login);
     },
 
-    toggleBlock(login) {
+    async toggleBlock(login) {
         const user = this.users.find(u => u.username === login);
         if (!user) return;
 
+        const isOnline = window.SupabaseConfig && window.SupabaseConfig.isConnected();
+        const loggedUser = this.getCurrentUser();
+        let newStatus = '';
+
         if (user.status === 'BLOQUEADO') {
-            user.status = 'ATIVO';
-            if (window.LoginModule) LoginModule.showToast(`Usuário ${user.name} foi desbloqueado.`, 'success');
+            newStatus = 'ATIVO';
         } else {
             if (confirm(`Tem certeza que deseja bloquear o acesso de ${user.name}?`)) {
-                user.status = 'BLOQUEADO';
-                if (window.LoginModule) LoginModule.showToast(`Usuário ${user.name} bloqueado.`, 'warn');
+                newStatus = 'BLOQUEADO';
             } else {
                 return;
             }
         }
-        this.saveUsers();
+
+        if (isOnline) {
+            try {
+                await window.SupabaseService.updateUserStatus(login, newStatus);
+                if (loggedUser) {
+                    await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'STATUS_USUARIO', `Usuário ${user.name} alterado para status ${newStatus}.`);
+                }
+                if (window.LoginModule) LoginModule.showToast(`Usuário ${user.name} está ${newStatus === 'ATIVO' ? 'desbloqueado' : 'bloqueado'}.`, 'success');
+            } catch (err) {
+                alert("Erro ao atualizar status no Supabase: " + err.message);
+                return;
+            }
+        } else {
+            user.status = newStatus;
+            this.saveUsersLocal();
+            if (window.LoginModule) LoginModule.showToast(`Usuário ${user.name} está ${newStatus === 'ATIVO' ? 'desbloqueado' : 'bloqueado'}.`, 'success');
+        }
+        await this.loadUsers();
     },
 
-    deleteUser(login) {
-        const userIndex = this.users.findIndex(u => u.username === login);
-        if (userIndex === -1) return;
+    async deleteUser(login) {
+        const user = this.users.find(u => u.username === login);
+        if (!user) return;
 
-        if (confirm(`Atenção: Tem certeza que deseja excluir permanentemente o usuário ${this.users[userIndex].name}?`)) {
-            this.users.splice(userIndex, 1);
-            this.saveUsers();
+        if (confirm(`Atenção: Tem certeza que deseja excluir permanentemente o usuário ${user.name}?`)) {
+            const isOnline = window.SupabaseConfig && window.SupabaseConfig.isConnected();
+            const loggedUser = this.getCurrentUser();
+
+            if (isOnline) {
+                try {
+                    await window.SupabaseService.deleteUser(login);
+                    if (loggedUser) {
+                        await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'EXCLUSAO_USUARIO', `Usuário ${user.name} (${login}) excluído.`);
+                    }
+                } catch (err) {
+                    alert("Erro ao excluir usuário no Supabase: " + err.message);
+                    return;
+                }
+            } else {
+                const userIndex = this.users.findIndex(u => u.username === login);
+                if (userIndex > -1) {
+                    this.users.splice(userIndex, 1);
+                    this.saveUsersLocal();
+                }
+            }
+            await this.loadUsers();
             if (window.LoginModule) LoginModule.showToast('Usuário excluído com sucesso.', 'info');
         }
     },
 
-    resetPassword(login) {
+    async resetPassword(login) {
         const user = this.users.find(u => u.username === login);
         if (!user) return;
 
@@ -315,8 +395,23 @@ const UsersModule = {
             return;
         }
 
-        user.password = newPass;
-        this.saveUsers();
+        const isOnline = window.SupabaseConfig && window.SupabaseConfig.isConnected();
+        const loggedUser = this.getCurrentUser();
+
+        if (isOnline) {
+            try {
+                await window.SupabaseService.resetPassword(login, newPass);
+                if (loggedUser) {
+                    await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'SENHA_USUARIO', `Senha de ${user.name} redefinida.`);
+                }
+            } catch (err) {
+                alert("Erro ao redefinir senha no Supabase: " + err.message);
+                return;
+            }
+        } else {
+            user.password = newPass;
+            this.saveUsersLocal();
+        }
         if (window.LoginModule) LoginModule.showToast(`Senha redefinida para ${user.name}.`, 'success');
     }
 };
@@ -324,3 +419,5 @@ const UsersModule = {
 document.addEventListener('DOMContentLoaded', () => {
     UsersModule.init();
 });
+
+window.UsersModule = UsersModule;
