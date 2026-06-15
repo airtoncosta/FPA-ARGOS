@@ -180,15 +180,16 @@ function bindLogoUpload() {
                         if (user.username) {
                             await SupabaseService.logAction(user.username, 'ARQUIVOS', 'UPLOAD_LOGO', 'Nova logomarca do PDF enviada.');
                         }
+                        hideLoading();
+                        showToast('✅ Logomarca salva com sucesso na Nuvem! O próximo PDF já usará sua logo.', 'success');
                     } catch (err) {
                         console.error("Erro ao salvar logo no Supabase:", err);
-                        showToast('⚠️ Salvo localmente, erro ao enviar para nuvem.', 'warn');
-                    } finally {
                         hideLoading();
+                        showToast('⚠️ Logo salva LOCALMENTE, erro ao enviar para nuvem. Verifique sua conexão ou chaves do Supabase.', 'warn');
                     }
+                } else {
+                    showToast('✅ Logomarca salva com sucesso LOCALMENTE! O próximo PDF já usará sua logo.', 'success');
                 }
-
-                showToast('✅ Logomarca salva com sucesso! O próximo PDF já usará sua logo.', 'success');
             } catch(err) {
                 console.error(err);
                 showToast('❌ Erro: Imagem muito grande para salvar no navegador.', 'error');
@@ -1533,14 +1534,17 @@ function bindImportSigtap() {
                     if (user.username) {
                         await SupabaseService.logAction(user.username, 'ARQUIVOS', 'IMPORTACAO_SIGTAP', `Tabela SIGTAP (${file.name}) sincronizada na nuvem.`);
                     }
+                    hideLoading();
+                    showToast(`✅ Tabela SIGTAP carregada com ${Object.keys(sigtapMap).length} itens na Nuvem!`, 'success');
                 } catch (err) {
                     console.error("Erro ao sincronizar SIGTAP no Supabase:", err);
-                    showToast('⚠️ SIGTAP salvo localmente, erro ao sincronizar nuvem.', 'warn');
+                    hideLoading();
+                    showToast(`⚠️ SIGTAP com ${Object.keys(sigtapMap).length} itens salvo LOCALMENTE, erro ao sincronizar nuvem. Verifique sua conexão ou chaves do Supabase.`, 'warn');
                 }
+            } else {
+                hideLoading();
+                showToast(`✅ Tabela SIGTAP carregada com ${Object.keys(sigtapMap).length} itens localmente!`, 'success');
             }
-            
-            hideLoading();
-            showToast(`✅ Tabela SIGTAP carregada com ${Object.keys(sigtapMap).length} itens!`, 'success');
             
             if (APP_STATE.data) {
                 const agg = buildAggregatedData(window.datasets);
@@ -2092,9 +2096,26 @@ function bindSupabase() {
 
     if (!btnConfig || !modal) return;
 
+    // Ajusta o botão de salvar para atuar como "Fechar" já que as chaves são gerenciadas automaticamente
+    if (btnSalvar) {
+        btnSalvar.innerHTML = '<i class="fas fa-check"></i> Fechar';
+        btnSalvar.style.backgroundColor = '#64748b';
+        btnSalvar.style.borderColor = '#64748b';
+    }
+
     btnConfig.addEventListener('click', () => {
         inpUrl.value = SupabaseConfig.getUrl();
         inpKey.value = SupabaseConfig.getAnonKey();
+        inpUrl.disabled = true;
+        inpKey.disabled = true;
+        
+        // Explicação amigável de que a conexão é automática e compartilhada
+        const pDesc = modal.querySelector('p');
+        if (pDesc) {
+            pDesc.innerHTML = 'As credenciais do banco de dados Supabase estão configuradas de forma automática e integrada para todos os usuários. Use a opção de teste abaixo para verificar o status do servidor.';
+            pDesc.style.color = '#0284c7';
+        }
+        
         divResult.style.display = 'none';
         modal.classList.remove('hidden');
     });
@@ -2104,26 +2125,10 @@ function bindSupabase() {
     });
 
     btnTestar.addEventListener('click', async () => {
-        const url = inpUrl.value.trim();
-        const key = inpKey.value.trim();
-
-        if (!url || !key) {
-            divResult.style.display = 'block';
-            divResult.style.backgroundColor = '#fee2e2';
-            divResult.style.color = '#991b1b';
-            divResult.textContent = 'Preencha ambos os campos para testar.';
-            return;
-        }
-
         divResult.style.display = 'block';
         divResult.style.backgroundColor = '#eff6ff';
         divResult.style.color = '#1e40af';
         divResult.textContent = 'Testando conexão...';
-
-        // Salva temporariamente para o teste conseguir rodar
-        const oldUrl = SupabaseConfig.getUrl();
-        const oldKey = SupabaseConfig.getAnonKey();
-        SupabaseConfig.setCredentials(url, key);
 
         const res = await SupabaseService.testConnection();
 
@@ -2136,35 +2141,10 @@ function bindSupabase() {
             divResult.style.color = '#991b1b';
             divResult.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${res.message}`;
         }
-
-        // Restaura credenciais antigas caso não tenha salvo definitivamente
-        if (oldUrl && oldKey) {
-            SupabaseConfig.setCredentials(oldUrl, oldKey);
-        } else {
-            SupabaseConfig.clearCredentials();
-        }
     });
 
-    btnSalvar.addEventListener('click', async () => {
-        const url = inpUrl.value.trim();
-        const key = inpKey.value.trim();
-
-        if (!url || !key) {
-            if (confirm('Deseja limpar as chaves de conexão e voltar ao Modo Local?')) {
-                SupabaseConfig.clearCredentials();
-                showToast('Conexão em nuvem desativada. Voltando para Modo Local.', 'info');
-                modal.classList.add('hidden');
-                setTimeout(() => window.location.reload(), 800);
-            }
-            return;
-        }
-
-        SupabaseConfig.setCredentials(url, key);
-        SupabaseService.init();
-        showToast('Credenciais do Supabase salvas! Conectando...', 'success');
+    btnSalvar.addEventListener('click', () => {
         modal.classList.add('hidden');
-        
-        setTimeout(() => window.location.reload(), 800);
     });
 }
 

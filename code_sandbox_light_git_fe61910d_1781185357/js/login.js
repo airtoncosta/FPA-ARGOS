@@ -297,7 +297,7 @@ const LoginModule = {
         this.loginUI(sessionUser);
     },
 
-    loginUI(user) {
+    async loginUI(user) {
         document.body.classList.add('logged-in');
         
         const loginContainer = document.getElementById('login-container');
@@ -322,9 +322,37 @@ const LoginModule = {
         // Aplicar as permissões e restrições baseadas no cargo
         this.applyPermissions(user.role);
 
+        // Sincronizar Logomarca e SIGTAP da nuvem (Supabase) ao logar
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected() && window.SupabaseService) {
+            try {
+                // Sincronizar Logo
+                const cloudLogo = await window.SupabaseService.loadLogo();
+                if (cloudLogo) {
+                    localStorage.setItem('argos_custom_logo', cloudLogo);
+                }
+            } catch(e) {
+                console.error("Erro ao carregar logo no login:", e);
+            }
+
+            try {
+                // Sincronizar SIGTAP
+                const cloudSigtap = await window.SupabaseService.loadSigtap();
+                if (cloudSigtap && Object.keys(cloudSigtap).length > 0) {
+                    window.SIGTAP = { ...(window.SIGTAP || {}), ...cloudSigtap };
+                    if (window.AppDB) {
+                        await window.AppDB.setItem('SIGTAP_DB', window.SIGTAP);
+                        const sigtapMeta = await window.AppDB.getItem('sigtap_meta') || { fileName: 'Nuvem Supabase', importDate: 'Sincronizado' };
+                        await window.AppDB.setItem('sigtap_meta', sigtapMeta);
+                    }
+                }
+            } catch(e) {
+                console.error("Erro ao carregar SIGTAP no login:", e);
+            }
+        }
+
         // Dispara re-render da central de arquivos caso o app principal esteja carregado
         if (window.renderArquivosManager) {
-            window.renderArquivosManager();
+            await window.renderArquivosManager();
         }
     },
 

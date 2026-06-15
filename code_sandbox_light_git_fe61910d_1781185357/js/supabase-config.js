@@ -6,16 +6,22 @@
 const SupabaseConfig = {
     // Chaves de conexão obtidas do painel do Supabase
     getUrl() {
-        return localStorage.getItem('ARGOS_SUPABASE_URL') || 'https://zrzaktbxzpjpyhidrsu.supabase.co';
+        // Remove chaves locais que possam estar desatualizadas ou inválidas no navegador
+        if (localStorage.getItem('ARGOS_SUPABASE_URL')) {
+            localStorage.removeItem('ARGOS_SUPABASE_URL');
+        }
+        return 'https://zrzaktbxzpyjpyhidrsu.supabase.co';
     },
     
     getAnonKey() {
-        return localStorage.getItem('ARGOS_SUPABASE_ANON_KEY') || 'sb_publishable_GzFTEW08CFV5XjA5JGPvVQ_ZkuMcAPh';
+        if (localStorage.getItem('ARGOS_SUPABASE_ANON_KEY')) {
+            localStorage.removeItem('ARGOS_SUPABASE_ANON_KEY');
+        }
+        return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyemFrdGJ4enB5anB5aGlkcnN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0OTg2NjIsImV4cCI6MjA5NzA3NDY2Mn0.db2d_4TFanE6KEJh7m8-nVBALvqv3erwwT8OJiMmU7k';
     },
 
     setCredentials(url, key) {
-        localStorage.setItem('ARGOS_SUPABASE_URL', url.trim());
-        localStorage.setItem('ARGOS_SUPABASE_ANON_KEY', key.trim());
+        // Credenciais gerenciadas de forma unificada e automática
     },
 
     clearCredentials() {
@@ -24,7 +30,7 @@ const SupabaseConfig = {
     },
 
     isConnected() {
-        return this.getUrl() !== '' && this.getAnonKey() !== '';
+        return true; // Sempre conectado à nuvem oficial do projeto
     },
 
     /**
