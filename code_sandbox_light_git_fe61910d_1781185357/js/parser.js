@@ -72,8 +72,8 @@ const Parser = {
      */
     parseFixedWidth(lines) {
         const data = {
-            municipio: 'BACABAL',
-            uf: 'MA',
+            municipio: '',
+            uf: '',
             sistema: 'SIA/SUS',
             competencia: '',
             ano: '',
@@ -96,6 +96,18 @@ const Parser = {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+
+            // Detectar Municipio e UF
+            if (line.includes('SISTEMA DE INFORMACOES AMBULATORIAIS')) {
+                const parts = line.split('SISTEMA DE INFORMACOES AMBULATORIAIS');
+                if (parts.length > 0) {
+                    const munUF = parts[0].trim();
+                    if (munUF.length > 2) {
+                        data.uf = munUF.slice(-2);
+                        data.municipio = munUF.slice(0, -2).trim();
+                    }
+                }
+            }
 
             // Detectar Competência
             // Ex: 03/06/2026             SINTESE DA PRODUCAO - JAN/2026                 12:23:42
@@ -139,9 +151,19 @@ const Parser = {
                 if (numMatch && currentUnidade) {
                     const textBeforeNumbers = line.substring(0, numMatch.index).trim();
                     const tokens = textBeforeNumbers.split(/\s+/);
-                    const cmp = tokens[0];
-                    const proc = tokens[3];
-                    const cboCode = tokens.length > 4 ? tokens[4] : '';
+                    const cmp = tokens[0] || 'Desconhecida';
+                    let proc = '';
+                    let cboCode = '';
+                    if (tokens.length >= 5) {
+                        proc = tokens[3];
+                        cboCode = tokens[4];
+                    } else if (tokens.length === 4) {
+                        proc = tokens[3];
+                    } else if (tokens.length === 3) {
+                        proc = tokens[2];
+                    } else {
+                        proc = tokens[1] || '0000000000';
+                    }
                     
                     const qtPrz = parseFloat(numMatch[1].replace(/\./g, '').replace(',', '.'));
                     const vlPrz = parseFloat(numMatch[2].replace(/\./g, '').replace(',', '.'));

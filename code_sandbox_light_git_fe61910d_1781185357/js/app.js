@@ -278,6 +278,15 @@ function loadData(data) {
     populateFilterMesAno();
     renderAll(data);
     document.getElementById('lblCompetencia').textContent = data.competencia || 'Sem competência';
+
+    const lblMunicipio = document.getElementById('lblMunicipio');
+    if (lblMunicipio) {
+        if (!data.municipio || data.competencia === 'Sem dados') {
+            lblMunicipio.textContent = 'SEM MUNICIPIO IMPORTADO';
+        } else {
+            lblMunicipio.textContent = `${data.municipio} — ${data.uf}`;
+        }
+    }
 }
 
 function setFilterStatus(status) {
@@ -292,7 +301,7 @@ function setFilterStatus(status) {
     }
 }
 
-function aggregateLinhas(linhas, cmpFallback, anoFallback) {
+function aggregateLinhas(linhas, cmpFallback, anoFallback, municipioFallback, ufFallback) {
     let uMap = {};
     let mesMap = {};
     let pMap = {};
@@ -406,6 +415,8 @@ function aggregateLinhas(linhas, cmpFallback, anoFallback) {
     return {
         competencia: cmpFallback,
         ano: anoFallback,
+        municipio: municipioFallback,
+        uf: ufFallback,
         unidades, faturamentoMensal, procedimentos, cbos, resumo
     };
 }
@@ -434,7 +445,7 @@ function getFilteredData() {
         if (f.procedimento !== 'all') linhas = linhas.filter(l => l.proc === f.procedimento);
         if (f.cbo !== 'all') linhas = linhas.filter(l => l.cbo === f.cbo);
 
-        const agg = aggregateLinhas(linhas, window.datasets[0].competencia, window.datasets[0].ano);
+        const agg = aggregateLinhas(linhas, window.datasets[0].competencia, window.datasets[0].ano, window.datasets[0].municipio, window.datasets[0].uf);
         
         if (f.status !== 'all') {
             agg.unidades = agg.unidades.filter(u => classificarStatus(u.pctAprovacaoVal).status === f.status.toUpperCase());
