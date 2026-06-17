@@ -102,9 +102,13 @@ const Parser = {
                 const parts = line.split('SISTEMA DE INFORMACOES AMBULATORIAIS');
                 if (parts.length > 0) {
                     const munUF = parts[0].trim();
-                    if (munUF.length > 2) {
-                        data.uf = munUF.slice(-2);
-                        data.municipio = munUF.slice(0, -2).trim();
+                    const ufMatch = munUF.match(/^(.*?)\s+([A-Z]{2})$/i);
+                    if (ufMatch) {
+                        data.municipio = ufMatch[1].trim();
+                        data.uf = ufMatch[2].toUpperCase();
+                    } else {
+                        data.municipio = munUF;
+                        data.uf = 'MA'; // Padrão
                     }
                 }
             }

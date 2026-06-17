@@ -287,6 +287,51 @@ const SupabaseService = {
     },
 
     /**
+     * Salva o histórico de logomarcas no banco
+     */
+    async saveLogoHistory(historyArray) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        try {
+            const { error } = await this.client
+                .from('configuracoes')
+                .upsert({
+                    chave: 'logo_history_array',
+                    valor: JSON.stringify(historyArray),
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'chave' });
+
+            if (error) throw error;
+            return { success: true };
+        } catch (e) {
+            console.error('Erro ao salvar histórico de logomarca no Supabase:', e);
+            throw e;
+        }
+    },
+
+    /**
+     * Retorna o histórico de logomarcas salvo na nuvem
+     */
+    async loadLogoHistory() {
+        if (!this.init()) return null;
+
+        try {
+            const { data, error } = await this.client
+                .from('configuracoes')
+                .select('valor')
+                .eq('chave', 'logo_history_array')
+                .limit(1);
+
+            if (error) throw error;
+            if (data && data.length > 0) return JSON.parse(data[0].valor);
+            return null;
+        } catch (e) {
+            console.error('Erro ao carregar histórico de logomarca do Supabase:', e);
+            return null;
+        }
+    },
+
+    /**
      * Remove a logomarca da nuvem
      */
     async deleteLogo() {

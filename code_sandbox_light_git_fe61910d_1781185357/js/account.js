@@ -23,15 +23,21 @@ const AccountModule = {
 
     async renderProfileData() {
         const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
-        if (!userStr) return;
+        const elNome = document.getElementById('accNome');
+        const elUsername = document.getElementById('accUsername');
+        const elRole = document.getElementById('accRole');
+        const elLastLogin = document.getElementById('accLastLogin');
+
+        if (!userStr) {
+            if(elNome) elNome.textContent = '-';
+            if(elUsername) elUsername.textContent = '-';
+            if(elRole) elRole.textContent = '-';
+            if(elLastLogin) elLastLogin.textContent = '-';
+            return;
+        }
 
         try {
             const user = JSON.parse(userStr);
-            const elNome = document.getElementById('accNome');
-            const elUsername = document.getElementById('accUsername');
-            const elRole = document.getElementById('accRole');
-            const elLastLogin = document.getElementById('accLastLogin');
-
             if(elNome) elNome.textContent = user.name || '-';
             if(elUsername) elUsername.textContent = user.email || user.username || '-';
             
@@ -73,7 +79,10 @@ const AccountModule = {
         if (!tbody) return;
 
         const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
-        if (!userStr) return;
+        if (!userStr) {
+            tbody.innerHTML = '';
+            return;
+        }
         
         let currentUser = null;
         try { currentUser = JSON.parse(userStr).username; } catch(e){}

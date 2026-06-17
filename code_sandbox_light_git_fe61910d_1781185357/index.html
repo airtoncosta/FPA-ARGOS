@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +9,9 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;700;900&family=Roboto+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- SheetJS for Excel export -->
@@ -17,1378 +20,1728 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.6.0/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
+
 <body>
 
-<!-- ===== TELA DE LOGIN (SOBREPOSIÇÃO) ===== -->
-<div id="login-container" class="hidden">
-    <!-- Vídeo de Plano de Fundo Loop -->
-    <video autoplay loop muted playsinline id="login-video-bg">
-        <source src="img/logo_background.mp4" type="video/mp4">
-    </video>
-    <div class="login-overlay"></div>
-    
-    <div class="login-card">
-        <div class="login-logo-area">
-            <div class="login-logo-img">
-                <img src="img/logo.jpg" alt="Logo Argos FPA">
-            </div>
-            <h1 class="login-title"><span class="argos-highlight-login">ARGOS</span> FPA</h1>
-            <p class="login-subtitle">Ver Mais. Decidir Melhor.</p>
-            <p class="login-instruction">Faça login para acessar o sistema</p>
-        </div>
-        
-        <!-- MENSAGEM DE ERRO INLINE -->
-        <div id="login-error-msg" class="hidden" style="background-color: #ffebee; color: #c62828; padding: 10px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; text-align: center; margin-bottom: 15px; border-left: 4px solid #c62828;"></div>
-        
-        <form id="login-form">
-            <div class="login-input-group">
-                <label for="login-username" style="font-size: 1.05rem; font-weight: 700; color: var(--sus-blue); margin-bottom: 8px;"><i class="fas fa-user-circle" style="font-size: 1.2rem; margin-right: 6px;"></i> Nome de Acesso ou E-mail</label>
-                <div class="login-input-wrapper">
-                    <i class="fas fa-user input-icon"></i>
-                    <input type="text" id="login-username" required placeholder="Digite seu Usuário Aqui">
+    <!-- ===== TELA DE LOGIN (SOBREPOSIÇÃO) ===== -->
+    <div id="login-container" class="hidden">
+        <!-- Vídeo de Plano de Fundo Loop -->
+        <video autoplay loop muted playsinline id="login-video-bg">
+            <source src="img/logo_background.mp4" type="video/mp4">
+        </video>
+        <div class="login-overlay"></div>
+
+        <div class="login-card">
+            <div class="login-logo-area">
+                <div class="cyber-eye-logo" title="Radar Argos">
+                    <div class="eye-image-wrapper">
+                        <!-- Salve a imagem que você enviou dentro da pasta img com o nome olho-cyber.png -->
+                        <img src="img/olho-cyber.png" alt="Olho Tecnológico" id="eye-custom-img">
+                    </div>
+                    <div class="eye-inner">
+                        <div class="radar-sweep"></div>
+                        <div class="radar-dot"></div>
+                    </div>
                 </div>
+                <h1 class="login-title"><span class="argos-highlight-login">ARGOS</span> FPA</h1>
+                <p class="login-subtitle">Monitoramento Inteligente. Gestão Eficiente.</p>
+                <p class="login-instruction">Faça login para acessar o sistema</p>
             </div>
-            
-            <div class="login-input-group">
-                <label for="login-password" style="font-size: 1.05rem; font-weight: 700; color: var(--sus-blue); margin-bottom: 8px;"><i class="fas fa-key" style="font-size: 1.2rem; margin-right: 6px;"></i> Senha</label>
-                <div class="login-input-wrapper">
-                    <i class="fas fa-lock input-icon"></i>
-                    <input type="password" id="login-password" required placeholder="Sua senha">
-                    <i class="fas fa-eye toggle-password" id="toggle-password-visibility"></i>
+
+            <!-- MENSAGEM DE ERRO INLINE -->
+            <div id="login-error-msg" class="hidden"
+                style="background-color: #ffebee; color: #c62828; padding: 10px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; text-align: center; margin-bottom: 15px; border-left: 4px solid #c62828;">
+            </div>
+
+            <form id="login-form">
+                <div class="login-input-group">
+                    <label for="login-username"
+                        style="font-size: 1.05rem; font-weight: 700; color: #e2e8f0; margin-bottom: 8px;"><i
+                            class="fas fa-user-circle" style="font-size: 1.2rem; margin-right: 6px;"></i> Nome de Acesso
+                        ou E-mail</label>
+                    <div class="login-input-wrapper">
+                        <i class="fas fa-user input-icon"></i>
+                        <input type="text" id="login-username" required placeholder="Digite seu Usuário Aqui">
+                    </div>
                 </div>
-                <!-- Requisitos mínimos de senha -->
-                <div class="password-requirements" id="password-reqs">
-                    <div class="requirement-item" id="req-letter"><i class="fas fa-circle"></i> Pelo menos uma letra</div>
-                    <div class="requirement-item" id="req-number"><i class="fas fa-circle"></i> Pelo menos um número</div>
-                    <div class="requirement-item" id="req-special"><i class="fas fa-circle"></i> Pelo menos um caractere especial (@, #, etc.)</div>
+
+                <div class="login-input-group">
+                    <label for="login-password"
+                        style="font-size: 1.05rem; font-weight: 700; color: #e2e8f0; margin-bottom: 8px;"><i
+                            class="fas fa-key" style="font-size: 1.2rem; margin-right: 6px;"></i> Senha</label>
+                    <div class="login-input-wrapper">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" id="login-password" required placeholder="Sua senha">
+                        <i class="fas fa-eye toggle-password" id="toggle-password-visibility"></i>
+                    </div>
+                    <!-- Requisitos mínimos de senha -->
+                    <div class="password-requirements" id="password-reqs">
+                        <div class="requirement-item" id="req-letter"><i class="fas fa-circle"></i> Pelo menos uma letra
+                        </div>
+                        <div class="requirement-item" id="req-number"><i class="fas fa-circle"></i> Pelo menos um número
+                        </div>
+                        <div class="requirement-item" id="req-special"><i class="fas fa-circle"></i> Pelo menos um
+                            caractere especial (@, #, etc.)</div>
+                    </div>
                 </div>
+
+                <div class="login-options">
+                    <label>
+                        <input type="checkbox" id="login-remember"> Lembrar-me neste navegador
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-login" id="btn-login-submit">
+                    <i class="fas fa-sign-in-alt"></i> Entrar no Sistema
+                </button>
+            </form>
+
+            <div class="login-divider"></div>
+
+            <div class="login-footer">
+                <div class="restricted-access"><i class="fas fa-shield-alt"></i> Sistema interno · Acesso restrito</div>
+                <div class="scaar-info scaar-highlight">
+                    SCAAR – Superintendência de Controle, Avaliação, Auditoria e Regulação</div>
+                <div class="made-by">Feito com <span class="heart-pulse">❤</span> por Airton Costa</div>
             </div>
-            
-            <div class="login-options">
-                <label>
-                    <input type="checkbox" id="login-remember"> Lembrar-me neste navegador
-                </label>
-            </div>
-            
-            <button type="submit" class="btn-login" id="btn-login-submit">
-                <i class="fas fa-sign-in-alt"></i> Entrar no Sistema
-            </button>
-        </form>
-        
-        <div class="login-divider"></div>
-        
-        <div class="login-footer">
-            <div class="restricted-access"><i class="fas fa-shield-alt"></i> Sistema interno · Acesso restrito</div>
-            <div class="scaar-info" style="font-weight: 600; color: var(--sus-blue); margin-bottom: 6px; font-size: 0.65rem; letter-spacing: 0.2px; white-space: nowrap;">SCAAR – Superintendência de Controle, Avaliação, Auditoria e Regulação</div>
-            <div class="made-by">Feito com <span class="heart-pulse">❤</span> por Airton Costa</div>
         </div>
     </div>
-</div>
 
-<!-- ===== TOP HEADER ===== -->
-<header id="main-header">
-    <div class="header-brand">
-        <div class="brand-logo" style="overflow: hidden; padding: 0; display: flex; align-items: center; justify-content: center;">
-            <img src="img/logo.jpg" alt="Argos Logo" style="width: 100%; height: 100%; object-fit: cover;">
+    <!-- ===== TOP HEADER ===== -->
+    <header id="main-header">
+        <div class="header-brand">
+            <div class="brand-logo">
+                <img src="img/olho-cyber.png" alt="Argos Logo">
+            </div>
+            <div class="brand-info">
+                <span class="brand-name"><span class="argos-highlight">ARGOS</span> FPA</span>
+                <span class="brand-sub">Monitoramento Inteligente. Gestão Eficiente.</span>
+            </div>
         </div>
-        <div class="brand-info">
-            <span class="brand-name"><span class="argos-highlight">ARGOS</span> FPA</span>
-            <span class="brand-sub">Ver Mais. Decidir Melhor.</span>
-        </div>
-    </div>
-    <div class="header-meta">
-        <div class="header-municipality">
-            <i class="fas fa-map-marker-alt"></i>
-            <span id="lblMunicipio">SEM MUNICIPIO IMPORTADO</span>
-        </div>
-        <div class="header-competencia" id="headerCompetencia">
-            <i class="fas fa-calendar-alt"></i>
-            <span id="lblCompetencia">Jan–Abr / 2026</span>
-        </div>
-        <div class="header-actions">
-            <button class="btn-header" id="btnImportar" title="Importar TXT SIA/SUS">
-                <i class="fas fa-file-import"></i><span>Importar</span>
-            </button>
-            <button class="btn-header" id="btnLimparDados" title="Limpar Banco de Dados" style="color: #ffcccc;">
-                <i class="fas fa-trash"></i><span>Limpar DB</span>
-            </button>
-            <button class="btn-header btn-argos" id="btnArgosAI" title="IA Analítica Argos">
-                <i class="fas fa-robot"></i><span>Argos IA</span>
-            </button>
-            <button class="btn-header" id="btnConfigSupabase" title="Conexão Supabase (Nuvem)" style="color: #3ecf8e; border: 1px solid rgba(62, 207, 142, 0.3); border-radius: 4px; padding: 4px 8px;">
-                <i class="fas fa-database"></i><span>Supabase</span>
-            </button>
-        </div>
-        
+        <div class="header-meta">
+            <div class="header-municipality">
+                <i class="fas fa-map-marker-alt"></i>
+                <span id="lblMunicipio">SEM MUNICIPIO IMPORTADO</span>
+            </div>
+            <div class="header-competencia" id="headerCompetencia">
+                <i class="fas fa-calendar-alt"></i>
+                <span id="lblCompetencia">Jan–Abr / 2026</span>
+            </div>
+            <div class="header-actions">
+                <button class="btn-header" id="btnImportar" title="Importar TXT SIA/SUS">
+                    <i class="fas fa-file-import"></i><span>Importar</span>
+                </button>
+                <button class="btn-header" id="btnLimparDados" title="Limpar Banco de Dados" style="color: #ffcccc;">
+                    <i class="fas fa-trash"></i><span>Limpar DB</span>
+                </button>
+                <button class="btn-header btn-argos" id="btnArgosAI" title="IA Analítica Argos">
+                    <i class="fas fa-robot"></i><span>Argos IA</span>
+                </button>
+                <button class="btn-header" id="btnConfigSupabase" title="Conexão Supabase (Nuvem)"
+                    style="color: #3ecf8e; border: 1px solid rgba(62, 207, 142, 0.3); border-radius: 4px; padding: 4px 8px;">
+                    <i class="fas fa-database"></i><span>Supabase</span>
+                </button>
+            </div>
 
-    </div>
-</header>
 
-<!-- ===== SIDEBAR NAV ===== -->
-<nav id="sidebar">
-    <ul class="nav-menu">
-        <li class="nav-item active" data-section="executivo">
-            <i class="fas fa-tachometer-alt"></i><span>Visão Geral</span>
-        </li>
-        <li class="nav-item" data-section="faturamento">
-            <i class="fas fa-dollar-sign"></i><span>Faturamento</span>
-        </li>
-        <li class="nav-item" data-section="eficiencia">
-            <i class="fas fa-chart-bar"></i><span>Eficiência</span>
-        </li>
-        <li class="nav-item" data-section="unidades">
-            <i class="fas fa-hospital"></i><span>Unidades</span>
-        </li>
-        <li class="nav-item" data-section="procedimentos">
-            <i class="fas fa-stethoscope"></i><span>Procedimentos</span>
-        </li>
-        <li class="nav-item" data-section="cbo">
-            <i class="fas fa-user-md"></i><span>Profissionais</span>
-        </li>
-        <li class="nav-item" data-section="glosas">
-            <i class="fas fa-exclamation-triangle"></i><span>Glosas</span>
-        </li>
-        <li class="nav-item" data-section="auditoria">
-            <i class="fas fa-search"></i><span>Auditoria</span>
-        </li>
-        <li class="nav-item" data-section="regulacao">
-            <i class="fas fa-traffic-light"></i><span>Regulação</span>
-        </li>
-        <li class="nav-item" data-section="relatorios">
-            <i class="fas fa-file-alt"></i><span>Relatórios</span>
-        </li>
-        <li class="nav-item" data-section="arquivos" style="border-top: 1px solid rgba(255,255,255,0.15); margin-top: 8px; padding-top: 14px;">
-            <i class="fas fa-folder-open"></i><span>Arquivos Importados</span>
-        </li>
-        <div id="navMenuAdmin" style="display: none;">
-            <li class="nav-header" style="padding: 15px 16px 5px; font-size: 0.65rem; color: rgba(255,255,255,0.4); text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">ADMINISTRAÇÃO</li>
-            <li class="nav-item" data-section="usuarios">
-                <i class="fas fa-users-cog"></i><span>Usuários</span>
+        </div>
+    </header>
+
+    <!-- ===== SIDEBAR NAV ===== -->
+    <nav id="sidebar">
+        <ul class="nav-menu">
+            <li class="nav-item active" data-section="executivo">
+                <i class="fas fa-tachometer-alt"></i><span>Visão Geral</span>
             </li>
-        </div>
-    </ul>
-
-    <div class="nav-footer sidebar-user-footer" id="headerUser" onclick="navigateTo('minha-conta')" style="cursor: pointer;" title="Acessar Minha Conta">
-        <i class="fas fa-user-circle"></i>
-        <div class="user-details">
-            <span id="userNameHeader">-</span>
-            <span id="userRoleHeader">-</span>
-        </div>
-        <button id="btnLogout" title="Sair do Sistema">
-            <i class="fas fa-sign-out-alt"></i>
-        </button>
-    </div>
-</nav>
-
-<!-- ===== MAIN CONTENT ===== -->
-<main id="main-content">
-
-    <!-- FILTER BAR -->
-    <div id="filter-bar">
-        <div class="filter-group">
-            <label><i class="fas fa-calendar"></i> Competência</label>
-            <select id="filterAno"><option value="2026">2026</option><option value="2025">2025</option></select>
-        </div>
-        <div class="filter-group">
-            <label><i class="fas fa-layer-group"></i> Mês</label>
-            <select id="filterMes">
-                <option value="all">Todos</option>
-                <option value="01">Janeiro</option>
-                <option value="02">Fevereiro</option>
-                <option value="03">Março</option>
-                <option value="04">Abril</option>
-            </select>
-        </div>
-        <div class="filter-group">
-            <label><i class="fas fa-hospital"></i> Unidade</label>
-            <select id="filterUnidade"><option value="all">Todas</option></select>
-        </div>
-        <div class="filter-group">
-            <label><i class="fas fa-stethoscope"></i> Procedimento</label>
-            <select id="filterProcedimento"><option value="all">Todos</option></select>
-        </div>
-        <div class="filter-group">
-            <label><i class="fas fa-user-md"></i> Profissional (CBO)</label>
-            <select id="filterCbo"><option value="all">Todos</option></select>
-        </div>
-        <div class="filter-group" style="display: none;">
-            <label><i class="fas fa-star"></i> Status</label>
-            <select id="filterStatus">
-                <option value="all">Todos</option>
-                <option value="EXCELENTE">Excelente</option>
-                <option value="BOA">Boa</option>
-                <option value="REGULAR">Regular</option>
-                <option value="CRITICA">Crítica</option>
-            </select>
-        </div>
-        <button class="btn-filter-apply" id="btnAplicarFiltros">
-            <i class="fas fa-filter"></i> Aplicar
-        </button>
-        <button class="btn-filter-clear" id="btnLimparFiltros">
-            <i class="fas fa-times"></i> Limpar
-        </button>
-    </div>
-
-    <!-- ======================== SEÇÃO MINHA CONTA ======================== -->
-    <section id="section-minha-conta" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-id-badge"></i> Minha Conta</h2>
-            <div class="section-badge">Gestão de Perfil e Auditoria de Acessos</div>
-        </div>
-
-        <div class="account-container">
-            <!-- Dados do Perfil -->
-            <div class="account-card profile-card">
-                <div class="card-header">
-                    <h3><i class="fas fa-address-card"></i> Dados do Perfil</h3>
-                </div>
-                <div class="card-body">
-                    <div class="profile-info-row">
-                        <span class="info-label">Nome completo:</span>
-                        <span class="info-value" id="accNome">-</span>
-                    </div>
-                    <div class="profile-info-row">
-                        <span class="info-label">Nome de acesso:</span>
-                        <span class="info-value" id="accUsername">-</span>
-                    </div>
-                    <div class="profile-info-row">
-                        <span class="info-label">Perfil de Acesso:</span>
-                        <span class="info-value" id="accRole">-</span>
-                    </div>
-                    <div class="profile-info-row">
-                        <span class="info-label">Último login:</span>
-                        <span class="info-value" id="accLastLogin">-</span>
-                    </div>
-                    
-                    <button class="btn-change-password" onclick="alert('Funcionalidade de troca de senha em desenvolvimento.')">
-                        <i class="fas fa-key"></i> Trocar minha senha
-                    </button>
-                </div>
+            <li class="nav-item" data-section="faturamento">
+                <i class="fas fa-dollar-sign"></i><span>Faturamento</span>
+            </li>
+            <li class="nav-item" data-section="eficiencia">
+                <i class="fas fa-chart-bar"></i><span>Eficiência</span>
+            </li>
+            <li class="nav-item" data-section="unidades">
+                <i class="fas fa-hospital"></i><span>Unidades</span>
+            </li>
+            <li class="nav-item" data-section="procedimentos">
+                <i class="fas fa-stethoscope"></i><span>Procedimentos</span>
+            </li>
+            <li class="nav-item" data-section="cbo">
+                <i class="fas fa-user-md"></i><span>Profissionais</span>
+            </li>
+            <li class="nav-item" data-section="glosas">
+                <i class="fas fa-exclamation-triangle"></i><span>Glosas</span>
+            </li>
+            <li class="nav-item" data-section="auditoria">
+                <i class="fas fa-search"></i><span>Auditoria</span>
+            </li>
+            <li class="nav-item" data-section="regulacao">
+                <i class="fas fa-traffic-light"></i><span>Regulação</span>
+            </li>
+            <li class="nav-item" data-section="relatorios">
+                <i class="fas fa-file-alt"></i><span>Relatórios</span>
+            </li>
+            <li class="nav-item" data-section="arquivos"
+                style="border-top: 1px solid rgba(255,255,255,0.15); margin-top: 8px; padding-top: 14px;">
+                <i class="fas fa-folder-open"></i><span>Arquivos Importados</span>
+            </li>
+            <div id="navMenuAdmin" style="display: none;">
+                <li class="nav-header"
+                    style="padding: 15px 16px 5px; font-size: 0.65rem; color: rgba(255,255,255,0.4); text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">
+                    ADMINISTRAÇÃO</li>
+                <li class="nav-item" data-section="usuarios">
+                    <i class="fas fa-users-cog"></i><span>Usuários</span>
+                </li>
             </div>
+        </ul>
 
-            <!-- Histórico de Ações -->
-            <div class="account-card history-card">
-                <div class="card-header">
-                    <h3><i class="fas fa-history"></i> Histórico de Ações</h3>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table-history">
-                            <thead>
-                                <tr>
-                                    <th>DATA/HORA</th>
-                                    <th>AÇÃO</th>
-                                    <th>MÓDULO</th>
-                                    <th>DESCRIÇÃO</th>
-                                </tr>
-                            </thead>
-                            <tbody id="historyTableBody">
-                                <!-- Preenchido dinamicamente pelo JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <div class="nav-footer sidebar-user-footer" id="headerUser" onclick="navigateTo('minha-conta')"
+            style="cursor: pointer;" title="Acessar Minha Conta">
+            <div class="user-avatar-wrapper">
+                <i class="fas fa-user"></i>
             </div>
-        </div>
-    </section>
-
-    <!-- ======================== SEÇÃO USUÁRIOS (ADM) ======================== -->
-    <section id="section-usuarios" class="content-section">
-        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-            <div>
-                <h2><i class="fas fa-users"></i> Gerenciamento de Usuários</h2>
-                <div class="section-badge">Cadastre gerentes e usuários comuns, defina permissões e gerencie acessos</div>
+            <div class="user-details">
+                <span id="userNameHeader">-</span>
+                <span id="userRoleHeader">-</span>
             </div>
-            <button class="btn-filter-apply" id="btnNovoUsuario" style="background: linear-gradient(135deg, var(--sus-blue) 0%, var(--sus-blue-light) 100%);">
-                <i class="fas fa-user-plus"></i> Novo Usuário
+            <button id="btnLogout" title="Sair do Sistema">
+                <i class="fas fa-sign-out-alt"></i>
             </button>
         </div>
+    </nav>
 
-        <!-- KPI CARDS -->
-        <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 20px;">
-            <div class="kpi-card" style="border-left: 4px solid var(--sus-blue);">
-                <div class="kpi-body" style="padding: 10px 15px;">
-                    <div class="kpi-value" id="kpiTotalUsers" style="font-size: 1.5rem;">0</div>
-                    <div class="kpi-label" style="font-size: 0.65rem; text-transform: uppercase;">TOTAL</div>
-                </div>
-            </div>
-            <div class="kpi-card" style="border-left: 4px solid var(--sus-sky);">
-                <div class="kpi-body" style="padding: 10px 15px;">
-                    <div class="kpi-value" id="kpiAtivosUsers" style="font-size: 1.5rem;">0</div>
-                    <div class="kpi-label" style="font-size: 0.65rem; text-transform: uppercase;">ATIVOS</div>
-                </div>
-            </div>
-            <div class="kpi-card" style="border-left: 4px solid #f44336;">
-                <div class="kpi-body" style="padding: 10px 15px;">
-                    <div class="kpi-value" id="kpiBloqueadosUsers" style="font-size: 1.5rem;">0</div>
-                    <div class="kpi-label" style="font-size: 0.65rem; text-transform: uppercase;">BLOQUEADOS</div>
-                </div>
-            </div>
-            <div class="kpi-card" style="border-left: 4px solid #ff9800;">
-                <div class="kpi-body" style="padding: 10px 15px;">
-                    <div class="kpi-value" id="kpiAdminUsers" style="font-size: 1.5rem;">0</div>
-                    <div class="kpi-label" style="font-size: 0.65rem; text-transform: uppercase;">ADMINISTRADORES</div>
-                </div>
-            </div>
-            <div class="kpi-card" style="border-left: 4px solid #9e9e9e;">
-                <div class="kpi-body" style="padding: 10px 15px;">
-                    <div class="kpi-value" id="kpiComumUsers" style="font-size: 1.5rem;">0</div>
-                    <div class="kpi-label" style="font-size: 0.65rem; text-transform: uppercase;">GERENTES</div>
-                </div>
-            </div>
-        </div>
+    <!-- ===== MAIN CONTENT ===== -->
+    <main id="main-content">
 
-        <div class="account-card">
-            <div class="card-header" style="background: white; border-bottom: none; padding-bottom: 0;">
-                <div class="filter-group" style="max-width: 400px; margin: 0;">
-                    <label><i class="fas fa-search"></i> Buscar Usuário</label>
-                    <input type="text" id="searchUser" class="form-control" placeholder="Buscar por nome ou login..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--gray-200);">
-                </div>
+        <!-- FILTER BAR -->
+        <div id="filter-bar">
+            <div class="filter-card-header">
+                <span class="filter-header-title">
+                    <i class="fas fa-sliders-h"></i> FILTROS
+                </span>
+                <span class="filter-badge" id="filter-active-count">0 ativos</span>
             </div>
-            <div class="card-body" style="padding-top: 10px;">
-                <div class="table-responsive">
-                    <table class="table-history table-users">
-                        <thead>
-                            <tr>
-                                <th>NOME COMPLETO</th>
-                                <th>LOGIN</th>
-                                <th>PERFIL</th>
-                                <th>STATUS</th>
-                                <th>CADASTRADO EM</th>
-                                <th>ÚLTIMO LOGIN</th>
-                                <th style="text-align: right;">AÇÕES</th>
-                            </tr>
-                        </thead>
-                        <tbody id="usersTableBody">
-                            <!-- JS preenche -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Modais de Usuário -->
-    <div id="modalUser" class="modal-overlay hidden">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3 id="modalUserTitle">Novo Usuário</h3>
-                <button class="btn-close-modal" id="btnCloseModalUser"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body">
-                <form id="formUser">
-                    <input type="hidden" id="userOriginalLogin">
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Nome Completo</label>
-                        <input type="text" id="userName" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" required>
+            <div class="filter-card-body">
+                <div class="filter-inputs-grid">
+                    <div class="filter-group group-competencia">
+                        <label><i class="fas fa-calendar-alt"></i> Ano</label>
+                        <div class="select-wrapper">
+                            <select id="filterAno">
+                                <option value="all">Todos</option>
+                                <option value="2026">2026</option>
+                                <option value="2025">2025</option>
+                            </select>
+                            <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+                        </div>
                     </div>
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">E-mail / Login</label>
-                        <input type="text" id="userEmail" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" required>
+                    <div class="filter-group group-mes">
+                        <label><i class="fas fa-calendar-check"></i> Competência</label>
+                        <div class="select-wrapper">
+                            <select id="filterMes">
+                                <option value="all">Todos</option>
+                                <option value="01">Janeiro</option>
+                                <option value="02">Fevereiro</option>
+                                <option value="03">Março</option>
+                                <option value="04">Abril</option>
+                            </select>
+                            <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+                        </div>
                     </div>
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Perfil de Acesso</label>
-                        <select id="userRole" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            <option value="ADM">Administrador</option>
-                            <option value="GERENTE">Gerente</option>
-                        </select>
+                    <div class="filter-group group-unidade">
+                        <label><i class="fas fa-hospital"></i> Unidade</label>
+                        <div class="select-wrapper">
+                            <select id="filterUnidade">
+                                <option value="all">Todas</option>
+                            </select>
+                            <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+                        </div>
                     </div>
-                    <div class="form-group" style="margin-bottom: 15px;" id="divUserPassword">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Senha Inicial</label>
-                        <input type="text" id="userPassword" class="form-control" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Ex: Senha@123">
-                        <small style="color: var(--gray-500);">A senha deve ter letras, números e caractere especial.</small>
+                    <div class="filter-group group-procedimento">
+                        <label><i class="fas fa-stethoscope"></i> Procedimento</label>
+                        <div class="select-wrapper">
+                            <select id="filterProcedimento">
+                                <option value="all">Todos</option>
+                            </select>
+                            <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+                        </div>
                     </div>
-                    <div style="text-align: right; margin-top: 20px;">
-                        <button type="button" class="btn-filter-clear" id="btnCancelUser" style="padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer;">Cancelar</button>
-                        <button type="submit" class="btn-filter-apply" style="padding: 8px 15px; margin-left: 10px; border-radius: 4px; border: none; cursor: pointer;">Salvar Usuário</button>
+                    <div class="filter-group group-profissional">
+                        <label><i class="fas fa-user-circle"></i> Profissional (CBO)</label>
+                        <div class="select-wrapper">
+                            <select id="filterCbo">
+                                <option value="all">Todos</option>
+                            </select>
+                            <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+                        </div>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- ======================== SEÇÃO EXECUTIVO ======================== -->
-    <section id="section-executivo" class="content-section active">
-        <div class="section-header">
-            <h2><i class="fas fa-tachometer-alt"></i> Dashboard Executivo</h2>
-            <div class="section-badge" id="lblConsolidadoGeral">Consolidado Geral de Produção Ambulatorial — Sem Dados</div>
-        </div>
-
-        <!-- KPI CARDS ROW 1 -->
-        <div class="kpi-grid">
-            <div class="kpi-card kpi-blue">
-                <div class="kpi-icon"><i class="fas fa-list-ol"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Procedimentos Apresentados</div>
-                    <div class="kpi-value" id="kpiApresentados">259.964</div>
-                    <div class="kpi-trend"><i class="fas fa-arrow-up"></i> Total acumulado</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-green">
-                <div class="kpi-icon"><i class="fas fa-check-double"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Procedimentos Aprovados</div>
-                    <div class="kpi-value" id="kpiAprovados">257.720</div>
-                    <div class="kpi-trend kpi-ok"><i class="fas fa-check"></i> 99,14% de aprovação</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-red" style="cursor: pointer;" onclick="navigateTo('glosas')" title="Ver detalhes das glosas">
-                <div class="kpi-icon"><i class="fas fa-times-circle"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Procedimentos Glosados</div>
-                    <div class="kpi-value" id="kpiGlosados">2.244</div>
-                    <div class="kpi-trend kpi-warn"><i class="fas fa-exclamation"></i> 0,86% de glosa</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-indigo" style="cursor: pointer;" onclick="navigateTo('unidades')" title="Ver ranking de unidades">
-                <div class="kpi-icon"><i class="fas fa-building"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Unidades Produtoras</div>
-                    <div class="kpi-value" id="kpiUnidades">21</div>
-                    <div class="kpi-trend"><i class="fas fa-map-marker"></i> Bacabal/MA</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-purple" style="cursor: pointer;" onclick="navigateTo('procedimentos')">
-                <div class="kpi-icon"><i class="fas fa-medal"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Top Procedimento</div>
-                    <div class="kpi-value" id="kpiTopProcNome" style="font-size: 15px; margin-bottom: 4px; white-space: nowrap; overflow: visible; letter-spacing: -0.5px;">-</div>
-                    <div class="kpi-trend" style="display: block; margin-bottom: 2px;"><strong id="kpiTopProcVal" style="color: #6A1B9A; font-size: 13px;">R$ 0,00</strong> <span style="font-size: 10px;">aprovado</span></div>
-                    <div class="kpi-trend" style="display: block;"><strong id="kpiTopProcQtd" style="font-size: 12px;">0</strong> <span style="font-size: 10px;">qtd</span></div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-teal" style="cursor: pointer;" onclick="navigateTo('cbo')">
-                <div class="kpi-icon"><i class="fas fa-user-md"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Top Profissional</div>
-                    <div class="kpi-value" id="kpiTopCboNome" style="font-size: 13px; line-height: 1.2; margin-bottom: 4px; white-space: normal; overflow: visible; text-overflow: clip; word-break: normal;">-</div>
-                    <div class="kpi-trend" style="display: block; margin-bottom: 2px;"><strong id="kpiTopCboVal" style="color: #00796B; font-size: 13px;">R$ 0,00</strong> <span style="font-size: 10px;">aprovado</span></div>
-                    <div class="kpi-trend" style="display: block;"><strong id="kpiTopCboQtd" style="font-size: 12px;">0</strong> <span style="font-size: 10px;">qtd</span></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- KPI CARDS ROW 2 — FINANCEIRO -->
-        <div class="kpi-grid kpi-grid-financial">
-            <div class="kpi-card kpi-financial kpi-fin-blue">
-                <div class="kpi-fin-label">Valor Apresentado</div>
-                <div class="kpi-fin-value" id="kpiValApresentado">R$ 5.435.722,55</div>
-                <div class="kpi-fin-sub">Total bruto produzido</div>
-            </div>
-            <div class="kpi-card kpi-financial kpi-fin-green">
-                <div class="kpi-fin-label">Valor Aprovado</div>
-                <div class="kpi-fin-value" id="kpiValAprovado">R$ 5.429.301,46</div>
-                <div class="kpi-fin-sub">Faturamento líquido</div>
-            </div>
-            <div class="kpi-card kpi-financial kpi-fin-orange" style="cursor: pointer;" onclick="navigateTo('glosas')" title="Ver detalhes das glosas">
-                <div class="kpi-fin-label">Valor Glosado</div>
-                <div class="kpi-fin-value" id="kpiValGlosado">R$ 6.421,09</div>
-                <div class="kpi-fin-sub">Valor não aprovado</div>
-            </div>
-            <div class="kpi-card kpi-financial kpi-fin-teal">
-                <div class="kpi-fin-label">Taxa de Aprovação</div>
-                <div class="kpi-fin-value kpi-pct" id="kpiTaxaAprovacao">99,14%</div>
-                <div class="kpi-progress-bar"><div class="kpi-progress-fill" id="barTaxaAprovacao" style="width:99.14%"></div></div>
-            </div>
-            <div class="kpi-card kpi-financial kpi-fin-red" style="cursor: pointer;" onclick="navigateTo('glosas')" title="Ver detalhes das glosas">
-                <div class="kpi-fin-label">Taxa de Glosa</div>
-                <div class="kpi-fin-value kpi-pct kpi-pct-warn" id="kpiTaxaGlosa">0,86%</div>
-                <div class="kpi-fin-sub">% de procedimentos glosados</div>
-            </div>
-            <div class="kpi-card kpi-financial kpi-fin-purple">
-                <div class="kpi-fin-label">Ticket Médio Aprovado</div>
-                <div class="kpi-fin-value" id="kpiTicketMedio">R$ 21,07</div>
-                <div class="kpi-fin-sub">Por procedimento</div>
-            </div>
-        </div>
-
-        <!-- CHARTS ROW -->
-        <div class="charts-row">
-            <div class="chart-card chart-full">
-                <div class="chart-header">
-                    <span><i class="fas fa-chart-line"></i> Evolução Mensal — Valor Aprovado vs Valor Apresentado</span>
-                    <div class="chart-legend-custom">
-                        <span class="leg leg-blue" style="cursor: pointer; transition: 0.3s;" onclick="toggleEvolucaoDataset(0, this)">Apresentado</span>
-                        <span class="leg leg-green" style="cursor: pointer; transition: 0.3s;" onclick="toggleEvolucaoDataset(1, this)">Aprovado</span>
-                        <span class="leg leg-red" style="cursor: pointer; transition: 0.3s;" onclick="toggleEvolucaoDataset(2, this)">Glosado</span>
+                    <div class="filter-group group-status" style="display: none;">
+                        <label><i class="fas fa-star"></i> Status</label>
+                        <div class="select-wrapper">
+                            <select id="filterStatus">
+                                <option value="all">Todos</option>
+                                <option value="EXCELENTE">Excelente</option>
+                                <option value="BOA">Boa</option>
+                                <option value="REGULAR">Regular</option>
+                                <option value="CRITICA">Crítica</option>
+                            </select>
+                            <span class="select-arrow"><i class="fas fa-chevron-down"></i></span>
+                        </div>
                     </div>
                 </div>
-                <div style="height:280px;"><canvas id="chartEvolucaoMensal"></canvas></div>
-            </div>
-        </div>
 
-        <!-- CHARTS ROW 1.5 -->
-        <div class="charts-row">
-            <div class="chart-card chart-full">
-                <div class="chart-header">
-                    <span><i class="fas fa-chart-pie"></i> Participação por Unidade</span>
-                </div>
-                <div style="height:320px;"><canvas id="chartParticipacaoUnidade"></canvas></div>
-            </div>
-        </div>
+                <div class="filter-divider"></div>
 
-        <!-- CHARTS ROW 1.6 (Top 20) -->
-        <div class="charts-row">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <span><i class="fas fa-stethoscope"></i> Top 20 Procedimentos</span>
-                </div>
-                <div style="height:600px;"><canvas id="chartTopProcedimentosExec"></canvas></div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <span><i class="fas fa-user-md"></i> Top 20 Profissionais</span>
-                </div>
-                <div style="height:600px;"><canvas id="chartTopProfissionaisExec"></canvas></div>
-            </div>
-        </div>
-
-        <!-- CHARTS ROW 2 -->
-        <div class="charts-row">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <span><i class="fas fa-chart-bar"></i> Produção Mensal — Quantidade</span>
-                </div>
-                <div style="height:260px;"><canvas id="chartProducaoMensal"></canvas></div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <span><i class="fas fa-trophy"></i> Top 10 Unidades — Valor Aprovado</span>
-                </div>
-                <div style="height:260px;"><canvas id="chartTopUnidades"></canvas></div>
-            </div>
-        </div>
-
-        <!-- STATUS DISTRIBUTION -->
-        <div class="status-summary-row">
-            <div class="status-card status-excelente" style="cursor: pointer;" onclick="setFilterStatus('EXCELENTE')" title="Filtrar unidades Excelentes">
-                <i class="fas fa-check-circle"></i>
-                <div class="status-count" id="cntExcelente">0</div>
-                <div class="status-label">Excelente ≥99%</div>
-            </div>
-            <div class="status-card status-boa" style="cursor: pointer;" onclick="setFilterStatus('BOA')" title="Filtrar unidades Boas">
-                <i class="fas fa-check"></i>
-                <div class="status-count" id="cntBoa">0</div>
-                <div class="status-label">Boa 97–98,99%</div>
-            </div>
-            <div class="status-card status-regular" style="cursor: pointer;" onclick="setFilterStatus('REGULAR')" title="Filtrar unidades Regulares">
-                <i class="fas fa-exclamation-triangle"></i>
-                <div class="status-count" id="cntRegular">0</div>
-                <div class="status-label">Regular 95–96,99%</div>
-            </div>
-            <div class="status-card status-critica" style="cursor: pointer;" onclick="setFilterStatus('CRITICA')" title="Filtrar unidades Críticas">
-                <i class="fas fa-times-circle"></i>
-                <div class="status-count" id="cntCritica">0</div>
-                <div class="status-label">Crítica &lt;95%</div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ======================== SEÇÃO FATURAMENTO ======================== -->
-    <section id="section-faturamento" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-dollar-sign"></i> Faturamento</h2>
-        </div>
-
-        <div class="kpi-grid kpi-grid-4">
-            <div class="kpi-card kpi-blue">
-                <div class="kpi-body">
-                    <div class="kpi-label">Média Mensal Apresentado</div>
-                    <div class="kpi-value" id="kpiMediaApres">R$ 1.358.930,64</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-green">
-                <div class="kpi-body">
-                    <div class="kpi-label">Média Mensal Aprovado</div>
-                    <div class="kpi-value" id="kpiMediaAprov">R$ 1.357.325,37</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-indigo">
-                <div class="kpi-body">
-                    <div class="kpi-label">Projeção Anual</div>
-                    <div class="kpi-value" id="kpiProjecaoAnual">R$ 16.287.904,38</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-teal">
-                <div class="kpi-body">
-                    <div class="kpi-label">Crescimento (Jan→Abr)</div>
-                    <div class="kpi-value" id="kpiCrescimento">+20,85%</div>
+                <div class="filter-card-footer">
+                    <div class="filter-selected-pills" id="filterSelectedPillsContainer">
+                        <i class="fas fa-tag"></i> Selecionado:
+                        <span class="text-muted" style="font-size: 0.8rem; margin-left: 6px;">Nenhum filtro ativo</span>
+                    </div>
+                    <div class="filter-action-buttons">
+                        <button class="btn-filter-clear" id="btnLimparFiltros">
+                            <i class="fas fa-times"></i> Limpar
+                        </button>
+                        <button class="btn-filter-apply" id="btnAplicarFiltros">
+                            <i class="fas fa-filter"></i> Aplicar filtros
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="table-container">
-            <div class="table-header-bar">
-                <span><i class="fas fa-table"></i> Consolidado Faturamento por Competência</span>
-                <input type="text" id="searchFaturamento" placeholder="🔍 Buscar..." class="table-search">
+        <!-- ======================== SEÇÃO MINHA CONTA ======================== -->
+        <section id="section-minha-conta" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-id-badge"></i> Minha Conta</h2>
+                <div class="section-badge">Gestão de Perfil e Auditoria de Acessos</div>
             </div>
-            <table class="data-table" id="tableFaturamento">
-                <thead>
-                    <tr>
-                        <th>Competência</th>
-                        <th class="text-right">Qtd. Apresentada</th>
-                        <th class="text-right">Qtd. Aprovada</th>
-                        <th class="text-right">Qtd. Glosada</th>
-                        <th class="text-right">Valor Apresentado (R$)</th>
-                        <th class="text-right">Valor Aprovado (R$)</th>
-                        <th class="text-right">Valor Glosado (R$)</th>
-                        <th class="text-right">% Aprovado</th>
-                        <th class="text-center">Tendência</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyFaturamento"></tbody>
-                <tfoot id="tfootFaturamento"></tfoot>
-            </table>
-        </div>
 
-        <div class="charts-row">
-            <div class="chart-card chart-full">
-                <div class="chart-header">
-                    <span><i class="fas fa-chart-area"></i> Evolução do Faturamento Mensal</span>
+            <div class="account-container">
+                <!-- Dados do Perfil -->
+                <div class="account-card profile-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-address-card"></i> Dados do Perfil</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="profile-info-row">
+                            <span class="info-label">Nome completo:</span>
+                            <span class="info-value" id="accNome">-</span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="info-label">Nome de acesso:</span>
+                            <span class="info-value" id="accUsername">-</span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="info-label">Perfil de Acesso:</span>
+                            <span class="info-value" id="accRole">-</span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="info-label">Último login:</span>
+                            <span class="info-value" id="accLastLogin">-</span>
+                        </div>
+
+                        <button class="btn-change-password"
+                            onclick="alert('Funcionalidade de troca de senha em desenvolvimento.')">
+                            <i class="fas fa-key"></i> Trocar minha senha
+                        </button>
+                    </div>
                 </div>
-                <div style="height:300px;"><canvas id="chartFaturamentoMensal"></canvas></div>
-            </div>
-        </div>
-    </section>
 
-    <!-- ======================== SEÇÃO EFICIÊNCIA ======================== -->
-    <section id="section-eficiencia" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-chart-bar"></i> Eficiência de Faturamento por Unidade</h2>
-            <div class="section-badge" id="lblRankingDesempenho">Ranking de Desempenho — Sem Dados</div>
-        </div>
-
-        <div class="table-container">
-            <div class="table-header-bar">
-                <span><i class="fas fa-list-ol"></i> Tabela de Eficiência — Ordenado por Maior Valor Aprovado</span>
-                <div class="table-controls">
-                    <input type="text" id="searchEficiencia" placeholder="🔍 Buscar unidade..." class="table-search">
-                    <select id="filterEficienciaStatus" class="table-filter-select">
-                        <option value="all">Todos os status</option>
-                        <option value="EXCELENTE">✅ Excelente</option>
-                        <option value="BOA">✔️ Boa</option>
-                        <option value="REGULAR">⚠️ Regular</option>
-                        <option value="CRITICA">❌ Crítica</option>
-                    </select>
-                    <button class="btn-table-export" id="btnExportEficienciaPDF" title="Exportar tabela de eficiência para PDF">
-                        <i class="fas fa-file-pdf"></i> PDF
-                    </button>
+                <!-- Histórico de Ações -->
+                <div class="account-card history-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-history"></i> Histórico de Ações</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table-history">
+                                <thead>
+                                    <tr>
+                                        <th>DATA/HORA</th>
+                                        <th>AÇÃO</th>
+                                        <th>MÓDULO</th>
+                                        <th>DESCRIÇÃO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody">
+                                    <!-- Preenchido dinamicamente pelo JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <table class="data-table table-eficiencia" id="tableEficiencia">
-                <thead>
-                    <tr>
-                        <th class="text-center">#</th>
-                        <th>Unidade de Saúde</th>
-                        <th class="text-right">Qtd. Apresentada</th>
-                        <th class="text-right">Qtd. Aprovada</th>
-                        <th class="text-right">% Aprovação (Qtd)</th>
-                        <th class="text-right">Valor Apresentado</th>
-                        <th class="text-right">Valor Aprovado</th>
-                        <th class="text-right">% Financeiro</th>
-                        <th class="text-right">Glosa (R$)</th>
-                        <th class="text-center">Status</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyEficiencia"></tbody>
-            </table>
+        </section>
+
+        <!-- ======================== SEÇÃO USUÁRIOS (ADM) ======================== -->
+        <section id="section-usuarios" class="content-section">
+            <div class="section-header"
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h2><i class="fas fa-users"></i> Gerenciamento de Usuários</h2>
+                    <div class="section-badge">Cadastre gerentes e usuários comuns, defina permissões e gerencie acessos
+                    </div>
+                </div>
+                <button class="btn-filter-apply" id="btnNovoUsuario"
+                    style="background: linear-gradient(135deg, var(--sus-blue) 0%, var(--sus-blue-light) 100%);">
+                    <i class="fas fa-user-plus"></i> Novo Usuário
+                </button>
+            </div>
+
+            <!-- CONTAINER DA LISTA DE USUÁRIOS -->
+            <div id="users-list-container">
+                <!-- KPI CARDS -->
+                <div class="kpi-grid"
+                    style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 20px; gap: 20px;">
+                    <div class="kpi-card-user sus-blue">
+                        <div class="kpi-body-user">
+                            <div class="kpi-value-user" id="kpiTotalUsers">0</div>
+                            <div class="kpi-label-user">Total de Usuários</div>
+                        </div>
+                        <div class="kpi-icon-wrapper" style="background: rgba(21, 101, 192, 0.08); color: var(--sus-blue);">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-card-user sus-sky">
+                        <div class="kpi-body-user">
+                            <div class="kpi-value-user" id="kpiAtivosUsers">0</div>
+                            <div class="kpi-label-user">Usuários Ativos</div>
+                        </div>
+                        <div class="kpi-icon-wrapper" style="background: rgba(3, 169, 244, 0.08); color: var(--sus-sky);">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-card-user red">
+                        <div class="kpi-body-user">
+                            <div class="kpi-value-user" id="kpiBloqueadosUsers">0</div>
+                            <div class="kpi-label-user">Contas Bloqueadas</div>
+                        </div>
+                        <div class="kpi-icon-wrapper" style="background: rgba(239, 68, 68, 0.08); color: #ef4444;">
+                            <i class="fas fa-user-slash"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-card-user orange">
+                        <div class="kpi-body-user">
+                            <div class="kpi-value-user" id="kpiAdminUsers">0</div>
+                            <div class="kpi-label-user">Administradores</div>
+                        </div>
+                        <div class="kpi-icon-wrapper" style="background: rgba(245, 124, 0, 0.08); color: #f57c00;">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-card-user grey">
+                        <div class="kpi-body-user">
+                            <div class="kpi-value-user" id="kpiComumUsers">0</div>
+                            <div class="kpi-label-user">Gerentes</div>
+                        </div>
+                        <div class="kpi-icon-wrapper" style="background: rgba(120, 144, 156, 0.08); color: #78909c;">
+                            <i class="fas fa-user-cog"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="account-card">
+                    <div class="card-header" style="background: white; border-bottom: none; padding-bottom: 0;">
+                        <div class="filter-group" style="max-width: 400px; margin: 0;">
+                            <label><i class="fas fa-search"></i> Buscar Usuário</label>
+                            <input type="text" id="searchUser" class="form-control"
+                                placeholder="Buscar por nome ou login..."
+                                style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--gray-200);">
+                        </div>
+                    </div>
+                    <div class="card-body" style="padding-top: 10px;">
+                        <div class="table-responsive">
+                            <table class="table-history table-users">
+                                <thead>
+                                    <tr>
+                                        <th>NOME COMPLETO</th>
+                                        <th>LOGIN</th>
+                                        <th>PERFIL</th>
+                                        <th>STATUS</th>
+                                        <th>CADASTRADO EM</th>
+                                        <th>ÚLTIMO LOGIN</th>
+                                        <th style="text-align: right;">AÇÕES</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <!-- JS preenche -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTAINER DO HISTÓRICO DE AÇÕES DE UM USUÁRIO -->
+            <div id="users-history-container" class="hidden">
+                <div class="account-card">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid var(--gray-200); padding: 15px 20px;">
+                        <h3 style="margin: 0; font-size: 1.05rem; color: var(--sus-blue); font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-history"></i> Histórico de Ações de: <span id="historySelectedUser" style="color: var(--gray-800); font-weight: 600;">-</span>
+                        </h3>
+                        <button class="btn-filter-clear" id="btnBackToUsers" style="padding: 6px 14px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; border: 1px solid var(--gray-300); border-radius: 4px; cursor: pointer; background: white; transition: all 0.2s; font-weight: 600; color: var(--gray-700);">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </button>
+                    </div>
+
+                    <!-- Filtros Avançados do Histórico -->
+                    <div class="history-filters-panel" style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid var(--gray-200); display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+                        <div class="filter-field" style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 0.72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase;">Data Inicial</label>
+                            <input type="date" id="historyFilterStartDate" style="padding: 6px 10px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.85rem; color: var(--gray-700); background: white;">
+                        </div>
+                        <div class="filter-field" style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 0.72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase;">Data Final</label>
+                            <input type="date" id="historyFilterEndDate" style="padding: 6px 10px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.85rem; color: var(--gray-700); background: white;">
+                        </div>
+                        <div class="filter-field" style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 0.72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase;">Ação</label>
+                            <select id="historyFilterAction" style="padding: 6px 10px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.85rem; color: var(--gray-700); min-width: 120px; background: white; height: 33px;">
+                                <option value="all">Todas</option>
+                                <option value="LOGIN">LOGIN</option>
+                                <option value="LOGOUT">LOGOUT</option>
+                                <option value="CADASTRO_USUARIO">CADASTRO_USUARIO</option>
+                                <option value="EDICAO_USUARIO">EDICAO_USUARIO</option>
+                                <option value="STATUS_USUARIO">STATUS_USUARIO</option>
+                                <option value="SENHA_USUARIO">SENHA_USUARIO</option>
+                                <option value="EXCLUSAO_USUARIO">EXCLUSAO_USUARIO</option>
+                                <option value="UPLOAD_LOGO">UPLOAD_LOGO</option>
+                                <option value="EXCLUSAO_LOGO">EXCLUSAO_LOGO</option>
+                                <option value="MUDANCA_LOGO">MUDANCA_LOGO</option>
+                                <option value="IMPORTAR_ARQUIVO">IMPORTAR_ARQUIVO</option>
+                                <option value="LIMPAR_DB">LIMPAR_DB</option>
+                            </select>
+                        </div>
+                        <div class="filter-field" style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 0.72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase;">Módulo</label>
+                            <select id="historyFilterModule" style="padding: 6px 10px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 0.85rem; color: var(--gray-700); min-width: 120px; background: white; height: 33px;">
+                                <option value="all">Todos</option>
+                                <option value="SISTEMA">SISTEMA</option>
+                                <option value="USUARIOS">USUARIOS</option>
+                                <option value="ARQUIVOS">ARQUIVOS</option>
+                                <option value="RELATORIOS">RELATORIOS</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="btnApplyHistoryFilters" class="btn-filter-apply" style="padding: 7px 15px; font-size: 0.85rem; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, var(--sus-blue) 0%, var(--sus-blue-light) 100%); color: white;">
+                                <i class="fas fa-filter"></i> Filtrar
+                            </button>
+                            <button id="btnClearHistoryFilters" class="btn-filter-clear" style="padding: 7px 15px; font-size: 0.85rem; border: 1px solid var(--gray-300); background: white; border-radius: 4px; cursor: pointer; font-weight: 600; color: var(--gray-600); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-times"></i> Limpar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-body" style="padding: 20px;">
+                        <div class="table-responsive">
+                            <table class="table-history">
+                                <thead>
+                                    <tr>
+                                        <th>DATA/HORA</th>
+                                        <th>AÇÃO</th>
+                                        <th>MÓDULO</th>
+                                        <th>DESCRIÇÃO</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userSingleHistoryTableBody">
+                                    <!-- Preenchido dinamicamente pelo JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Modais de Usuário -->
+        <div id="modalUser" class="modal-overlay hidden">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3 id="modalUserTitle">Novo Usuário</h3>
+                    <button class="btn-close-modal" id="btnCloseModalUser"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formUser">
+                        <input type="hidden" id="userOriginalLogin">
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Nome Completo</label>
+                            <input type="text" id="userName" class="form-control"
+                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">E-mail / Login</label>
+                            <input type="text" id="userEmail" class="form-control"
+                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Perfil de
+                                Acesso</label>
+                            <select id="userRole" class="form-control"
+                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="ADM">Administrador</option>
+                                <option value="GERENTE">Gerente</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 15px;" id="divUserPassword">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Senha Inicial</label>
+                            <input type="text" id="userPassword" class="form-control"
+                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
+                                placeholder="Ex: Senha@123">
+                            <small style="color: var(--gray-500);">A senha deve ter letras, números e caractere
+                                especial.</small>
+                        </div>
+                        <div style="text-align: right; margin-top: 20px;">
+                            <button type="button" class="btn-filter-clear" id="btnCancelUser"
+                                style="padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer;">Cancelar</button>
+                            <button type="submit" class="btn-filter-apply"
+                                style="padding: 8px 15px; margin-left: 10px; border-radius: 4px; border: none; cursor: pointer;">Salvar
+                                Usuário</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
-        <div class="charts-row">
-            <div class="chart-card chart-large">
-                <div class="chart-header"><span><i class="fas fa-chart-bar"></i> % Aprovação Financeira por Unidade</span></div>
-                <div style="height:320px;"><canvas id="chartEficienciaBar"></canvas></div>
+        <!-- ======================== SEÇÃO EXECUTIVO ======================== -->
+        <section id="section-executivo" class="content-section active">
+            <div class="section-header">
+                <h2><i class="fas fa-tachometer-alt"></i> Dashboard Executivo</h2>
+                <div class="section-badge" id="lblConsolidadoGeral">Consolidado Geral de Produção Ambulatorial — Sem
+                    Dados</div>
             </div>
-            <div class="chart-card">
-                <div class="chart-header"><span><i class="fas fa-chart-pie"></i> Distribuição de Status</span></div>
-                <div style="height:320px;"><canvas id="chartStatusDist"></canvas></div>
+
+            <!-- KPI CARDS ROW 1 -->
+            <div class="kpi-grid">
+                <div class="kpi-card kpi-blue">
+                    <div class="kpi-icon"><i class="fas fa-list-ol"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Procedimentos Apresentados</div>
+                        <div class="kpi-value" id="kpiApresentados">259.964</div>
+                        <div class="kpi-trend"><i class="fas fa-arrow-up"></i> Total acumulado</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-green">
+                    <div class="kpi-icon"><i class="fas fa-check-double"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Procedimentos Aprovados</div>
+                        <div class="kpi-value" id="kpiAprovados">257.720</div>
+                        <div class="kpi-trend kpi-ok"><i class="fas fa-check"></i> 99,14% de aprovação</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-red" style="cursor: pointer;" onclick="navigateTo('glosas')"
+                    title="Ver detalhes das glosas">
+                    <div class="kpi-icon"><i class="fas fa-times-circle"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Procedimentos Glosados</div>
+                        <div class="kpi-value" id="kpiGlosados">2.244</div>
+                        <div class="kpi-trend kpi-warn"><i class="fas fa-exclamation"></i> 0,86% de glosa</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-indigo" style="cursor: pointer;" onclick="navigateTo('unidades')"
+                    title="Ver ranking de unidades">
+                    <div class="kpi-icon"><i class="fas fa-building"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Unidades Produtoras</div>
+                        <div class="kpi-value" id="kpiUnidades">21</div>
+                        <div class="kpi-trend"><i class="fas fa-map-marker"></i> Bacabal/MA</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-purple" style="cursor: pointer;" onclick="navigateTo('procedimentos')">
+                    <div class="kpi-icon"><i class="fas fa-medal"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Top Procedimento</div>
+                        <div class="kpi-value" id="kpiTopProcNome"
+                            style="font-size: 15px; margin-bottom: 4px; white-space: nowrap; overflow: visible; letter-spacing: -0.5px;">
+                            -</div>
+                        <div class="kpi-trend" style="display: block; margin-bottom: 2px;"><strong id="kpiTopProcVal"
+                                style="color: #6A1B9A; font-size: 13px;">R$ 0,00</strong> <span
+                                style="font-size: 10px;">aprovado</span></div>
+                        <div class="kpi-trend" style="display: block;"><strong id="kpiTopProcQtd"
+                                style="font-size: 12px;">0</strong> <span style="font-size: 10px;">qtd</span></div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-teal" style="cursor: pointer;" onclick="navigateTo('cbo')">
+                    <div class="kpi-icon"><i class="fas fa-user-md"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Top Profissional</div>
+                        <div class="kpi-value" id="kpiTopCboNome"
+                            style="font-size: 13px; line-height: 1.2; margin-bottom: 4px; white-space: normal; overflow: visible; text-overflow: clip; word-break: normal;">
+                            -</div>
+                        <div class="kpi-trend" style="display: block; margin-bottom: 2px;"><strong id="kpiTopCboVal"
+                                style="color: #00796B; font-size: 13px;">R$ 0,00</strong> <span
+                                style="font-size: 10px;">aprovado</span></div>
+                        <div class="kpi-trend" style="display: block;"><strong id="kpiTopCboQtd"
+                                style="font-size: 12px;">0</strong> <span style="font-size: 10px;">qtd</span></div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </section>
 
-    <!-- ======================== SEÇÃO UNIDADES ======================== -->
-    <section id="section-unidades" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-hospital"></i> Painel de Unidades Executoras</h2>
-        </div>
-
-        <div id="unidadeSelector" class="unidade-selector">
-            <div class="selector-header">
-                <input type="text" id="searchUnidade" placeholder="🔍 Pesquisar unidade..." class="selector-search">
+            <!-- KPI CARDS ROW 2 — FINANCEIRO -->
+            <div class="kpi-grid kpi-grid-financial">
+                <div class="kpi-card kpi-financial kpi-fin-blue">
+                    <div class="kpi-fin-label">Valor Apresentado</div>
+                    <div class="kpi-fin-value" id="kpiValApresentado">R$ 5.435.722,55</div>
+                    <div class="kpi-fin-sub">Total bruto produzido</div>
+                </div>
+                <div class="kpi-card kpi-financial kpi-fin-green">
+                    <div class="kpi-fin-label">Valor Aprovado</div>
+                    <div class="kpi-fin-value" id="kpiValAprovado">R$ 5.429.301,46</div>
+                    <div class="kpi-fin-sub">Faturamento líquido</div>
+                </div>
+                <div class="kpi-card kpi-financial kpi-fin-orange" style="cursor: pointer;"
+                    onclick="navigateTo('glosas')" title="Ver detalhes das glosas">
+                    <div class="kpi-fin-label">Valor Glosado</div>
+                    <div class="kpi-fin-value" id="kpiValGlosado">R$ 6.421,09</div>
+                    <div class="kpi-fin-sub">Valor não aprovado</div>
+                </div>
+                <div class="kpi-card kpi-financial kpi-fin-teal">
+                    <div class="kpi-fin-label">Taxa de Aprovação</div>
+                    <div class="kpi-fin-value kpi-pct" id="kpiTaxaAprovacao">99,14%</div>
+                    <div class="kpi-progress-bar">
+                        <div class="kpi-progress-fill" id="barTaxaAprovacao" style="width:99.14%"></div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-financial kpi-fin-red" style="cursor: pointer;" onclick="navigateTo('glosas')"
+                    title="Ver detalhes das glosas">
+                    <div class="kpi-fin-label">Taxa de Glosa</div>
+                    <div class="kpi-fin-value kpi-pct kpi-pct-warn" id="kpiTaxaGlosa">0,86%</div>
+                    <div class="kpi-fin-sub">% de procedimentos glosados</div>
+                </div>
+                <div class="kpi-card kpi-financial kpi-fin-purple">
+                    <div class="kpi-fin-label">Ticket Médio Aprovado</div>
+                    <div class="kpi-fin-value" id="kpiTicketMedio">R$ 21,07</div>
+                    <div class="kpi-fin-sub">Por procedimento</div>
+                </div>
             </div>
-            <div id="unidadeCardGrid" class="unidade-card-grid"></div>
 
-            <div class="table-container" style="margin-top: 25px;">
+            <!-- CHARTS ROW -->
+            <div class="charts-row">
+                <div class="chart-card chart-full">
+                    <div class="chart-header">
+                        <span><i class="fas fa-chart-line"></i> Evolução Mensal — Valor Aprovado vs Valor
+                            Apresentado</span>
+                        <div class="chart-legend-custom">
+                            <span class="leg leg-blue" style="cursor: pointer; transition: 0.3s;"
+                                onclick="toggleEvolucaoDataset(0, this)">Apresentado</span>
+                            <span class="leg leg-green" style="cursor: pointer; transition: 0.3s;"
+                                onclick="toggleEvolucaoDataset(1, this)">Aprovado</span>
+                            <span class="leg leg-red" style="cursor: pointer; transition: 0.3s;"
+                                onclick="toggleEvolucaoDataset(2, this)">Glosado</span>
+                        </div>
+                    </div>
+                    <div style="height:280px;"><canvas id="chartEvolucaoMensal"></canvas></div>
+                </div>
+            </div>
+
+            <!-- CHARTS ROW 1.5 -->
+            <div class="charts-row">
+                <div class="chart-card chart-full">
+                    <div class="chart-header">
+                        <span><i class="fas fa-chart-pie"></i> Participação por Unidade</span>
+                    </div>
+                    <div style="height:320px;"><canvas id="chartParticipacaoUnidade"></canvas></div>
+                </div>
+            </div>
+
+            <!-- CHARTS ROW 1.6 (Top 20) -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <span><i class="fas fa-stethoscope"></i> Top 20 Procedimentos</span>
+                    </div>
+                    <div style="height:600px;"><canvas id="chartTopProcedimentosExec"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <span><i class="fas fa-user-md"></i> Top 20 Profissionais</span>
+                    </div>
+                    <div style="height:600px;"><canvas id="chartTopProfissionaisExec"></canvas></div>
+                </div>
+            </div>
+
+            <!-- CHARTS ROW 2 -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <span><i class="fas fa-chart-bar"></i> Produção Mensal — Quantidade</span>
+                    </div>
+                    <div style="height:260px;"><canvas id="chartProducaoMensal"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <span><i class="fas fa-trophy"></i> Top 10 Unidades — Valor Aprovado</span>
+                    </div>
+                    <div style="height:260px;"><canvas id="chartTopUnidades"></canvas></div>
+                </div>
+            </div>
+
+            <!-- STATUS DISTRIBUTION -->
+            <div class="status-summary-row">
+                <div class="status-card status-excelente" style="cursor: pointer;"
+                    onclick="setFilterStatus('EXCELENTE')" title="Filtrar unidades Excelentes">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="status-count" id="cntExcelente">0</div>
+                    <div class="status-label">Excelente ≥99%</div>
+                </div>
+                <div class="status-card status-boa" style="cursor: pointer;" onclick="setFilterStatus('BOA')"
+                    title="Filtrar unidades Boas">
+                    <i class="fas fa-check"></i>
+                    <div class="status-count" id="cntBoa">0</div>
+                    <div class="status-label">Boa 97–98,99%</div>
+                </div>
+                <div class="status-card status-regular" style="cursor: pointer;" onclick="setFilterStatus('REGULAR')"
+                    title="Filtrar unidades Regulares">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div class="status-count" id="cntRegular">0</div>
+                    <div class="status-label">Regular 95–96,99%</div>
+                </div>
+                <div class="status-card status-critica" style="cursor: pointer;" onclick="setFilterStatus('CRITICA')"
+                    title="Filtrar unidades Críticas">
+                    <i class="fas fa-times-circle"></i>
+                    <div class="status-count" id="cntCritica">0</div>
+                    <div class="status-label">Crítica &lt;95%</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO FATURAMENTO ======================== -->
+        <section id="section-faturamento" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-dollar-sign"></i> Faturamento</h2>
+            </div>
+
+            <div class="kpi-grid kpi-grid-4">
+                <div class="kpi-card kpi-blue">
+                    <div class="kpi-body">
+                        <div class="kpi-label">Média Mensal Apresentado</div>
+                        <div class="kpi-value" id="kpiMediaApres">R$ 1.358.930,64</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-green">
+                    <div class="kpi-body">
+                        <div class="kpi-label">Média Mensal Aprovado</div>
+                        <div class="kpi-value" id="kpiMediaAprov">R$ 1.357.325,37</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-indigo">
+                    <div class="kpi-body">
+                        <div class="kpi-label">Projeção Anual</div>
+                        <div class="kpi-value" id="kpiProjecaoAnual">R$ 16.287.904,38</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-teal">
+                    <div class="kpi-body">
+                        <div class="kpi-label">Crescimento (Jan→Abr)</div>
+                        <div class="kpi-value" id="kpiCrescimento">+20,85%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
                 <div class="table-header-bar">
-                    <span><i class="fas fa-hospital"></i> Lista de Unidades Executoras</span>
+                    <span><i class="fas fa-table"></i> Consolidado Faturamento por Competência</span>
+                    <input type="text" id="searchFaturamento" placeholder="🔍 Buscar..." class="table-search">
+                </div>
+                <table class="data-table" id="tableFaturamento">
+                    <thead>
+                        <tr>
+                            <th>Competência</th>
+                            <th class="text-right">Qtd. Apresentada</th>
+                            <th class="text-right">Qtd. Aprovada</th>
+                            <th class="text-right">Qtd. Glosada</th>
+                            <th class="text-right">Valor Apresentado (R$)</th>
+                            <th class="text-right">Valor Aprovado (R$)</th>
+                            <th class="text-right">Valor Glosado (R$)</th>
+                            <th class="text-right">% Aprovado</th>
+                            <th class="text-center">Tendência</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyFaturamento"></tbody>
+                    <tfoot id="tfootFaturamento"></tfoot>
+                </table>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-card chart-full">
+                    <div class="chart-header">
+                        <span><i class="fas fa-chart-area"></i> Evolução do Faturamento Mensal</span>
+                    </div>
+                    <div style="height:300px;"><canvas id="chartFaturamentoMensal"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO EFICIÊNCIA ======================== -->
+        <section id="section-eficiencia" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-chart-bar"></i> Eficiência de Faturamento por Unidade</h2>
+                <div class="section-badge" id="lblRankingDesempenho">Ranking de Desempenho — Sem Dados</div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header-bar">
+                    <span><i class="fas fa-list-ol"></i> Tabela de Eficiência — Ordenado por Maior Valor Aprovado</span>
                     <div class="table-controls">
-                        <button class="btn-table-export" id="btnExportUnidadesPDF" title="Exportar tabela de unidades para PDF">
+                        <input type="text" id="searchEficiencia" placeholder="🔍 Buscar unidade..."
+                            class="table-search">
+                        <select id="filterEficienciaStatus" class="table-filter-select">
+                            <option value="all">Todos os status</option>
+                            <option value="EXCELENTE">✅ Excelente</option>
+                            <option value="BOA">✔️ Boa</option>
+                            <option value="REGULAR">⚠️ Regular</option>
+                            <option value="CRITICA">❌ Crítica</option>
+                        </select>
+                        <button class="btn-table-export" id="btnExportEficienciaPDF"
+                            title="Exportar tabela de eficiência para PDF">
                             <i class="fas fa-file-pdf"></i> PDF
                         </button>
                     </div>
                 </div>
-                <table class="data-table" id="tableUnidades">
+                <table class="data-table table-eficiencia" id="tableEficiencia">
                     <thead>
                         <tr>
                             <th class="text-center">#</th>
                             <th>Unidade de Saúde</th>
+                            <th class="text-right">Qtd. Apresentada</th>
                             <th class="text-right">Qtd. Aprovada</th>
-                            <th class="text-right" style="cursor: pointer;" onclick="toggleSortUnidades('valAprovado')" id="thUnidadeValAprovado" title="Ordenar por Valor Aprovado (Maior para Menor)">Valor Aprovado (R$) <i class="fas fa-sort-amount-down" style="font-size: 0.72rem; margin-left: 4px; opacity: 0.7;"></i></th>
-                            <th class="text-right" style="cursor: pointer;" onclick="toggleSortUnidades('pctAprovacao')" id="thUnidadePctAprovacao" title="Ordenar por % Aprovação (Maior para Menor)">% Aprovação <i class="fas fa-sort-amount-down" style="font-size: 0.72rem; margin-left: 4px; opacity: 0.7;"></i></th>
+                            <th class="text-right">% Aprovação (Qtd)</th>
+                            <th class="text-right">Valor Apresentado</th>
+                            <th class="text-right">Valor Aprovado</th>
+                            <th class="text-right">% Financeiro</th>
+                            <th class="text-right">Glosa (R$)</th>
                             <th class="text-center">Status</th>
                         </tr>
                     </thead>
-                    <tbody id="tbodyUnidadesMenu"></tbody>
+                    <tbody id="tbodyEficiencia"></tbody>
                 </table>
             </div>
-        </div>
 
-        <div id="unidadeDetalhe" class="unidade-detalhe hidden">
-            <div class="detalhe-header">
-                <button id="btnVoltarUnidades" class="btn-voltar"><i class="fas fa-arrow-left"></i> Voltar</button>
-                <h3 id="detalheUnidadeNome">—</h3>
-                <div id="detalheStatusBadge" class="status-badge"></div>
+            <div class="charts-row">
+                <div class="chart-card chart-large">
+                    <div class="chart-header"><span><i class="fas fa-chart-bar"></i> % Aprovação Financeira por
+                            Unidade</span></div>
+                    <div style="height:320px;"><canvas id="chartEficienciaBar"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header"><span><i class="fas fa-chart-pie"></i> Distribuição de Status</span></div>
+                    <div style="height:320px;"><canvas id="chartStatusDist"></canvas></div>
+                </div>
             </div>
-            <div class="kpi-grid kpi-grid-5">
-                <div class="kpi-card kpi-blue"><div class="kpi-body"><div class="kpi-label">Qtd. Apresentada</div><div class="kpi-value" id="dQtdApres">—</div></div></div>
-                <div class="kpi-card kpi-green"><div class="kpi-body"><div class="kpi-label">Qtd. Aprovada</div><div class="kpi-value" id="dQtdAprov">—</div></div></div>
-                <div class="kpi-card kpi-red"><div class="kpi-body"><div class="kpi-label">Qtd. Glosada</div><div class="kpi-value" id="dQtdGlos">—</div></div></div>
-                <div class="kpi-card kpi-teal"><div class="kpi-body"><div class="kpi-label">Valor Aprovado</div><div class="kpi-value" id="dValAprov">—</div></div></div>
-                <div class="kpi-card kpi-orange"><div class="kpi-body"><div class="kpi-label">% Aprovação</div><div class="kpi-value" id="dPctAprov">—</div></div></div>
+        </section>
+
+        <!-- ======================== SEÇÃO UNIDADES ======================== -->
+        <section id="section-unidades" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-hospital"></i> Painel de Unidades Executoras</h2>
+            </div>
+
+            <div id="unidadeSelector" class="unidade-selector">
+                <div class="selector-header">
+                    <input type="text" id="searchUnidade" placeholder="🔍 Pesquisar unidade..." class="selector-search">
+                </div>
+                <div id="unidadeCardGrid" class="unidade-card-grid"></div>
+
+                <div class="table-container" style="margin-top: 25px;">
+                    <div class="table-header-bar">
+                        <span><i class="fas fa-hospital"></i> Lista de Unidades Executoras</span>
+                        <div class="table-controls">
+                            <button class="btn-table-export" id="btnExportUnidadesPDF"
+                                title="Exportar tabela de unidades para PDF">
+                                <i class="fas fa-file-pdf"></i> PDF
+                            </button>
+                        </div>
+                    </div>
+                    <table class="data-table" id="tableUnidades">
+                        <thead>
+                            <tr>
+                                <th class="text-center">#</th>
+                                <th>Unidade de Saúde</th>
+                                <th class="text-right">Qtd. Aprovada</th>
+                                <th class="text-right" style="cursor: pointer;"
+                                    onclick="toggleSortUnidades('valAprovado')" id="thUnidadeValAprovado"
+                                    title="Ordenar por Valor Aprovado (Maior para Menor)">Valor Aprovado (R$) <i
+                                        class="fas fa-sort-amount-down"
+                                        style="font-size: 0.72rem; margin-left: 4px; opacity: 0.7;"></i></th>
+                                <th class="text-right" style="cursor: pointer;"
+                                    onclick="toggleSortUnidades('pctAprovacao')" id="thUnidadePctAprovacao"
+                                    title="Ordenar por % Aprovação (Maior para Menor)">% Aprovação <i
+                                        class="fas fa-sort-amount-down"
+                                        style="font-size: 0.72rem; margin-left: 4px; opacity: 0.7;"></i></th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyUnidadesMenu"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="unidadeDetalhe" class="unidade-detalhe hidden">
+                <div class="detalhe-header">
+                    <button id="btnVoltarUnidades" class="btn-voltar"><i class="fas fa-arrow-left"></i> Voltar</button>
+                    <h3 id="detalheUnidadeNome">—</h3>
+                    <div id="detalheStatusBadge" class="status-badge"></div>
+                </div>
+                <div class="kpi-grid kpi-grid-5">
+                    <div class="kpi-card kpi-blue">
+                        <div class="kpi-body">
+                            <div class="kpi-label">Qtd. Apresentada</div>
+                            <div class="kpi-value" id="dQtdApres">—</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-green">
+                        <div class="kpi-body">
+                            <div class="kpi-label">Qtd. Aprovada</div>
+                            <div class="kpi-value" id="dQtdAprov">—</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-red">
+                        <div class="kpi-body">
+                            <div class="kpi-label">Qtd. Glosada</div>
+                            <div class="kpi-value" id="dQtdGlos">—</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-teal">
+                        <div class="kpi-body">
+                            <div class="kpi-label">Valor Aprovado</div>
+                            <div class="kpi-value" id="dValAprov">—</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-orange">
+                        <div class="kpi-body">
+                            <div class="kpi-label">% Aprovação</div>
+                            <div class="kpi-value" id="dPctAprov">—</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="charts-row">
+                    <div class="chart-card chart-full">
+                        <div class="chart-header"><span><i class="fas fa-chart-line"></i> Evolução Mensal da
+                                Unidade</span></div>
+                        <div style="height:260px;"><canvas id="chartUnidadeDetalhe"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO PROCEDIMENTOS ======================== -->
+        <section id="section-procedimentos" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-stethoscope"></i> Todos os Procedimentos</h2>
+            </div>
+            <div class="table-container">
+                <div class="table-header-bar">
+                    <span><i class="fas fa-list"></i> Todos os Procedimentos</span>
+                    <div class="table-controls">
+                        <input type="text" id="searchProc" placeholder="🔍 Buscar procedimento/código..."
+                            class="table-search">
+                        <button class="btn-table-export" id="btnExportProcPDF"
+                            title="Exportar tabela de procedimentos para PDF">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </button>
+                    </div>
+                </div>
+                <table class="data-table" id="tableProcedimentos">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Código</th>
+                            <th>Descrição</th>
+                            <th class="text-right">Qtd. Aprovada</th>
+                            <th class="text-right" style="cursor: pointer;"
+                                onclick="toggleSortProcedimentos('valAprovado')" id="thValAprovado"
+                                title="Ordenar por Valor Aprovado (Maior para Menor)">Valor Aprovado (R$) <i
+                                    class="fas fa-sort-amount-down"
+                                    style="font-size: 0.72rem; margin-left: 4px; opacity: 0.7;"></i></th>
+                            <th class="text-right" style="cursor: pointer;"
+                                onclick="toggleSortProcedimentos('valUnitario')" id="thValUnitario"
+                                title="Ordenar por Valor Unitário (Maior para Menor)">Valor Unitário (R$) <i
+                                    class="fas fa-sort-amount-down"
+                                    style="font-size: 0.72rem; margin-left: 4px; opacity: 0.7;"></i></th>
+                            <th class="text-right">% do Total</th>
+                            <th class="text-center">Participação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyProcedimentos"></tbody>
+                </table>
             </div>
             <div class="charts-row">
                 <div class="chart-card chart-full">
-                    <div class="chart-header"><span><i class="fas fa-chart-line"></i> Evolução Mensal da Unidade</span></div>
-                    <div style="height:260px;"><canvas id="chartUnidadeDetalhe"></canvas></div>
+                    <div class="chart-header"><span><i class="fas fa-chart-bar"></i> Top 15 Procedimentos — Valor
+                            Aprovado</span></div>
+                    <div style="height:350px;"><canvas id="chartProcedimentos"></canvas></div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- ======================== SEÇÃO PROCEDIMENTOS ======================== -->
-    <section id="section-procedimentos" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-stethoscope"></i> Todos os Procedimentos</h2>
-        </div>
-        <div class="table-container">
-            <div class="table-header-bar">
-                <span><i class="fas fa-list"></i> Todos os Procedimentos</span>
-                <div class="table-controls">
-                    <input type="text" id="searchProc" placeholder="🔍 Buscar procedimento/código..." class="table-search">
-                    <button class="btn-table-export" id="btnExportProcPDF" title="Exportar tabela de procedimentos para PDF">
-                        <i class="fas fa-file-pdf"></i> PDF
-                    </button>
-                </div>
+        <!-- ======================== SEÇÃO CBO (PROFISSÕES) ======================== -->
+        <section id="section-cbo" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-user-md"></i> Ocupações e Profissões (CBO)</h2>
             </div>
-            <table class="data-table" id="tableProcedimentos">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Código</th>
-                        <th>Descrição</th>
-                        <th class="text-right">Qtd. Aprovada</th>
-                        <th class="text-right" style="cursor: pointer;" onclick="toggleSortProcedimentos('valAprovado')" id="thValAprovado" title="Ordenar por Valor Aprovado (Maior para Menor)">Valor Aprovado (R$) <i class="fas fa-sort-amount-down" style="font-size: 0.72rem; margin-left: 4px; opacity: 0.7;"></i></th>
-                        <th class="text-right" style="cursor: pointer;" onclick="toggleSortProcedimentos('valUnitario')" id="thValUnitario" title="Ordenar por Valor Unitário (Maior para Menor)">Valor Unitário (R$) <i class="fas fa-sort-amount-down" style="font-size: 0.72rem; margin-left: 4px; opacity: 0.7;"></i></th>
-                        <th class="text-right">% do Total</th>
-                        <th class="text-center">Participação</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyProcedimentos"></tbody>
-            </table>
-        </div>
-        <div class="charts-row">
-            <div class="chart-card chart-full">
-                <div class="chart-header"><span><i class="fas fa-chart-bar"></i> Top 15 Procedimentos — Valor Aprovado</span></div>
-                <div style="height:350px;"><canvas id="chartProcedimentos"></canvas></div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ======================== SEÇÃO CBO (PROFISSÕES) ======================== -->
-    <section id="section-cbo" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-user-md"></i> Ocupações e Profissões (CBO)</h2>
-        </div>
-        <div class="table-container">
-            <div class="table-header-bar">
-                <span><i class="fas fa-list-alt"></i> Produção Consolidada por CBO</span>
-                <div class="table-controls">
-                    <input type="text" id="searchCbo" placeholder="🔍 Buscar CBO/Profissão..." class="table-search">
-                    <button class="btn-table-export" id="btnExportCboPDF" title="Exportar tabela de profissionais para PDF">
-                        <i class="fas fa-file-pdf"></i> PDF
-                    </button>
-                </div>
-            </div>
-            <table class="data-table" id="tableCbo">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Código CBO</th>
-                        <th>Profissão / Especialidade</th>
-                        <th class="text-right">Qtd. Aprovada</th>
-                        <th class="text-right">Valor Aprovado (R$)</th>
-                        <th class="text-right">% do Faturamento</th>
-                        <th class="text-center">Participação</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyCbo"></tbody>
-            </table>
-        </div>
-        <div class="charts-row">
-            <div class="chart-card chart-full">
-                <div class="chart-header"><span><i class="fas fa-chart-pie"></i> Distribuição Financeira por Profissão (CBO)</span></div>
-                <div style="height:350px;"><canvas id="chartCbo"></canvas></div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ======================== SEÇÃO GLOSAS ======================== -->
-    <section id="section-glosas" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-exclamation-triangle"></i> Módulo de Glosas</h2>
-        </div>
-
-        <div class="kpi-grid kpi-grid-4">
-            <div class="kpi-card kpi-red">
-                <div class="kpi-icon"><i class="fas fa-times-circle"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Valor Total Glosado</div>
-                    <div class="kpi-value" id="gKpiValGlosado">R$ 6.421,09</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-orange">
-                <div class="kpi-icon"><i class="fas fa-list"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Qtd. Glosada</div>
-                    <div class="kpi-value" id="gKpiQtdGlosada">2.244</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-yellow">
-                <div class="kpi-icon"><i class="fas fa-percent"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Taxa de Glosa</div>
-                    <div class="kpi-value" id="gKpiTaxa">0,86%</div>
-                </div>
-            </div>
-            <div class="kpi-card kpi-purple">
-                <div class="kpi-icon"><i class="fas fa-hospital"></i></div>
-                <div class="kpi-body">
-                    <div class="kpi-label">Unidades com Glosa</div>
-                    <div class="kpi-value" id="gKpiUnidades">—</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="charts-row">
-            <div class="chart-card">
-                <div class="chart-header"><span><i class="fas fa-chart-bar"></i> Top Unidades com Maior Glosa</span></div>
-                <div style="height:280px;"><canvas id="chartGlosasUnidades"></canvas></div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header"><span><i class="fas fa-chart-line"></i> Evolução Mensal das Glosas</span></div>
-                <div style="height:280px;"><canvas id="chartGlosasMensal"></canvas></div>
-            </div>
-        </div>
-
-        <!-- HEATMAP -->
-        <div class="table-container">
-            <div class="table-header-bar">
-                <span><i class="fas fa-fire"></i> Heatmap — Glosa por Unidade × Competência</span>
-            </div>
-            <div id="heatmapGlosas" class="heatmap-container"></div>
-        </div>
-
-        <div class="table-container">
-            <div class="table-header-bar"><span><i class="fas fa-table"></i> Detalhamento de Glosas por Unidade</span></div>
-            <table class="data-table" id="tableGlosas">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Unidade</th>
-                        <th class="text-right">Qtd. Glosada</th>
-                        <th class="text-right">Valor Glosado (R$)</th>
-                        <th class="text-right">% Glosa</th>
-                        <th class="text-center">Impacto</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyGlosas"></tbody>
-            </table>
-        </div>
-    </section>
-
-    <!-- ======================== SEÇÃO AUDITORIA ======================== -->
-    <section id="section-auditoria" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-search"></i> Painel de Auditoria Inteligente</h2>
-        </div>
-
-        <div id="alertasAuditoria" class="alertas-grid"></div>
-
-        <div class="table-container" style="margin-top:20px;">
-            <div class="table-header-bar"><span><i class="fas fa-clipboard-list"></i> Registro de Ocorrências Auditadas</span></div>
-            <table class="data-table" id="tableAuditoria">
-                <thead>
-                    <tr>
-                        <th>Severidade</th>
-                        <th>Tipo</th>
-                        <th>Unidade</th>
-                        <th>Competência</th>
-                        <th>Descrição</th>
-                        <th>Valor Impactado</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyAuditoria"></tbody>
-            </table>
-        </div>
-    </section>
-
-    <!-- ======================== SEÇÃO REGULAÇÃO ======================== -->
-    <section id="section-regulacao" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-traffic-light"></i> Painel de Regulação — SCAAR</h2>
-        </div>
-
-        <div class="kpi-grid kpi-grid-4">
-            <div class="kpi-card kpi-blue"><div class="kpi-body"><div class="kpi-label">Produção Regulada</div><div class="kpi-value" id="regKpiProd">257.720</div></div></div>
-            <div class="kpi-card kpi-green"><div class="kpi-body"><div class="kpi-label">Cobertura Executada</div><div class="kpi-value" id="regKpiCobertura">99,14%</div></div></div>
-            <div class="kpi-card kpi-orange"><div class="kpi-body"><div class="kpi-label">Demanda Reprimida</div><div class="kpi-value" id="regKpiDemanda">2.244</div></div></div>
-            <div class="kpi-card kpi-purple"><div class="kpi-body"><div class="kpi-label">Unidades Ativas</div><div class="kpi-value" id="regKpiAtivas">21</div></div></div>
-        </div>
-
-        <div class="charts-row">
-            <div class="chart-card chart-full">
-                <div class="chart-header"><span><i class="fas fa-chart-bar"></i> Oferta × Produção por Unidade</span></div>
-                <div style="height:320px;"><canvas id="chartRegulacao"></canvas></div>
-            </div>
-        </div>
-
-        <div class="table-container">
-            <div class="table-header-bar"><span><i class="fas fa-table"></i> Monitoramento de Produção vs Meta</span></div>
-            <table class="data-table" id="tableRegulacao">
-                <thead>
-                    <tr>
-                        <th>Unidade</th>
-                        <th class="text-right">Produção Esperada</th>
-                        <th class="text-right">Produção Realizada</th>
-                        <th class="text-right">% Execução</th>
-                        <th class="text-right">Diferença</th>
-                        <th class="text-center">Status Regulação</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyRegulacao"></tbody>
-            </table>
-        </div>
-    </section>
-
-    <!-- ======================== SEÇÃO RELATÓRIOS ======================== -->
-    <section id="section-relatorios" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-file-alt"></i> Exportar Relatório</h2>
-            <div class="section-badge">Gere relatórios personalizados com gráficos, resumos e tabelas detalhadas</div>
-        </div>
-
-        <div class="reports-grid">
-            <!-- Coluna Esquerda: Parâmetros e Exportação -->
-            <div class="reports-sidebar-column">
-                <!-- Painel: Período -->
-                <div class="reports-panel">
-                    <div class="reports-panel-header">
-                        <i class="fas fa-calendar-alt"></i> Período do Relatório
+            <div class="table-container">
+                <div class="table-header-bar">
+                    <span><i class="fas fa-list-alt"></i> Produção Consolidada por CBO</span>
+                    <div class="table-controls">
+                        <input type="text" id="searchCbo" placeholder="🔍 Buscar CBO/Profissão..." class="table-search">
+                        <button class="btn-table-export" id="btnExportCboPDF"
+                            title="Exportar tabela de profissionais para PDF">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </button>
                     </div>
-                    <div class="reports-panel-body">
-                        <div class="reports-form-row">
-                            <div class="reports-form-group">
-                                <label>Ano</label>
-                                <select id="reportAno"><option value="2026">2026</option></select>
+                </div>
+                <table class="data-table" id="tableCbo">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Código CBO</th>
+                            <th>Profissão / Especialidade</th>
+                            <th class="text-right">Qtd. Aprovada</th>
+                            <th class="text-right">Valor Aprovado (R$)</th>
+                            <th class="text-right">% do Faturamento</th>
+                            <th class="text-center">Participação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyCbo"></tbody>
+                </table>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card chart-full">
+                    <div class="chart-header"><span><i class="fas fa-chart-pie"></i> Distribuição Financeira por
+                            Profissão (CBO)</span></div>
+                    <div style="height:350px;"><canvas id="chartCbo"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO GLOSAS ======================== -->
+        <section id="section-glosas" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-exclamation-triangle"></i> Módulo de Glosas</h2>
+            </div>
+
+            <div class="kpi-grid kpi-grid-4">
+                <div class="kpi-card kpi-red">
+                    <div class="kpi-icon"><i class="fas fa-times-circle"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Valor Total Glosado</div>
+                        <div class="kpi-value" id="gKpiValGlosado">R$ 6.421,09</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-orange">
+                    <div class="kpi-icon"><i class="fas fa-list"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Qtd. Glosada</div>
+                        <div class="kpi-value" id="gKpiQtdGlosada">2.244</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-yellow">
+                    <div class="kpi-icon"><i class="fas fa-percent"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Taxa de Glosa</div>
+                        <div class="kpi-value" id="gKpiTaxa">0,86%</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-purple">
+                    <div class="kpi-icon"><i class="fas fa-hospital"></i></div>
+                    <div class="kpi-body">
+                        <div class="kpi-label">Unidades com Glosa</div>
+                        <div class="kpi-value" id="gKpiUnidades">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-header"><span><i class="fas fa-chart-bar"></i> Top Unidades com Maior Glosa</span>
+                    </div>
+                    <div style="height:280px;"><canvas id="chartGlosasUnidades"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header"><span><i class="fas fa-chart-line"></i> Evolução Mensal das Glosas</span>
+                    </div>
+                    <div style="height:280px;"><canvas id="chartGlosasMensal"></canvas></div>
+                </div>
+            </div>
+
+            <!-- HEATMAP -->
+            <div class="table-container">
+                <div class="table-header-bar">
+                    <span><i class="fas fa-fire"></i> Heatmap — Glosa por Unidade × Competência</span>
+                </div>
+                <div id="heatmapGlosas" class="heatmap-container"></div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header-bar"><span><i class="fas fa-table"></i> Detalhamento de Glosas por
+                        Unidade</span></div>
+                <table class="data-table" id="tableGlosas">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Unidade</th>
+                            <th class="text-right">Qtd. Glosada</th>
+                            <th class="text-right">Valor Glosado (R$)</th>
+                            <th class="text-right">% Glosa</th>
+                            <th class="text-center">Impacto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyGlosas"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO AUDITORIA ======================== -->
+        <section id="section-auditoria" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-search"></i> Painel de Auditoria Inteligente</h2>
+            </div>
+
+            <div id="alertasAuditoria" class="alertas-grid"></div>
+
+            <div class="table-container" style="margin-top:20px;">
+                <div class="table-header-bar"><span><i class="fas fa-clipboard-list"></i> Registro de Ocorrências
+                        Auditadas</span></div>
+                <table class="data-table" id="tableAuditoria">
+                    <thead>
+                        <tr>
+                            <th>Severidade</th>
+                            <th>Tipo</th>
+                            <th>Unidade</th>
+                            <th>Competência</th>
+                            <th>Descrição</th>
+                            <th>Valor Impactado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyAuditoria"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO REGULAÇÃO ======================== -->
+        <section id="section-regulacao" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-traffic-light"></i> Painel de Regulação — SCAAR</h2>
+            </div>
+
+            <div class="kpi-grid kpi-grid-4">
+                <div class="kpi-card kpi-blue">
+                    <div class="kpi-body">
+                        <div class="kpi-label">Produção Regulada</div>
+                        <div class="kpi-value" id="regKpiProd">257.720</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-green">
+                    <div class="kpi-body">
+                        <div class="kpi-label">Cobertura Executada</div>
+                        <div class="kpi-value" id="regKpiCobertura">99,14%</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-orange">
+                    <div class="kpi-body">
+                        <div class="kpi-label">Demanda Reprimida</div>
+                        <div class="kpi-value" id="regKpiDemanda">2.244</div>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-purple">
+                    <div class="kpi-body">
+                        <div class="kpi-label">Unidades Ativas</div>
+                        <div class="kpi-value" id="regKpiAtivas">21</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-card chart-full">
+                    <div class="chart-header"><span><i class="fas fa-chart-bar"></i> Oferta × Produção por
+                            Unidade</span></div>
+                    <div style="height:320px;"><canvas id="chartRegulacao"></canvas></div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-header-bar"><span><i class="fas fa-table"></i> Monitoramento de Produção vs
+                        Meta</span></div>
+                <table class="data-table" id="tableRegulacao">
+                    <thead>
+                        <tr>
+                            <th>Unidade</th>
+                            <th class="text-right">Produção Esperada</th>
+                            <th class="text-right">Produção Realizada</th>
+                            <th class="text-right">% Execução</th>
+                            <th class="text-right">Diferença</th>
+                            <th class="text-center">Status Regulação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyRegulacao"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO RELATÓRIOS ======================== -->
+        <section id="section-relatorios" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-file-alt"></i> Exportar Relatório</h2>
+                <div class="section-badge">Gere relatórios personalizados com gráficos, resumos e tabelas detalhadas
+                </div>
+            </div>
+
+            <div class="reports-grid">
+                <!-- Coluna Esquerda: Parâmetros e Exportação -->
+                <div class="reports-sidebar-column">
+                    <!-- Painel: Período -->
+                    <div class="reports-panel">
+                        <div class="reports-panel-header">
+                            <i class="fas fa-calendar-alt"></i> Período do Relatório
+                        </div>
+                        <div class="reports-panel-body">
+                            <div class="reports-form-row">
+                                <div class="reports-form-group">
+                                    <label>Ano</label>
+                                    <select id="reportAno">
+                                        <option value="2026">2026</option>
+                                    </select>
+                                </div>
+                                <div class="reports-form-group">
+                                    <label>Mês</label>
+                                    <select id="reportMes">
+                                        <option value="all">Todos</option>
+                                        <option value="01">Janeiro</option>
+                                        <option value="02">Fevereiro</option>
+                                        <option value="03">Março</option>
+                                        <option value="04">Abril</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="reports-form-group">
-                                <label>Mês</label>
-                                <select id="reportMes">
-                                    <option value="all">Todos</option>
-                                    <option value="01">Janeiro</option>
-                                    <option value="02">Fevereiro</option>
-                                    <option value="03">Março</option>
-                                    <option value="04">Abril</option>
+                            <div class="reports-form-group" style="margin-top: 12px;">
+                                <label>Unidade de Saúde</label>
+                                <select id="reportUnidade">
+                                    <option value="all">Todas as Unidades</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="reports-form-group" style="margin-top: 12px;">
-                            <label>Unidade de Saúde</label>
-                            <select id="reportUnidade"><option value="all">Todas as Unidades</option></select>
+                    </div>
+
+                    <!-- Painel: Formato de Exportação -->
+                    <div class="reports-panel" style="margin-top: 20px;">
+                        <div class="reports-panel-header">
+                            <i class="fas fa-file-download"></i> Formato de Exportação
+                        </div>
+                        <div class="reports-panel-body">
+                            <button class="btn-report-action btn-pdf-export" id="btnReportPDF">
+                                <div class="btn-report-icon"><i class="fas fa-file-pdf"></i></div>
+                                <div class="btn-report-text">
+                                    <strong>Relatório Imprimível</strong>
+                                    <span>Abre em nova aba para impressão/PDF</span>
+                                </div>
+                            </button>
+                            <button class="btn-report-action btn-excel-export" id="btnReportExcel"
+                                style="margin-top: 12px;">
+                                <div class="btn-report-icon"><i class="fas fa-file-excel"></i></div>
+                                <div class="btn-report-text">
+                                    <strong>Exportar Excel</strong>
+                                    <span>Planilha com abas detalhadas</span>
+                                </div>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Painel: Formato de Exportação -->
-                <div class="reports-panel" style="margin-top: 20px;">
-                    <div class="reports-panel-header">
-                        <i class="fas fa-file-download"></i> Formato de Exportação
-                    </div>
-                    <div class="reports-panel-body">
-                        <button class="btn-report-action btn-pdf-export" id="btnReportPDF">
-                            <div class="btn-report-icon"><i class="fas fa-file-pdf"></i></div>
-                            <div class="btn-report-text">
-                                <strong>Relatório Imprimível</strong>
-                                <span>Abre em nova aba para impressão/PDF</span>
+                <!-- Coluna Direita: Seções do Relatório -->
+                <div class="reports-content-column">
+                    <div class="reports-panel">
+                        <div class="reports-panel-header">
+                            <i class="fas fa-tasks"></i> Seções do Relatório
+                        </div>
+                        <div class="reports-panel-body">
+                            <p class="reports-info-text">Selecione o que deseja incluir no relatório gerado:</p>
+
+                            <div class="checkbox-list">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkCapa" checked>
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Capa / Identificação</strong>
+                                        <span>Cabeçalho com nome do município, competência e data de geração</span>
+                                    </div>
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkResumo" checked>
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Resumo Geral (KPIs)</strong>
+                                        <span>Total de procedimentos apresentados, aprovados, glosas e valores
+                                            faturados</span>
+                                    </div>
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkFaturamento" checked>
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Faturamento Mensal (Tabela)</strong>
+                                        <span>Evolução mensal do faturamento e tendências por competência</span>
+                                    </div>
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkEficiencia" checked>
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Eficiência por Unidade</strong>
+                                        <span>Ranking de desempenho e aprovação financeira de todas as unidades</span>
+                                    </div>
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkProcedimentos" checked>
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Top Procedimentos</strong>
+                                        <span>Lista dos procedimentos com maior faturamento e produção</span>
+                                    </div>
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkCbo" checked>
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Ocupações e Profissões (CBO)</strong>
+                                        <span>Consolidado de produção e faturamento por especialidade/CBO</span>
+                                    </div>
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkGlosas">
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Módulo de Glosas</strong>
+                                        <span>Detalhamento e Heatmap de glosas por Unidade × Competência</span>
+                                    </div>
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkAuditoria">
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Auditoria Inteligente</strong>
+                                        <span>Alertas automáticos de severidade (crítica, moderada) e
+                                            irregularidades</span>
+                                    </div>
+                                </label>
+
+                                <label class="checkbox-item">
+                                    <input type="checkbox" id="chkRegulacao">
+                                    <span class="checkbox-box"><i class="fas fa-check"></i></span>
+                                    <div class="checkbox-label">
+                                        <strong>Regulação (SCAAR)</strong>
+                                        <span>Monitoramento de produção vs metas contratualizadas</span>
+                                    </div>
+                                </label>
                             </div>
-                        </button>
-                        <button class="btn-report-action btn-excel-export" id="btnReportExcel" style="margin-top: 12px;">
-                            <div class="btn-report-icon"><i class="fas fa-file-excel"></i></div>
-                            <div class="btn-report-text">
-                                <strong>Exportar Excel</strong>
-                                <span>Planilha com abas detalhadas</span>
+
+                            <div class="checkbox-list-actions">
+                                <button class="btn-text-action" id="btnReportCheckAll"><i
+                                        class="fas fa-check-double"></i> Selecionar tudo</button>
+                                <button class="btn-text-action" id="btnReportUncheckAll"
+                                    style="color: var(--sus-red);"><i class="fas fa-times"></i> Desmarcar tudo</button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO ARQUIVOS IMPORTADOS ======================== -->
+        <section id="section-arquivos" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-folder-open"></i> Central de Arquivos Importados</h2>
+                <div class="section-badge">Gestão e Histórico de Cargas do Sistema</div>
+            </div>
+
+            <div class="arquivos-grid">
+                <!-- Card 1: Logomarca do PDF -->
+                <div class="arquivos-card logo-pdf">
+                    <div class="arquivos-card-header">
+                        <div class="arquivos-card-icon"><i class="fas fa-image"></i></div>
+                        <div class="arquivos-card-title">
+                            <h3>Logomarca do PDF</h3>
+                            <span>Personalize o cabeçalho dos relatórios exportados</span>
+                        </div>
+                    </div>
+                    <div class="arquivos-card-body">
+                        <div class="logo-preview-box" id="logoPreviewBox">
+                            <div class="logo-preview-placeholder" id="logoPreviewPlaceholder">
+                                <i class="fas fa-image"></i>
+                                <span>Nenhuma logo carregada (Padrão ativa)</span>
+                            </div>
+                            <img id="logoPreviewImage" class="logo-preview-img hidden" alt="Preview Logo">
+                        </div>
+                        <!-- LOGO HISTORY -->
+                        <div class="logo-history-container" id="logoHistoryContainer">
+                            <div class="logo-history-title">Histórico Recente:</div>
+                            <div class="logo-history-list" id="logoHistoryList"></div>
+                        </div>
+                    </div>
+                    <div class="arquivos-card-actions">
+                        <input type="file" id="fileLogoInput" accept="image/png, image/jpeg" style="display:none;">
+                        <button class="btn-primary" id="btnUploadLogo" style="font-size: 0.8rem; padding: 6px 12px;"><i
+                                class="fas fa-upload"></i> Importar/Alterar</button>
+                        <button class="btn-secondary" id="btnExcluirLogo"
+                            style="font-size: 0.8rem; padding: 6px 12px; color: var(--sus-red); border-color: rgba(198,40,40,0.3);"><i
+                                class="fas fa-trash-alt"></i> Excluir</button>
+                    </div>
+                </div>
+
+                <!-- Card 2: Tabela SIGTAP -->
+                <div class="arquivos-card sigtap">
+                    <div class="arquivos-card-header">
+                        <div class="arquivos-card-icon"><i class="fas fa-table"></i></div>
+                        <div class="arquivos-card-title">
+                            <h3>Tabela Unificada SIGTAP</h3>
+                            <span>Catálogo oficial de procedimentos e descrições do SUS</span>
+                        </div>
+                    </div>
+                    <div class="arquivos-card-body">
+                        <div class="sigtap-status-box">
+                            <span class="sigtap-status-badge missing" id="lblSigtapStatusBadge"><i
+                                    class="fas fa-times-circle"></i> Não Carregada</span>
+                            <span class="sigtap-status-date" id="lblSigtapStatusDate">Importe o arquivo TXT da tabela
+                                SIGTAP</span>
+                        </div>
+                    </div>
+                    <div class="arquivos-card-actions">
+                        <input type="file" id="fileSigtapInput" accept=".txt" style="display:none;">
+                        <button class="btn-primary" id="btnUploadSigtap"
+                            style="font-size: 0.8rem; padding: 6px 12px;"><i class="fas fa-upload"></i>
+                            Importar/Atualizar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela: Histórico de Arquivos de Faturamento SIA/SUS -->
+            <div class="table-container">
+                <div class="table-header-bar">
+                    <span><i class="fas fa-history"></i> Histórico de Arquivos de Faturamento SIA/SUS</span>
+                    <div class="table-actions">
+                        <button class="btn-header" id="btnImportarArquivosPage"
+                            style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; padding: 4px 8px; font-size: 0.75rem; color: #fff; cursor: pointer;">
+                            <i class="fas fa-file-import"></i> Importar Novo TXT
                         </button>
                     </div>
                 </div>
+                <table class="data-table" id="tableHistoricoArquivos">
+                    <thead>
+                        <tr>
+                            <th>Nome do Arquivo</th>
+                            <th>Data de Importação</th>
+                            <th>Competência</th>
+                            <th class="text-right">Procedimentos</th>
+                            <th class="text-right">Valor Aprovado (R$)</th>
+                            <th class="text-center" style="width: 80px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyHistoricoArquivos">
+                        <tr>
+                            <td colspan="6" class="text-center text-muted" style="padding: 15px;">Nenhum arquivo de
+                                faturamento importado</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
+        </section>
 
-            <!-- Coluna Direita: Seções do Relatório -->
-            <div class="reports-content-column">
-                <div class="reports-panel">
-                    <div class="reports-panel-header">
-                        <i class="fas fa-tasks"></i> Seções do Relatório
-                    </div>
-                    <div class="reports-panel-body">
-                        <p class="reports-info-text">Selecione o que deseja incluir no relatório gerado:</p>
-                        
-                        <div class="checkbox-list">
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkCapa" checked>
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Capa / Identificação</strong>
-                                    <span>Cabeçalho com nome do município, competência e data de geração</span>
-                                </div>
-                            </label>
+    </main>
 
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkResumo" checked>
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Resumo Geral (KPIs)</strong>
-                                    <span>Total de procedimentos apresentados, aprovados, glosas e valores faturados</span>
-                                </div>
-                            </label>
-
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkFaturamento" checked>
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Faturamento Mensal (Tabela)</strong>
-                                    <span>Evolução mensal do faturamento e tendências por competência</span>
-                                </div>
-                            </label>
-
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkEficiencia" checked>
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Eficiência por Unidade</strong>
-                                    <span>Ranking de desempenho e aprovação financeira de todas as unidades</span>
-                                </div>
-                            </label>
-
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkProcedimentos" checked>
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Top Procedimentos</strong>
-                                    <span>Lista dos procedimentos com maior faturamento e produção</span>
-                                </div>
-                            </label>
-
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkCbo" checked>
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Ocupações e Profissões (CBO)</strong>
-                                    <span>Consolidado de produção e faturamento por especialidade/CBO</span>
-                                </div>
-                            </label>
-
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkGlosas">
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Módulo de Glosas</strong>
-                                    <span>Detalhamento e Heatmap de glosas por Unidade × Competência</span>
-                                </div>
-                            </label>
-
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkAuditoria">
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Auditoria Inteligente</strong>
-                                    <span>Alertas automáticos de severidade (crítica, moderada) e irregularidades</span>
-                                </div>
-                            </label>
-
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="chkRegulacao">
-                                <span class="checkbox-box"><i class="fas fa-check"></i></span>
-                                <div class="checkbox-label">
-                                    <strong>Regulação (SCAAR)</strong>
-                                    <span>Monitoramento de produção vs metas contratualizadas</span>
-                                </div>
-                            </label>
-                        </div>
-
-                        <div class="checkbox-list-actions">
-                            <button class="btn-text-action" id="btnReportCheckAll"><i class="fas fa-check-double"></i> Selecionar tudo</button>
-                            <button class="btn-text-action" id="btnReportUncheckAll" style="color: var(--sus-red);"><i class="fas fa-times"></i> Desmarcar tudo</button>
-                        </div>
-                    </div>
-                </div>
+    <!-- ===== MODAL IMPORTAR ===== -->
+    <div id="modalImportar" class="modal-overlay hidden">
+        <div class="modal-box modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-import"></i> Importar Dados SIA/SUS</h3>
+                <button class="modal-close" id="btnFecharImportar"><i class="fas fa-times"></i></button>
             </div>
-        </div>
-    </section>
+            <div class="modal-body">
+                <div class="import-tabs">
+                    <button class="import-tab active" data-tab="txt">📄 Arquivo TXT</button>
+                    <button class="import-tab" data-tab="manual">✏️ Entrada Manual</button>
+                    <button class="import-tab" data-tab="demo">🎯 Dados Demo</button>
+                </div>
 
-    <!-- ======================== SEÇÃO ARQUIVOS IMPORTADOS ======================== -->
-    <section id="section-arquivos" class="content-section">
-        <div class="section-header">
-            <h2><i class="fas fa-folder-open"></i> Central de Arquivos Importados</h2>
-            <div class="section-badge">Gestão e Histórico de Cargas do Sistema</div>
-        </div>
+                <!-- TAB TXT -->
+                <div id="importTabTxt" class="import-tab-content active">
+                    <div class="dropzone" id="dropzone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Arraste o arquivo TXT da Síntese SIA/SUS aqui</p>
+                        <p class="drop-sub">ou clique para selecionar</p>
+                        <input type="file" id="fileInput" accept=".txt,.csv" style="display:none">
+                        <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-folder-open"></i> Selecionar Arquivo
+                        </button>
+                    </div>
+                    <div id="importPreview" class="import-preview hidden"></div>
+                </div>
 
-        <div class="arquivos-grid">
-            <!-- Card 1: Logomarca do PDF -->
-            <div class="arquivos-card logo-pdf">
-                <div class="arquivos-card-header">
-                    <div class="arquivos-card-icon"><i class="fas fa-image"></i></div>
-                    <div class="arquivos-card-title">
-                        <h3>Logomarca do PDF</h3>
-                        <span>Personalize o cabeçalho dos relatórios exportados</span>
-                    </div>
+                <!-- TAB MANUAL -->
+                <div id="importTabManual" class="import-tab-content">
+                    <p class="import-info">Cole aqui o conteúdo do arquivo TXT da Síntese SIA/SUS:</p>
+                    <textarea id="txtManualInput" rows="12" placeholder="Cole o conteúdo do arquivo TXT aqui..."
+                        class="import-textarea"></textarea>
+                    <button class="btn-primary" id="btnProcessarManual"><i class="fas fa-cogs"></i> Processar
+                        Dados</button>
                 </div>
-                <div class="arquivos-card-body">
-                    <div class="logo-preview-box" id="logoPreviewBox">
-                        <div class="logo-preview-placeholder" id="logoPreviewPlaceholder">
-                            <i class="fas fa-image"></i>
-                            <span>Nenhuma logo carregada (Padrão ativa)</span>
-                        </div>
-                        <img id="logoPreviewImage" class="logo-preview-img hidden" alt="Preview Logo">
-                    </div>
-                </div>
-                <div class="arquivos-card-actions">
-                    <input type="file" id="fileLogoInput" accept="image/png, image/jpeg" style="display:none;">
-                    <button class="btn-primary" id="btnUploadLogo" style="font-size: 0.8rem; padding: 6px 12px;"><i class="fas fa-upload"></i> Importar/Alterar</button>
-                    <button class="btn-secondary" id="btnExcluirLogo" style="font-size: 0.8rem; padding: 6px 12px; color: var(--sus-red); border-color: rgba(198,40,40,0.3);"><i class="fas fa-trash-alt"></i> Excluir</button>
-                </div>
-            </div>
 
-            <!-- Card 2: Tabela SIGTAP -->
-            <div class="arquivos-card sigtap">
-                <div class="arquivos-card-header">
-                    <div class="arquivos-card-icon"><i class="fas fa-table"></i></div>
-                    <div class="arquivos-card-title">
-                        <h3>Tabela Unificada SIGTAP</h3>
-                        <span>Catálogo oficial de procedimentos e descrições do SUS</span>
+                <!-- TAB DEMO -->
+                <div id="importTabDemo" class="import-tab-content">
+                    <div class="demo-info">
+                        <i class="fas fa-info-circle"></i>
+                        <p>Carregue os dados de demonstração baseados no consolidado real de Bacabal/MA — Janeiro a
+                            Abril de 2026.</p>
                     </div>
-                </div>
-                <div class="arquivos-card-body">
-                    <div class="sigtap-status-box">
-                        <span class="sigtap-status-badge missing" id="lblSigtapStatusBadge"><i class="fas fa-times-circle"></i> Não Carregada</span>
-                        <span class="sigtap-status-date" id="lblSigtapStatusDate">Importe o arquivo TXT da tabela SIGTAP</span>
-                    </div>
-                </div>
-                <div class="arquivos-card-actions">
-                    <input type="file" id="fileSigtapInput" accept=".txt" style="display:none;">
-                    <button class="btn-primary" id="btnUploadSigtap" style="font-size: 0.8rem; padding: 6px 12px;"><i class="fas fa-upload"></i> Importar/Atualizar</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tabela: Histórico de Arquivos de Faturamento SIA/SUS -->
-        <div class="table-container">
-            <div class="table-header-bar">
-                <span><i class="fas fa-history"></i> Histórico de Arquivos de Faturamento SIA/SUS</span>
-                <div class="table-actions">
-                    <button class="btn-header" id="btnImportarArquivosPage" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; padding: 4px 8px; font-size: 0.75rem; color: #fff; cursor: pointer;">
-                        <i class="fas fa-file-import"></i> Importar Novo TXT
+                    <button class="btn-primary btn-large" id="btnCarregarDemo">
+                        <i class="fas fa-database"></i> Carregar Dados Demo — Bacabal/MA 2026
                     </button>
                 </div>
             </div>
-            <table class="data-table" id="tableHistoricoArquivos">
-                <thead>
-                    <tr>
-                        <th>Nome do Arquivo</th>
-                        <th>Data de Importação</th>
-                        <th>Competência</th>
-                        <th class="text-right">Procedimentos</th>
-                        <th class="text-right">Valor Aprovado (R$)</th>
-                        <th class="text-center" style="width: 80px;">Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="tbodyHistoricoArquivos">
-                    <tr>
-                        <td colspan="6" class="text-center text-muted" style="padding: 15px;">Nenhum arquivo de faturamento importado</td>
-                    </tr>
-                </tbody>
-            </table>
         </div>
-    </section>
+    </div>
 
-</main>
-
-<!-- ===== MODAL IMPORTAR ===== -->
-<div id="modalImportar" class="modal-overlay hidden">
-    <div class="modal-box modal-large">
-        <div class="modal-header">
-            <h3><i class="fas fa-file-import"></i> Importar Dados SIA/SUS</h3>
-            <button class="modal-close" id="btnFecharImportar"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <div class="import-tabs">
-                <button class="import-tab active" data-tab="txt">📄 Arquivo TXT</button>
-                <button class="import-tab" data-tab="manual">✏️ Entrada Manual</button>
-                <button class="import-tab" data-tab="demo">🎯 Dados Demo</button>
+    <!-- ===== MODAL ARGOS IA ===== -->
+    <div id="modalArgosIA" class="modal-overlay hidden">
+        <div class="modal-box modal-large">
+            <div class="modal-header argos-header">
+                <h3><i class="fas fa-robot"></i> ARGOS IA — Análise Inteligente da Produção</h3>
+                <button class="modal-close" id="btnFecharArgos"><i class="fas fa-times"></i></button>
             </div>
-
-            <!-- TAB TXT -->
-            <div id="importTabTxt" class="import-tab-content active">
-                <div class="dropzone" id="dropzone">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <p>Arraste o arquivo TXT da Síntese SIA/SUS aqui</p>
-                    <p class="drop-sub">ou clique para selecionar</p>
-                    <input type="file" id="fileInput" accept=".txt,.csv" style="display:none">
-                    <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">
-                        <i class="fas fa-folder-open"></i> Selecionar Arquivo
-                    </button>
+            <div class="modal-body">
+                <div class="argos-intro">
+                    <i class="fas fa-brain argos-brain"></i>
+                    <p>O sistema ARGOS analisa automaticamente a produção ambulatorial e gera insights estratégicos para
+                        gestores.</p>
                 </div>
-                <div id="importPreview" class="import-preview hidden"></div>
-            </div>
-
-            <!-- TAB MANUAL -->
-            <div id="importTabManual" class="import-tab-content">
-                <p class="import-info">Cole aqui o conteúdo do arquivo TXT da Síntese SIA/SUS:</p>
-                <textarea id="txtManualInput" rows="12" placeholder="Cole o conteúdo do arquivo TXT aqui..." class="import-textarea"></textarea>
-                <button class="btn-primary" id="btnProcessarManual"><i class="fas fa-cogs"></i> Processar Dados</button>
-            </div>
-
-            <!-- TAB DEMO -->
-            <div id="importTabDemo" class="import-tab-content">
-                <div class="demo-info">
-                    <i class="fas fa-info-circle"></i>
-                    <p>Carregue os dados de demonstração baseados no consolidado real de Bacabal/MA — Janeiro a Abril de 2026.</p>
-                </div>
-                <button class="btn-primary btn-large" id="btnCarregarDemo">
-                    <i class="fas fa-database"></i> Carregar Dados Demo — Bacabal/MA 2026
+                <button class="btn-primary btn-argos-analyze" id="btnAnalisarArgos">
+                    <i class="fas fa-search"></i> Analisar Produção
                 </button>
+                <div id="argosResult" class="argos-result hidden"></div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- ===== MODAL ARGOS IA ===== -->
-<div id="modalArgosIA" class="modal-overlay hidden">
-    <div class="modal-box modal-large">
-        <div class="modal-header argos-header">
-            <h3><i class="fas fa-robot"></i> ARGOS IA — Análise Inteligente da Produção</h3>
-            <button class="modal-close" id="btnFecharArgos"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <div class="argos-intro">
-                <i class="fas fa-brain argos-brain"></i>
-                <p>O sistema ARGOS analisa automaticamente a produção ambulatorial e gera insights estratégicos para gestores.</p>
+    <!-- ===== MODAL SUPABASE CONEXAO ===== -->
+    <div id="modalSupabase" class="modal-overlay hidden">
+        <div class="modal-box modal-medium">
+            <div class="modal-header"
+                style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;"><i
+                        class="fas fa-database" style="color: #3ecf8e;"></i> Configurar Supabase</h3>
+                <button class="modal-close" id="btnFecharSupabase"
+                    style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.1rem;"><i
+                        class="fas fa-times"></i></button>
             </div>
-            <button class="btn-primary btn-argos-analyze" id="btnAnalisarArgos">
-                <i class="fas fa-search"></i> Analisar Produção
-            </button>
-            <div id="argosResult" class="argos-result hidden"></div>
-        </div>
-    </div>
-</div>
-
-<!-- ===== MODAL SUPABASE CONEXAO ===== -->
-<div id="modalSupabase" class="modal-overlay hidden">
-    <div class="modal-box modal-medium">
-        <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px;">
-            <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;"><i class="fas fa-database" style="color: #3ecf8e;"></i> Configurar Supabase</h3>
-            <button class="modal-close" id="btnFecharSupabase" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.1rem;"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body" style="padding: 20px;">
-            <p style="margin-top: 0; margin-bottom: 15px; font-size: 0.9rem; color: #64748b; line-height: 1.4;">
-                Insira as credenciais do seu projeto Supabase abaixo. Suas chaves ficarão salvas com segurança no armazenamento local do seu navegador (localStorage).
-            </p>
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label for="supabaseUrl" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: #334155;">Supabase URL (API URL)</label>
-                <input type="text" id="supabaseUrl" placeholder="https://xxxx.supabase.co" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box;">
-            </div>
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label for="supabaseAnonKey" style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: #334155;">Supabase Public Anon Key (Key Pública)</label>
-                <input type="password" id="supabaseAnonKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box;">
-            </div>
-            <div class="supabase-actions" style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button class="btn-secondary" id="btnTestarConexaoSupabase" style="padding: 8px 16px; border-radius: 6px; cursor: pointer;"><i class="fas fa-plug"></i> Testar Conexão</button>
-                <button class="btn-primary" id="btnSalvarSupabase" style="background-color: #3ecf8e; border-color: #3ecf8e; color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer;"><i class="fas fa-save"></i> Salvar e Conectar</button>
-            </div>
-            <div id="supabaseTestResult" style="margin-top: 15px; padding: 10px; border-radius: 6px; font-size: 0.85rem; display: none; line-height: 1.4;"></div>
-        </div>
-    </div>
-</div>
-
-<!-- ===== MODAL CONFIRMAR EXCLUSÃO ===== -->
-<div id="modalConfirmarExclusao" class="modal-overlay hidden">
-    <div class="modal-box modal-medium" style="max-width: 440px;">
-        <div class="modal-header" style="background: linear-gradient(135deg, #c62828, #d32f2f); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-radius: 16px 16px 0 0;">
-            <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;"><i class="fas fa-trash-alt"></i> Confirmar Exclusão</h3>
-            <button class="modal-close" id="btnFecharConfirmarExclusao" style="background: none; border: none; color: #ffcdd2; cursor: pointer; font-size: 1.1rem;"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body" style="padding: 20px 24px; text-align: center;">
-            <div style="font-size: 2.2rem; color: #ef4444; margin-bottom: 12px;"><i class="fas fa-exclamation-triangle"></i></div>
-            <p style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem; font-weight: 600; color: #1e293b; line-height: 1.4;">
-                Você tem certeza de que deseja excluir permanentemente este arquivo de faturamento do sistema?
-            </p>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 20px; text-align: left; font-size: 0.82rem; color: #475569; line-height: 1.5;">
-                <div style="margin-bottom: 4px;"><strong>Arquivo:</strong> <span id="delConfirmName" style="color: #0f172a; font-weight: 600;">-</span></div>
-                <div><strong>Importado em:</strong> <span id="delConfirmDate" style="color: #0f172a;">-</span></div>
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: center;">
-                <button class="btn-secondary" id="btnConfirmarExclusaoOk" style="padding: 8px 18px; border-radius: 6px; font-weight: 600; border-color: #cbd5e1; background-color: #cbd5e1; color: #334155; font-size: 0.85rem;"><i class="fas fa-check"></i> Confirmar</button>
-                <button class="btn-primary" id="btnConfirmarExclusaoCancelar" style="padding: 8px 18px; border-radius: 6px; font-weight: 700; background-color: #ef4444; border-color: #ef4444; color: white; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);"><i class="fas fa-times"></i> Não</button>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="margin-top: 0; margin-bottom: 15px; font-size: 0.9rem; color: #64748b; line-height: 1.4;">
+                    Insira as credenciais do seu projeto Supabase abaixo. Suas chaves ficarão salvas com segurança no
+                    armazenamento local do seu navegador (localStorage).
+                </p>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label for="supabaseUrl"
+                        style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: #334155;">Supabase
+                        URL (API URL)</label>
+                    <input type="text" id="supabaseUrl" placeholder="https://xxxx.supabase.co"
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box;">
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="supabaseAnonKey"
+                        style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: #334155;">Supabase
+                        Public Anon Key (Key Pública)</label>
+                    <input type="password" id="supabaseAnonKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box;">
+                </div>
+                <div class="supabase-actions" style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn-secondary" id="btnTestarConexaoSupabase"
+                        style="padding: 8px 16px; border-radius: 6px; cursor: pointer;"><i class="fas fa-plug"></i>
+                        Testar Conexão</button>
+                    <button class="btn-primary" id="btnSalvarSupabase"
+                        style="background-color: #3ecf8e; border-color: #3ecf8e; color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer;"><i
+                            class="fas fa-save"></i> Salvar e Conectar</button>
+                </div>
+                <div id="supabaseTestResult"
+                    style="margin-top: 15px; padding: 10px; border-radius: 6px; font-size: 0.85rem; display: none; line-height: 1.4;">
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- ===== TOAST ===== -->
-<div id="toast" class="toast hidden"></div>
-
-<!-- ===== LOADING ===== -->
-<div id="loadingOverlay" class="loading-overlay hidden">
-    <div class="loading-box">
-        <div class="loading-spinner"></div>
-        <p id="loadingMsg">Processando dados...</p>
+    <!-- ===== MODAL CONFIRMAR EXCLUSÃO ===== -->
+    <div id="modalConfirmarExclusao" class="modal-overlay hidden">
+        <div class="modal-box modal-medium" style="max-width: 440px;">
+            <div class="modal-header"
+                style="background: linear-gradient(135deg, #c62828, #d32f2f); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-radius: 16px 16px 0 0;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;"><i
+                        class="fas fa-trash-alt"></i> Confirmar Exclusão</h3>
+                <button class="modal-close" id="btnFecharConfirmarExclusao"
+                    style="background: none; border: none; color: #ffcdd2; cursor: pointer; font-size: 1.1rem;"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 20px 24px; text-align: center;">
+                <div style="font-size: 2.2rem; color: #ef4444; margin-bottom: 12px;"><i
+                        class="fas fa-exclamation-triangle"></i></div>
+                <p
+                    style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem; font-weight: 600; color: #1e293b; line-height: 1.4;">
+                    Você tem certeza de que deseja excluir permanentemente este arquivo de faturamento do sistema?
+                </p>
+                <div
+                    style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 20px; text-align: left; font-size: 0.82rem; color: #475569; line-height: 1.5;">
+                    <div style="margin-bottom: 4px;"><strong>Arquivo:</strong> <span id="delConfirmName"
+                            style="color: #0f172a; font-weight: 600;">-</span></div>
+                    <div><strong>Importado em:</strong> <span id="delConfirmDate" style="color: #0f172a;">-</span></div>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button class="btn-secondary" id="btnConfirmarExclusaoOk"
+                        style="padding: 8px 18px; border-radius: 6px; font-weight: 600; border-color: #cbd5e1; background-color: #cbd5e1; color: #334155; font-size: 0.85rem;"><i
+                            class="fas fa-check"></i> Confirmar</button>
+                    <button class="btn-primary" id="btnConfirmarExclusaoCancelar"
+                        style="padding: 8px 18px; border-radius: 6px; font-weight: 700; background-color: #ef4444; border-color: #ef4444; color: white; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);"><i
+                            class="fas fa-times"></i> Não</button>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
-<!-- Scripts -->
-<!-- Banco de Dados e Serviços -->
-<script src="js/db.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabase-config.js"></script>
-<script src="js/supabase-service.js"></script>
+    <!-- ===== TOAST ===== -->
+    <div id="toast" class="toast hidden"></div>
 
-<!-- Dicionários de Dados -->
-<script src="js/data.js"></script>
-<script src="js/sigtap.js"></script>
-<script src="js/cbo.js"></script>
-<script src="js/scaar_logo.js?v=3.0.2"></script>
+    <!-- ===== LOADING ===== -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-box">
+            <div class="loading-spinner"></div>
+            <p id="loadingMsg">Processando dados...</p>
+        </div>
+    </div>
 
-<!-- Parsers e Motores Auxiliares -->
-<script src="js/parser.js"></script>
-<script src="js/charts.js"></script>
-<script src="js/export.js?v=3.0.3"></script>
+    <!-- Scripts -->
+    <!-- Banco de Dados e Serviços -->
+    <script src="js/db.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/supabase-service.js"></script>
 
-<!-- Módulos de Interface (Telas) -->
-<script src="js/login.js"></script>
-<script src="js/account.js"></script>
-<script src="js/users.js"></script>
+    <!-- Dicionários de Dados -->
+    <script src="js/data.js"></script>
+    <script src="js/sigtap.js"></script>
+    <script src="js/cbo.js"></script>
+    <script src="js/scaar_logo.js?v=3.0.2"></script>
 
-<!-- Script Principal da Aplicação -->
-<script src="js/app.js?v=3.0.3"></script>
+    <!-- Parsers e Motores Auxiliares -->
+    <script src="js/parser.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/export.js?v=3.0.3"></script>
+
+    <!-- Módulos de Interface (Telas) -->
+    <script src="js/login.js"></script>
+    <script src="js/account.js"></script>
+    <script src="js/users.js"></script>
+
+    <!-- Script Principal da Aplicação -->
+    <script src="js/app.js?v=3.0.3"></script>
 
 </body>
+
 </html>

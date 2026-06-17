@@ -6,6 +6,8 @@
 const UsersModule = {
     dbKey: 'argos_users_db',
     users: [],
+    currentHistoryData: [],
+    currentHistoryUser: null,
 
     init() {
         this.loadUsers();
@@ -38,11 +40,17 @@ const UsersModule = {
         const btnCancel = document.getElementById('btnCancelUser');
         const formUser = document.getElementById('formUser');
         const searchInput = document.getElementById('searchUser');
+        const btnBack = document.getElementById('btnBackToUsers');
+        const btnApplyHistoryFilters = document.getElementById('btnApplyHistoryFilters');
+        const btnClearHistoryFilters = document.getElementById('btnClearHistoryFilters');
 
         if (btnNovo) btnNovo.addEventListener('click', () => this.openModal());
         if (btnCloseModal) btnCloseModal.addEventListener('click', () => this.closeModal());
         if (btnCancel) btnCancel.addEventListener('click', () => this.closeModal());
         if (formUser) formUser.addEventListener('submit', (e) => this.handleSaveUser(e));
+        if (btnBack) btnBack.addEventListener('click', () => this.backToUserList());
+        if (btnApplyHistoryFilters) btnApplyHistoryFilters.addEventListener('click', () => this.applyHistoryFilters());
+        if (btnClearHistoryFilters) btnClearHistoryFilters.addEventListener('click', () => this.clearHistoryFilters());
         
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
@@ -60,6 +68,7 @@ const UsersModule = {
         document.addEventListener('click', (e) => {
             const navItem = e.target.closest('.nav-item[data-section="usuarios"]');
             if (navItem) {
+                this.backToUserList();
                 this.loadUsers();
             }
         });
@@ -105,6 +114,14 @@ const UsersModule = {
             if (u.status === 'BLOQUEADO') statusBadge = `<span class="badge-action" style="background:#ffebee;color:#c62828;">Bloqueado</span>`;
             if (u.status === 'INATIVO') statusBadge = `<span class="badge-action" style="background:#eceff1;color:#546e7a;">Inativo</span>`;
 
+            // Tentativas falhas
+            const failedCount = this.getFailedAttempts(u);
+            let failedHtml = '';
+            if (failedCount > 0) {
+                const badgeColor = failedCount >= 4 ? '#d32f2f' : '#f57c00';
+                failedHtml = `<div style="font-size:0.7rem;color:${badgeColor};font-weight:600;margin-top:4px;"><i class="fas fa-exclamation-triangle"></i> Falhas: ${failedCount}/5</div>`;
+            }
+
             // Role Badge
             let roleBadge = `<span class="badge-action" style="background:#fff3e0;color:#ef6c00;">Administrador</span>`;
             if (u.role === 'GERENTE') roleBadge = `<span class="badge-action" style="background:#e3f2fd;color:#1565c0;">Gerente</span>`;
@@ -113,7 +130,8 @@ const UsersModule = {
             const lastLogin = this.getLastLogin(u.username);
             
             const isMe = currentUser && currentUser.username === u.username;
-            const nameHtml = isMe ? `${u.name} <span style="background:#e0f2f1;color:#00796b;font-size:0.6rem;padding:2px 6px;border-radius:10px;margin-left:5px;">Você</span>` : u.name;
+            const nameSpan = `<span class="clickable-user-name" onclick="UsersModule.viewUserHistory('${u.username}', '${u.name}')" style="color: var(--sus-blue); cursor: pointer; font-weight: 700; transition: color 0.2s;" onmouseover="this.style.color='var(--sus-blue-light)'; this.style.textDecoration='underline';" onmouseout="this.style.color='var(--sus-blue)'; this.style.textDecoration='none';">${u.name}</span>`;
+            const nameHtml = isMe ? `${nameSpan} <span style="background:#e0f2f1;color:#00796b;font-size:0.6rem;padding:2px 6px;border-radius:10px;margin-left:5px;">Você</span>` : nameSpan;
 
             const registerDate = u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : (u.createdAt ? u.createdAt.split(',')[0] : '-');
 
@@ -121,18 +139,18 @@ const UsersModule = {
                 <td style="font-weight:600;">${nameHtml}</td>
                 <td>${u.email}</td>
                 <td>${roleBadge}</td>
-                <td>${statusBadge}</td>
+                <td>${statusBadge}${failedHtml}</td>
                 <td>${registerDate}</td>
                 <td>${lastLogin}</td>
                 <td style="text-align:right;">
-                    ${this.getActionButtons(u, isMe)}
+                    ${this.getActionButtons(u, isMe, failedCount)}
                 </td>
             `;
             tbody.appendChild(tr);
         });
     },
 
-    getActionButtons(user, isMe) {
+    getActionButtons(user, isMe, failedCount) {
         let html = '';
         
         // Editar
@@ -141,10 +159,15 @@ const UsersModule = {
         // Redefinir Senha
         html += `<button class="btn-user-action btn-key" title="Redefinir Senha" onclick="UsersModule.resetPassword('${user.username}')"><i class="fas fa-key"></i></button>`;
 
+        // Zerar tentativas (se não for o próprio usuário, sempre visível para facilitar auditoria)
+        if (!isMe) {
+            html += `<button class="btn-user-action btn-reset-attempts" style="background:#fffde7;color:#f57f17;border:1px solid #ffe082;" title="Zerar Tentativas Falhas" onclick="UsersModule.resetFailedAttempts('${user.username}')" onmouseover="this.style.background='#f57f17'; this.style.color='#fff';" onmouseout="this.style.background='#fffde7'; this.style.color='#f57f17';"><i class="fas fa-redo"></i></button>`;
+        }
+
         // Bloquear (Se não for eu mesmo)
         if (!isMe) {
             if (user.status === 'BLOQUEADO') {
-                html += `<button class="btn-user-action btn-unlock" title="Desbloquear Usuário" onclick="UsersModule.toggleBlock('${user.username}')"><i class="fas fa-lock-open"></i></button>`;
+                html += `<button class="btn-user-action btn-unlock" title="Desbloquear/Ativar Usuário" onclick="UsersModule.toggleBlock('${user.username}')"><i class="fas fa-lock-open"></i></button>`;
             } else {
                 html += `<button class="btn-user-action btn-lock" title="Bloquear Usuário" onclick="UsersModule.toggleBlock('${user.username}')"><i class="fas fa-lock"></i></button>`;
             }
@@ -413,6 +436,184 @@ const UsersModule = {
             this.saveUsersLocal();
         }
         if (window.LoginModule) LoginModule.showToast(`Senha redefinida para ${user.name}.`, 'success');
+    },
+
+    async viewUserHistory(username, fullName) {
+        this.currentHistoryUser = username;
+        
+        const listContainer = document.getElementById('users-list-container');
+        const historyContainer = document.getElementById('users-history-container');
+        const labelUser = document.getElementById('historySelectedUser');
+        const btnNovoUsuario = document.getElementById('btnNovoUsuario');
+
+        if (!listContainer || !historyContainer || !labelUser || !btnNovoUsuario) return;
+
+        // Ocultar a lista de usuários e o botão de criar novo
+        listContainer.classList.add('hidden');
+        btnNovoUsuario.classList.add('hidden');
+        historyContainer.classList.remove('hidden');
+
+        labelUser.textContent = fullName;
+        this.clearHistoryFilters(); // Zera os campos visualmente antes de carregar
+        
+        const tbody = document.getElementById('userSingleHistoryTableBody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Carregando histórico...</td></tr>';
+        }
+
+        // Buscar histórico do usuário
+        let userHistory = [];
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            try {
+                userHistory = await window.SupabaseService.getUserActionHistory(username);
+            } catch (err) {
+                console.error("Erro ao buscar logs do Supabase, usando local:", err);
+                let history = [];
+                try { history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); } catch(e){}
+                userHistory = history.filter(h => h.user === username);
+            }
+        } else {
+            let history = [];
+            try { history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); } catch(e){}
+            userHistory = history.filter(h => h.user === username);
+        }
+
+        this.currentHistoryData = userHistory;
+        this.renderHistoryTable(userHistory);
+    },
+
+    renderHistoryTable(historyList) {
+        const tbody = document.getElementById('userSingleHistoryTableBody');
+        if (!tbody) return;
+
+        if (historyList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;padding:20px;">Nenhum registro de ação atende aos filtros aplicados.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        historyList.forEach(reg => {
+            const tr = document.createElement('tr');
+            
+            const dateStr = AccountModule.formatDateStr(reg.date);
+            const badgeClass = reg.action === 'LOGIN' ? 'badge-login' : 
+                               reg.action === 'LOGOUT' ? 'badge-logout' : 'badge-general';
+
+            tr.innerHTML = `
+                <td>${dateStr}</td>
+                <td><span class="badge-action ${badgeClass}">${reg.action}</span></td>
+                <td>${reg.module}</td>
+                <td>${reg.desc}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    },
+
+    applyHistoryFilters() {
+        const startDateVal = document.getElementById('historyFilterStartDate').value;
+        const endDateVal = document.getElementById('historyFilterEndDate').value;
+        const actionVal = document.getElementById('historyFilterAction').value;
+        const moduleVal = document.getElementById('historyFilterModule').value;
+
+        let filtered = [...this.currentHistoryData];
+
+        // Filtro por data de início
+        if (startDateVal) {
+            const start = new Date(startDateVal + 'T00:00:00');
+            filtered = filtered.filter(h => {
+                const date = new Date(h.date);
+                return date >= start;
+            });
+        }
+
+        // Filtro por data de término
+        if (endDateVal) {
+            const end = new Date(endDateVal + 'T23:59:59');
+            filtered = filtered.filter(h => {
+                const date = new Date(h.date);
+                return date <= end;
+            });
+        }
+
+        // Filtro por ação
+        if (actionVal !== 'all') {
+            filtered = filtered.filter(h => h.action === actionVal);
+        }
+
+        // Filtro por módulo
+        if (moduleVal !== 'all') {
+            filtered = filtered.filter(h => h.module === moduleVal);
+        }
+
+        this.renderHistoryTable(filtered);
+    },
+
+    clearHistoryFilters() {
+        const start = document.getElementById('historyFilterStartDate');
+        const end = document.getElementById('historyFilterEndDate');
+        const action = document.getElementById('historyFilterAction');
+        const module = document.getElementById('historyFilterModule');
+
+        if (start) start.value = '';
+        if (end) end.value = '';
+        if (action) action.value = 'all';
+        if (module) module.value = 'all';
+
+        this.renderHistoryTable(this.currentHistoryData);
+    },
+
+    backToUserList() {
+        const listContainer = document.getElementById('users-list-container');
+        const historyContainer = document.getElementById('users-history-container');
+        const btnNovoUsuario = document.getElementById('btnNovoUsuario');
+
+        if (listContainer && historyContainer && btnNovoUsuario) {
+            listContainer.classList.remove('hidden');
+            btnNovoUsuario.classList.remove('hidden');
+            historyContainer.classList.add('hidden');
+        }
+    },
+
+    getFailedAttempts(user) {
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            return parseInt(localStorage.getItem('failed_attempts_' + user.username) || '0');
+        }
+        return user.failedAttempts || 0;
+    },
+
+    async resetFailedAttempts(username) {
+        const isOnline = window.SupabaseConfig && window.SupabaseConfig.isConnected();
+        const loggedUser = this.getCurrentUser();
+        const user = this.users.find(u => u.username === username);
+
+        if (!user) return;
+
+        if (isOnline) {
+            // Zerar localmente para o navegador do admin
+            localStorage.removeItem('failed_attempts_' + username);
+            
+            // Se o usuário estiver BLOQUEADO, desbloqueia ele na nuvem (status -> ATIVO)
+            if (user.status === 'BLOQUEADO') {
+                try {
+                    await window.SupabaseService.updateUserStatus(username, 'ATIVO');
+                    if (loggedUser) {
+                        await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'STATUS_USUARIO', `Conta de ${user.name} desbloqueada e tentativas resetadas.`);
+                    }
+                } catch (err) {
+                    alert("Erro ao desbloquear usuário no Supabase: " + err.message);
+                    return;
+                }
+            }
+        } else {
+            user.failedAttempts = 0;
+            if (user.status === 'BLOQUEADO') {
+                user.status = 'ATIVO';
+            }
+            this.saveUsersLocal();
+        }
+        
+        await this.loadUsers();
+        if (window.LoginModule) LoginModule.showToast(`Contador de tentativas de ${user.name} zerado com sucesso!`, 'success');
     }
 };
 

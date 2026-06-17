@@ -1195,7 +1195,7 @@ const PDFExport = {
         
         // Empurra o texto para a direita do logo
         const textX = scaarImg ? 32 : 14;
-        doc.text(`Emitido em ${fmt.data()} | ARGOS FPA - Ver Mais. Decidir Melhor. | SCAAR — Controle, Avaliação, Auditoria e Regulação`, textX, pageH - 5);
+        doc.text(`Emitido em ${fmt.data()} | ARGOS FPA - Monitoramento Inteligente. Gestão Eficiente. | SCAAR — Controle, Avaliação, Auditoria e Regulação`, textX, pageH - 5);
         doc.text(`Página ${pageNum} de ${totalPages}`, pageW - 14, pageH - 5, { align: 'right' });
     },
 

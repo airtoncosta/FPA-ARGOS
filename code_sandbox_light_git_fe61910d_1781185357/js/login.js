@@ -309,18 +309,29 @@ const LoginModule = {
         if (userNameHeader) userNameHeader.textContent = user.name;
         if (userRoleHeader) {
             userRoleHeader.textContent = user.role;
-            // Cor do distintivo com base na permissão
+            // Cor do distintivo com base na permissão (Estilo Pill Premium)
             if (user.role === 'ADM') {
                 userRoleHeader.style.color = '#ff8a80'; // Vermelho suave / Coral
+                userRoleHeader.style.backgroundColor = 'rgba(255, 138, 128, 0.12)';
+                userRoleHeader.style.border = '1px solid rgba(255, 138, 128, 0.25)';
             } else if (user.role === 'GERENTE') {
                 userRoleHeader.style.color = '#82b1ff'; // Azul suave
+                userRoleHeader.style.backgroundColor = 'rgba(130, 177, 255, 0.12)';
+                userRoleHeader.style.border = '1px solid rgba(130, 177, 255, 0.25)';
             } else {
                 userRoleHeader.style.color = '#b2dfdb'; // Verde/teal claro
+                userRoleHeader.style.backgroundColor = 'rgba(178, 223, 219, 0.12)';
+                userRoleHeader.style.border = '1px solid rgba(178, 223, 219, 0.25)';
             }
         }
 
         // Aplicar as permissões e restrições baseadas no cargo
         this.applyPermissions(user.role);
+
+        // Atualiza a tela Minha Conta imediatamente com as informações do novo usuário
+        if (window.AccountModule) {
+            await window.AccountModule.refreshAccountView();
+        }
 
         // Sincronizar Logomarca e SIGTAP da nuvem (Supabase) ao logar
         if (window.SupabaseConfig && window.SupabaseConfig.isConnected() && window.SupabaseService) {
@@ -416,6 +427,24 @@ const LoginModule = {
         const loginForm = document.getElementById('login-form');
         if (loginForm) loginForm.reset();
 
+        // Ocultar e limpar a mensagem de erro/sucesso inline
+        const loginErrorMsg = document.getElementById('login-error-msg');
+        if (loginErrorMsg) {
+            loginErrorMsg.textContent = '';
+            loginErrorMsg.classList.add('hidden');
+        }
+
+        // Limpar dados do cabeçalho do usuário
+        const userNameHeader = document.getElementById('userNameHeader');
+        const userRoleHeader = document.getElementById('userRoleHeader');
+        if (userNameHeader) userNameHeader.textContent = '-';
+        if (userRoleHeader) {
+            userRoleHeader.textContent = '-';
+            userRoleHeader.style.color = '';
+            userRoleHeader.style.backgroundColor = '';
+            userRoleHeader.style.border = '';
+        }
+
         // Resetar requisitos da senha
         this.updateRequirementUI('req-letter', false);
         this.updateRequirementUI('req-number', false);
@@ -434,6 +463,17 @@ const LoginModule = {
         sessionStorage.removeItem('argos_user');
         localStorage.removeItem('argos_user');
         this.showToast('ℹ️ Você saiu do sistema.', 'info');
+        
+        // Retorna a navegação para a seção inicial default (Dashboard Executivo)
+        if (window.navigateTo) {
+            window.navigateTo('executivo');
+        }
+
+        // Limpa a tela Minha Conta imediatamente ao deslogar
+        if (window.AccountModule) {
+            await window.AccountModule.refreshAccountView();
+        }
+
         this.showLoginUI();
     },
 

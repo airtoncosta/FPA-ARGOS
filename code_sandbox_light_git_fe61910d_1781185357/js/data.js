@@ -470,6 +470,6 @@ let APP_STATE = {
     data: null,
     filteredData: null,
     activeSection: 'executivo',
-    filters: { ano: '2026', mes: 'all', unidade: 'all', status: 'all' },
+    filters: { ano: 'all', mes: 'all', unidade: 'all', status: 'all' },
     chartsInstances: {}
 };

@@ -37,6 +37,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updateLogoPreview();
                 }
 
+                // Carregar Histórico de Logos do Supabase
+                const cloudHistory = await SupabaseService.loadLogoHistory();
+                if (cloudHistory && Array.isArray(cloudHistory) && cloudHistory.length > 0) {
+                    let localHistory = await AppDB.getItem('logos_history') || [];
+                    let merged = [...new Set([...cloudHistory, ...localHistory])].slice(0, 10);
+                    await AppDB.setItem('logos_history', merged);
+                    renderLogoHistory();
+                }
+
                 // 2. Carregar SIGTAP do Supabase
                 const cloudSigtap = await SupabaseService.loadSigtap();
                 if (cloudSigtap && Object.keys(cloudSigtap).length > 0) {
@@ -112,6 +121,91 @@ function bindLimparDados() {
     });
 }
 
+async function renderLogoHistory() {
+    const list = document.getElementById('logoHistoryList');
+    const container = document.getElementById('logoHistoryContainer');
+    if (!list || !container) return;
+
+    try {
+        const history = await AppDB.getItem('logos_history') || [];
+        if (history.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+        list.innerHTML = '';
+        
+        const activeLogo = localStorage.getItem('argos_custom_logo');
+
+        history.forEach(base64 => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'logo-history-item-wrapper';
+
+            const img = document.createElement('img');
+            img.src = base64;
+            img.className = 'logo-history-item';
+            if (activeLogo === base64) img.classList.add('active');
+
+            const btnDelete = document.createElement('div');
+            btnDelete.className = 'logo-history-delete';
+            btnDelete.innerHTML = '<i class="fas fa-times"></i>';
+
+            btnDelete.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm('Tem certeza que deseja remover esta logomarca do histórico?')) {
+                    const newHistory = history.filter(h => h !== base64);
+                    await AppDB.setItem('logos_history', newHistory);
+                    
+                    if (SupabaseConfig.isConnected()) {
+                        try {
+                            await SupabaseService.saveLogoHistory(newHistory);
+                        } catch (err) {
+                            console.error("Erro ao sincronizar histórico excluído com Supabase", err);
+                        }
+                    }
+                    
+                    // Se excluiu a logo ativa do histórico, a logo principal continua intacta.
+                    // Para apagá-la do sistema de vez, ele usa o botão "Excluir" principal.
+                    renderLogoHistory();
+                }
+            });
+
+            img.addEventListener('click', async () => {
+                localStorage.setItem('argos_custom_logo', base64);
+                updateLogoPreview();
+                renderLogoHistory();
+
+                if (SupabaseConfig.isConnected()) {
+                    showLoading('Ativando logomarca na nuvem...');
+                    try {
+                        await SupabaseService.saveLogo(base64);
+                        const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
+                        if (user.username) {
+                            await SupabaseService.logAction(user.username, 'ARQUIVOS', 'MUDANCA_LOGO', 'Logomarca do PDF alterada pelo histórico.');
+                        }
+                        hideLoading();
+                        showToast('✅ Logomarca alterada com sucesso na Nuvem!', 'success');
+                    } catch (err) {
+                        console.error("Erro ao salvar logo no Supabase:", err);
+                        hideLoading();
+                        showToast('⚠️ Logo ativada LOCALMENTE, erro ao enviar para nuvem.', 'warn');
+                    }
+                } else {
+                    showToast('✅ Logomarca ativada com sucesso LOCALMENTE!', 'success');
+                }
+            });
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(btnDelete);
+            list.appendChild(wrapper);
+        });
+    } catch (e) {
+        console.error("Erro ao carregar histórico de logos", e);
+        container.style.display = 'none';
+    }
+}
+
 function updateLogoPreview() {
     const customLogo = localStorage.getItem('argos_custom_logo');
     const previewBox = document.getElementById('logoPreviewBox');
@@ -138,6 +232,7 @@ function bindLogoUpload() {
     if (!input) return;
 
     updateLogoPreview();
+    renderLogoHistory();
 
     btnUpload?.addEventListener('click', () => input.click());
 
@@ -145,6 +240,7 @@ function bindLogoUpload() {
         if (confirm('Tem certeza que deseja excluir a logomarca do PDF?')) {
             localStorage.removeItem('argos_custom_logo');
             updateLogoPreview();
+            renderLogoHistory();
 
             if (SupabaseConfig.isConnected()) {
                 try {
@@ -169,13 +265,24 @@ function bindLogoUpload() {
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
-                localStorage.setItem('argos_custom_logo', event.target.result);
+                const base64 = event.target.result;
+                
+                // Add to history
+                let history = await AppDB.getItem('logos_history') || [];
+                history = history.filter(h => h !== base64); // Remove se já existir
+                history.unshift(base64); // Adiciona no início
+                if (history.length > 10) history.pop(); // Mantém apenas 10
+                await AppDB.setItem('logos_history', history);
+
+                localStorage.setItem('argos_custom_logo', base64);
                 updateLogoPreview();
+                renderLogoHistory();
 
                 if (SupabaseConfig.isConnected()) {
                     showLoading('Salvando logomarca na nuvem...');
                     try {
                         await SupabaseService.saveLogo(event.target.result);
+                        await SupabaseService.saveLogoHistory(history); // Sincroniza histórico
                         const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
                         if (user.username) {
                             await SupabaseService.logAction(user.username, 'ARQUIVOS', 'UPLOAD_LOGO', 'Nova logomarca do PDF enviada.');
@@ -1325,10 +1432,11 @@ function renderDashboardRegulacao(d) {
 function bindFilters() {
     document.getElementById('btnAplicarFiltros')?.addEventListener('click', aplicarFiltros);
     document.getElementById('btnLimparFiltros')?.addEventListener('click', limparFiltros);
+    updateFilterSummary();
 }
 
 function aplicarFiltros() {
-    APP_STATE.filters.ano     = document.getElementById('filterAno')?.value || '2026';
+    APP_STATE.filters.ano     = document.getElementById('filterAno')?.value || 'all';
     APP_STATE.filters.mes     = document.getElementById('filterMes')?.value || 'all';
     APP_STATE.filters.unidade = document.getElementById('filterUnidade')?.value || 'all';
     APP_STATE.filters.procedimento = document.getElementById('filterProcedimento')?.value || 'all';
@@ -1336,19 +1444,77 @@ function aplicarFiltros() {
     APP_STATE.filters.status  = document.getElementById('filterStatus')?.value || 'all';
     const d = getFilteredData();
     renderAll(d);
+    updateFilterSummary();
     showToast('Filtros aplicados!', 'success');
 }
 
 function limparFiltros() {
-    APP_STATE.filters = { ano: '2026', mes: 'all', unidade: 'all', procedimento: 'all', cbo: 'all', status: 'all' };
-    document.getElementById('filterAno').value     = '2026';
+    APP_STATE.filters = { ano: 'all', mes: 'all', unidade: 'all', procedimento: 'all', cbo: 'all', status: 'all' };
+    document.getElementById('filterAno').value     = 'all';
     document.getElementById('filterMes').value     = 'all';
     document.getElementById('filterUnidade').value = 'all';
     if(document.getElementById('filterProcedimento')) document.getElementById('filterProcedimento').value = 'all';
     if(document.getElementById('filterCbo')) document.getElementById('filterCbo').value = 'all';
     document.getElementById('filterStatus').value  = 'all';
     renderAll(APP_STATE.data);
+    updateFilterSummary();
     showToast('Filtros limpos.', 'success');
+}
+
+function updateFilterSummary() {
+    const container = document.getElementById('filterSelectedPillsContainer');
+    const badge = document.getElementById('filter-active-count');
+    if (!container) return;
+
+    let activeCount = 0;
+    let html = '<i class="fas fa-tag"></i> Selecionado: ';
+    
+    const filters = [
+        { id: 'filterAno', name: 'Ano', icon: 'fa-calendar-alt', isDefault: true },
+        { id: 'filterMes', name: 'Competência', icon: 'fa-calendar-check', isDefault: true },
+        { id: 'filterUnidade', name: 'Unidade', icon: 'fa-hospital', isDefault: true },
+        { id: 'filterProcedimento', name: 'Procedimento', icon: 'fa-stethoscope', isDefault: true },
+        { id: 'filterCbo', name: 'Profissional', icon: 'fa-user-circle', isDefault: true }
+    ];
+
+    let activePills = [];
+
+    filters.forEach(f => {
+        const el = document.getElementById(f.id);
+        if (el) {
+            const val = el.value;
+            const text = el.options[el.selectedIndex]?.text || val;
+            
+            // Verifica se está ativo
+            let isActive = false;
+            if (f.isDefault) {
+                isActive = (val !== 'all');
+            } else {
+                isActive = (val && val !== 'all');
+            }
+
+            if (isActive) {
+                activeCount++;
+                activePills.push(`<span class="selected-pill-item"><i class="fas ${f.icon}"></i> ${text}</span>`);
+            }
+        }
+    });
+
+    if (activePills.length > 0) {
+        html += activePills.join(' ');
+    } else {
+        html += '<span class="text-muted" style="font-size: 0.8rem; margin-left: 6px;">Nenhum filtro ativo</span>';
+    }
+
+    container.innerHTML = html;
+    if (badge) {
+        badge.textContent = `${activeCount} ${activeCount === 1 ? 'ativo' : 'ativos'}`;
+        if (activeCount > 0) {
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
 }
 
 function populateFilterUnidades(data) {
@@ -1363,6 +1529,7 @@ function populateFilterUnidades(data) {
         rSel.innerHTML = '<option value="all">Todas as Unidades</option>' +
             data.unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
     }
+    updateFilterSummary();
 }
 
 function populateFilterProcedimentosCbo(data) {
@@ -1376,6 +1543,7 @@ function populateFilterProcedimentosCbo(data) {
         selCbo.innerHTML = '<option value="all">Todos</option>' +
             data.cbos.map(c => `<option value="${c.codigo}">${c.codigo} - ${c.descricao}</option>`).join('');
     }
+    updateFilterSummary();
 }
 
 function populateFilterMesAno() {
@@ -1384,8 +1552,9 @@ function populateFilterMesAno() {
     if (!selAno || !selMes) return;
 
     if (!window.datasets || window.datasets.length === 0) {
-        selAno.innerHTML = '<option value="2026">2026</option>';
+        selAno.innerHTML = '<option value="all">Todos</option>';
         selMes.innerHTML = '<option value="all">Todos</option>';
+        updateFilterSummary();
         return;
     }
 
@@ -1410,9 +1579,9 @@ function populateFilterMesAno() {
     });
 
     const anosArr = Array.from(anos).sort((a,b) => b.localeCompare(a));
-    selAno.innerHTML = anosArr.length > 0 
+    selAno.innerHTML = '<option value="all">Todos</option>' + (anosArr.length > 0 
         ? anosArr.map(a => `<option value="${a}">${a}</option>`).join('')
-        : '<option value="all">Todos</option>';
+        : '');
 
     const mesesArr = Array.from(meses.entries()).sort((a,b) => a[0].localeCompare(b[0]));
     selMes.innerHTML = '<option value="all">Todos</option>' + 
@@ -1422,9 +1591,9 @@ function populateFilterMesAno() {
     const rAno = document.getElementById('reportAno');
     const rMes = document.getElementById('reportMes');
     if (rAno && rMes) {
-        rAno.innerHTML = anosArr.length > 0 
+        rAno.innerHTML = '<option value="all">Todos</option>' + (anosArr.length > 0 
             ? anosArr.map(a => `<option value="${a}">${a}</option>`).join('')
-            : '<option value="all">Todos</option>';
+            : '');
         rMes.innerHTML = '<option value="all">Todos</option>' + 
             mesesArr.map(m => `<option value="${m[0]}">${m[1]}</option>`).join('');
     }
@@ -1433,12 +1602,13 @@ function populateFilterMesAno() {
     if (!meses.has(APP_STATE.filters.mes) && APP_STATE.filters.mes !== 'all') {
         APP_STATE.filters.mes = 'all';
     }
-    if (anosArr.length > 0 && !anosArr.includes(APP_STATE.filters.ano)) {
-        APP_STATE.filters.ano = anosArr[0];
+    if (anosArr.length > 0 && !anosArr.includes(APP_STATE.filters.ano) && APP_STATE.filters.ano !== 'all') {
+        APP_STATE.filters.ano = 'all';
     }
     
-    selAno.value = APP_STATE.filters.ano || (anosArr[0] || 'all');
+    selAno.value = APP_STATE.filters.ano || 'all';
     selMes.value = APP_STATE.filters.mes || 'all';
+    updateFilterSummary();
 }
 
 /* =========================================================
