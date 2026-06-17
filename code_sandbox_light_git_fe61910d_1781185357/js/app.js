@@ -561,16 +561,38 @@ function getFilteredData() {
     if (hasLinhas) {
         let linhas = [];
         window.datasets.forEach(d => {
-            if (f.mes !== 'all' && d.competencia.split('/')[0] !== f.mes) return;
-            if (f.ano !== 'all' && d.ano !== f.ano && !d.competencia.endsWith('/'+f.ano)) return;
-            if (d.linhas) linhas = linhas.concat(d.linhas);
+            if (f.ano !== 'all' && String(d.ano) !== String(f.ano) && (!d.competencia || !d.competencia.endsWith('/'+f.ano))) return;
+            
+            let dtLinhas = d.linhas || [];
+            if (f.mes !== 'all') {
+                dtLinhas = dtLinhas.filter(l => {
+                    const lMes = l.mes || (l.cmp ? l.cmp.split('/')[0] : '');
+                    return lMes === f.mes;
+                });
+            }
+            if (dtLinhas.length > 0) {
+                linhas = linhas.concat(dtLinhas);
+            }
         });
+
+        if (linhas.length === 0) {
+            return {
+                competencia: f.mes !== 'all' ? `${f.mes}/${f.ano !== 'all' ? f.ano : (window.datasets[0] ? window.datasets[0].ano : '')}` : '',
+                ano: f.ano,
+                municipio: window.datasets[0] ? window.datasets[0].municipio : '',
+                uf: window.datasets[0] ? window.datasets[0].uf : '',
+                unidades: [], faturamentoMensal: [], procedimentos: [], cbos: [],
+                resumo: { qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0, valApresentado: 0, valAprovado: 0, valGlosado: 0, pctAprovacaoQtd: 0, pctGlosaQtd: 0, totalUnidades: 0 }
+            };
+        }
 
         if (f.unidade !== 'all') linhas = linhas.filter(l => l.uId === f.unidade);
         if (f.procedimento !== 'all') linhas = linhas.filter(l => l.proc === f.procedimento);
         if (f.cbo !== 'all') linhas = linhas.filter(l => l.cbo === f.cbo);
 
-        const agg = aggregateLinhas(linhas, window.datasets[0].competencia, window.datasets[0].ano, window.datasets[0].municipio, window.datasets[0].uf);
+        const cmpRef = linhas[0].cmp || (window.datasets[0] ? window.datasets[0].competencia : '');
+        const anoRef = linhas[0].cmp ? linhas[0].cmp.split('/')[1] : (window.datasets[0] ? window.datasets[0].ano : '');
+        const agg = aggregateLinhas(linhas, cmpRef, anoRef, window.datasets[0] ? window.datasets[0].municipio : '', window.datasets[0] ? window.datasets[0].uf : '');
         
         if (f.status !== 'all') {
             agg.unidades = agg.unidades.filter(u => classificarStatus(u.pctAprovacaoVal).status === f.status.toUpperCase());
@@ -583,12 +605,14 @@ function getFilteredData() {
     let dts = window.datasets;
     if (f.mes !== 'all') {
         dts = dts.filter(d => {
-            const mesNum = (d.faturamentoMensal && d.faturamentoMensal.length > 0) ? d.faturamentoMensal[0].nomeMes.split('/')[0] : '';
-            return mesNum === f.mes;
+            return d.faturamentoMensal && d.faturamentoMensal.some(m => {
+                const mesVal = m.mes || (m.nomeMes ? m.nomeMes.split('/')[0] : '');
+                return mesVal === f.mes;
+            });
         });
     }
     if (f.ano !== 'all') {
-        dts = dts.filter(d => d.ano === f.ano || (d.competencia && d.competencia.endsWith('/' + f.ano)));
+        dts = dts.filter(d => String(d.ano) === String(f.ano) || (d.competencia && d.competencia.endsWith('/' + f.ano)));
     }
     
     let agg = buildAggregatedData(dts);
@@ -1567,14 +1591,17 @@ function populateFilterMesAno() {
     };
 
     window.datasets.forEach(d => {
-        if (d.ano) anos.add(d.ano);
+        if (d.ano) anos.add(String(d.ano));
         if (d.faturamentoMensal && d.faturamentoMensal.length > 0) {
-            const nomeMes = d.faturamentoMensal[0].nomeMes;
-            const p = nomeMes.split('/');
-            if (p.length === 2) {
-                anos.add(p[1]);
-                meses.set(p[0], monthNames[p[0]] || p[0]);
-            }
+            d.faturamentoMensal.forEach(m => {
+                const p = (m.nomeMes || '').split('/');
+                if (p.length === 2) {
+                    anos.add(p[1]);
+                    meses.set(p[0], monthNames[p[0]] || p[0]);
+                } else if (m.mes) {
+                    meses.set(m.mes, monthNames[m.mes] || m.mes);
+                }
+            });
         }
     });
 
