@@ -1062,7 +1062,7 @@ function renderDashboardProcedimentos(d) {
 
         return `<tr class="proc-row" onclick="toggleProcDetails('${p.codigo}')" style="cursor: pointer;">
             <td class="text-center fw-bold"><i id="icon-proc-${p.codigo}" class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 6px;"></i>${i+1}</td>
-            <td class="mono" style="font-size:.75rem; white-space: nowrap;">${p.codigo.replace(/-/g, '\u2011')}</td>
+            <td class="table-code" style="font-size:.75rem; white-space: nowrap;">${p.codigo.replace(/-/g, '\u2011')}</td>
             <td><strong>${p.descricao}</strong></td>
             <td class="text-right mono">${fmt.numero(p.qtdAprovada)}</td>
             <td class="text-right mono fw-bold">${fmt.moeda(p.valAprovado)}</td>
@@ -1141,7 +1141,7 @@ function renderDashboardCbo(d) {
 
         return `<tr class="cbo-row" onclick="toggleCboDetails('${c.codigo}')" style="cursor: pointer;">
             <td class="text-center fw-bold"><i id="icon-cbo-${c.codigo}" class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 6px;"></i>${i+1}</td>
-            <td class="mono" style="font-size:.75rem">CBO ${c.codigo}</td>
+            <td class="table-code" style="font-size:.75rem">CBO ${c.codigo}</td>
             <td><strong>${c.descricao}</strong></td>
             <td class="text-right mono">${fmt.numero(c.qtdAprovada)}</td>
             <td class="text-right mono fw-bold">${fmt.moeda(c.valAprovado)}</td>

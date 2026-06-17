@@ -1981,6 +1981,14 @@ body {
     font-weight: 700;
 }
 
+.table-code {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.2px;
+    font-variant-numeric: tabular-nums;
+}
+
 .mono {
     font-family: 'Roboto Mono', monospace;
 }
