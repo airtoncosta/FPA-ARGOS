@@ -287,6 +287,24 @@ function loadData(data) {
             lblMunicipio.textContent = `${data.municipio} — ${data.uf}`;
         }
     }
+
+    const lblConsolidado = document.getElementById('lblConsolidadoGeral');
+    if (lblConsolidado) {
+        if (!data.municipio || data.competencia === 'Sem dados') {
+            lblConsolidado.textContent = 'Consolidado Geral de Produção Ambulatorial — Sem Dados';
+        } else {
+            lblConsolidado.textContent = `Consolidado Geral de Produção Ambulatorial — ${data.municipio}/${data.uf} — ${data.competencia}`;
+        }
+    }
+
+    const lblRanking = document.getElementById('lblRankingDesempenho');
+    if (lblRanking) {
+        if (data.competencia === 'Sem dados') {
+            lblRanking.textContent = 'Ranking de Desempenho — Sem Dados';
+        } else {
+            lblRanking.textContent = `Ranking de Desempenho — ${data.competencia}`;
+        }
+    }
 }
 
 function setFilterStatus(status) {
