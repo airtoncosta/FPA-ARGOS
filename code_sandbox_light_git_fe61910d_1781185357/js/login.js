@@ -4,54 +4,54 @@
  */
 
 const ARGOS_USERS = [
-    { 
-        username: 'airton', 
-        email: 'airton.costa@yahoo.com.br', 
-        name: 'Airton Costa', 
-        password: 'airton@2026', 
-        role: 'ADM' 
+    {
+        username: 'airton',
+        email: 'airton.costa@yahoo.com.br',
+        name: 'Airton Costa',
+        password: 'airton@2026',
+        role: 'ADM'
     },
-    { 
-        username: 'francileide', 
-        email: 'francileide@fpa.gov.br', 
-        name: 'Francileide', 
-        password: 'francileide@2026', 
-        role: 'GERENTE' 
+    {
+        username: 'francileide',
+        email: 'francileide@fpa.gov.br',
+        name: 'Francileide',
+        password: 'francileide@2026',
+        role: 'GERENTE'
     },
-    { 
-        username: 'jessica', 
-        email: 'jessica@fpa.gov.br', 
-        name: 'Jessica', 
-        password: 'jessica@2026', 
-        role: 'GERENTE' 
+    {
+        username: 'jessica',
+        email: 'jessica@fpa.gov.br',
+        name: 'Jessica',
+        password: 'jessica@2026',
+        role: 'GERENTE'
     },
-    { 
-        username: 'aline', 
-        email: 'aline@fpa.gov.br', 
-        name: 'Aline', 
-        password: 'aline@2026', 
-        role: 'GERENTE' 
+    {
+        username: 'aline',
+        email: 'aline@fpa.gov.br',
+        name: 'Aline',
+        password: 'aline@2026',
+        role: 'GERENTE'
     },
-    { 
-        username: 'ewerton', 
-        email: 'ewerton@fpa.gov.br', 
-        name: 'Ewerton', 
-        password: 'ewerton@2026', 
-        role: 'GERENTE' 
+    {
+        username: 'ewerton',
+        email: 'ewerton@fpa.gov.br',
+        name: 'Ewerton',
+        password: 'ewerton@2026',
+        role: 'GERENTE'
     },
-    { 
-        username: 'mariline', 
-        email: 'mariline@fpa.gov.br', 
-        name: 'Mariline', 
-        password: 'mariline@2026', 
-        role: 'GERENTE' 
+    {
+        username: 'marilene',
+        email: 'marilene@fpa.gov.br',
+        name: 'Marilene',
+        password: 'marilene@2026',
+        role: 'GERENTE'
     },
-    { 
-        username: 'flavia', 
-        email: 'flavia@fpa.gov.br', 
-        name: 'Flavia', 
-        password: 'flavia@2026', 
-        role: 'GERENTE' 
+    {
+        username: 'flavia',
+        email: 'flavia@fpa.gov.br',
+        name: 'Flavia',
+        password: 'flavia@2026',
+        role: 'GERENTE'
     }
 ];
 
@@ -181,7 +181,7 @@ const LoginModule = {
 
             try {
                 const res = await window.SupabaseService.authLogin(loginVal, passwordVal);
-                
+
                 if (btnSubmit) {
                     btnSubmit.disabled = false;
                     btnSubmit.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar no Sistema';
@@ -192,7 +192,7 @@ const LoginModule = {
                         // Incrementar tentativas falhas no Supabase via Relação Local/Remota
                         let failedAttempts = parseInt(localStorage.getItem('failed_attempts_' + res.user.username) || '0');
                         failedAttempts++;
-                        
+
                         if (failedAttempts >= 5) {
                             await window.SupabaseService.updateUserStatus(res.user.username, 'BLOQUEADO');
                             localStorage.removeItem('failed_attempts_' + res.user.username);
@@ -210,7 +210,7 @@ const LoginModule = {
                 // Login Sucesso
                 const user = res.user;
                 localStorage.removeItem('failed_attempts_' + user.username);
-                
+
                 const sessionUser = {
                     username: user.username,
                     email: user.email,
@@ -242,12 +242,12 @@ const LoginModule = {
 
         // --- MODO OFFLINE: Fallback Local ---
         let dbUsers = [];
-        try { dbUsers = JSON.parse(localStorage.getItem('argos_users_db') || '[]'); } catch(e){}
-        if(dbUsers.length === 0) dbUsers = ARGOS_USERS; // fallback
+        try { dbUsers = JSON.parse(localStorage.getItem('argos_users_db') || '[]'); } catch (e) { }
+        if (dbUsers.length === 0) dbUsers = ARGOS_USERS; // fallback
 
         // Buscar o usuário pelo username ou pelo e-mail
-        const user = dbUsers.find(u => 
-            u.username.toLowerCase() === loginVal || 
+        const user = dbUsers.find(u =>
+            u.username.toLowerCase() === loginVal ||
             u.email.toLowerCase() === loginVal
         );
 
@@ -299,7 +299,7 @@ const LoginModule = {
 
     async loginUI(user) {
         document.body.classList.add('logged-in');
-        
+
         const loginContainer = document.getElementById('login-container');
         if (loginContainer) loginContainer.classList.add('hidden');
 
@@ -341,7 +341,7 @@ const LoginModule = {
                 if (cloudLogo) {
                     localStorage.setItem('argos_custom_logo', cloudLogo);
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error("Erro ao carregar logo no login:", e);
             }
 
@@ -356,7 +356,7 @@ const LoginModule = {
                         await window.AppDB.setItem('sigtap_meta', sigtapMeta);
                     }
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error("Erro ao carregar SIGTAP no login:", e);
             }
         }
@@ -376,6 +376,7 @@ const LoginModule = {
         const btnUploadLogo = document.getElementById('btnUploadLogo');
         const btnExcluirLogo = document.getElementById('btnExcluirLogo');
         const btnUploadSigtap = document.getElementById('btnUploadSigtap');
+        const tabImportPortaria = document.getElementById('tabImportPortaria');
         const navMenuAdmin = document.getElementById('navMenuAdmin'); // Container do Menu Administração
 
         // ADM -> Acesso a tudo
@@ -387,8 +388,9 @@ const LoginModule = {
             if (btnUploadLogo) btnUploadLogo.classList.remove('hidden');
             if (btnExcluirLogo) btnExcluirLogo.classList.remove('hidden');
             if (btnUploadSigtap) btnUploadSigtap.classList.remove('hidden');
+            if (tabImportPortaria) tabImportPortaria.classList.remove('hidden');
             if (navMenuAdmin) navMenuAdmin.style.display = 'block';
-        } 
+        }
         // GERENTE -> Não limpa DB nem configura Supabase, não acessa usuários
         else if (role === 'GERENTE') {
             if (btnLimpar) btnLimpar.classList.add('hidden');
@@ -398,6 +400,7 @@ const LoginModule = {
             if (btnUploadLogo) btnUploadLogo.classList.remove('hidden');
             if (btnExcluirLogo) btnExcluirLogo.classList.remove('hidden');
             if (btnUploadSigtap) btnUploadSigtap.classList.remove('hidden');
+            if (tabImportPortaria) tabImportPortaria.classList.add('hidden');
             if (navMenuAdmin) navMenuAdmin.style.display = 'none';
         }
     },
@@ -419,7 +422,7 @@ const LoginModule = {
 
     showLoginUI() {
         document.body.classList.remove('logged-in');
-        
+
         const loginContainer = document.getElementById('login-container');
         if (loginContainer) loginContainer.classList.remove('hidden');
 
@@ -457,13 +460,13 @@ const LoginModule = {
             try {
                 const user = JSON.parse(userStr);
                 await this.logAction(user.username, 'LOGOUT');
-            } catch(e) {}
+            } catch (e) { }
         }
-        
+
         sessionStorage.removeItem('argos_user');
         localStorage.removeItem('argos_user');
         this.showToast('ℹ️ Você saiu do sistema.', 'info');
-        
+
         // Retorna a navegação para a seção inicial default (Dashboard Executivo)
         if (window.navigateTo) {
             window.navigateTo('executivo');
@@ -479,7 +482,7 @@ const LoginModule = {
 
     async logAction(username, action) {
         const desc = action === 'LOGIN' ? 'Login realizado' : 'Logout realizado';
-        
+
         // Registrar na nuvem (Supabase) se conectado
         if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
             try {
@@ -491,10 +494,10 @@ const LoginModule = {
 
         // Salvar localmente como fallback
         let history = [];
-        try { 
-            history = JSON.parse(localStorage.getItem('argos_user_history') || '[]'); 
-        } catch(e){}
-        
+        try {
+            history = JSON.parse(localStorage.getItem('argos_user_history') || '[]');
+        } catch (e) { }
+
         history.unshift({
             date: new Date().toISOString(),
             user: username,
@@ -502,9 +505,9 @@ const LoginModule = {
             module: 'SISTEMA',
             desc: desc
         });
-        
+
         // Manter os últimos 100 registros locais
-        if(history.length > 100) history = history.slice(0, 100);
+        if (history.length > 100) history = history.slice(0, 100);
         localStorage.setItem('argos_user_history', JSON.stringify(history));
     },
 
@@ -512,12 +515,12 @@ const LoginModule = {
         const loginContainer = document.getElementById('login-container');
         const loginErrorMsg = document.getElementById('login-error-msg');
         const loginCard = document.querySelector('.login-card');
-        
+
         // Se a tela de login estiver visível, mostra o erro dentro dela
         if (loginContainer && !loginContainer.classList.contains('hidden') && loginErrorMsg) {
             loginErrorMsg.textContent = msg;
             loginErrorMsg.classList.remove('hidden');
-            
+
             // Adicionar shake effect se for erro ou aviso
             if (loginCard && (type === 'error' || type === 'warn')) {
                 loginCard.classList.remove('shake');

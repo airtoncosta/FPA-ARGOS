@@ -441,6 +441,51 @@ const SupabaseService = {
             console.error('Erro ao carregar SIGTAP do Supabase:', e);
             return null;
         }
+    },
+
+    /**
+     * Salva o mapeamento da portaria no Supabase sob a chave 'portaria_db_data'
+     */
+    async savePortariaDb(portariaData) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        try {
+            const { error } = await this.client
+                .from('configuracoes')
+                .upsert({
+                    chave: 'portaria_db_data',
+                    valor: JSON.stringify(portariaData),
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'chave' });
+
+            if (error) throw error;
+            return { success: true };
+        } catch (e) {
+            console.error('Erro ao salvar Portaria no Supabase:', e);
+            throw e;
+        }
+    },
+
+    /**
+     * Carrega os dados da portaria do Supabase
+     */
+    async loadPortariaDb() {
+        if (!this.init()) return null;
+
+        try {
+            const { data, error } = await this.client
+                .from('configuracoes')
+                .select('valor')
+                .eq('chave', 'portaria_db_data')
+                .limit(1);
+
+            if (error) throw error;
+            if (data && data.length > 0) return JSON.parse(data[0].valor);
+            return null;
+        } catch (e) {
+            console.error('Erro ao carregar Portaria do Supabase:', e);
+            return null;
+        }
     }
 };
 

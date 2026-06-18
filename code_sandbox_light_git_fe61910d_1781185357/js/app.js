@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindFilters();
     bindImport();
     bindImportSigtap();
+    bindImportPortaria();
     bindArgosIA();
     bindModals();
     bindLimparDados();
@@ -56,6 +57,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await AppDB.setItem('sigtap_meta', sigtapMeta);
                 }
 
+                // 3. Carregar Portaria do Supabase
+                try {
+                    const cloudPortaria = await SupabaseService.loadPortariaDb();
+                    if (cloudPortaria && Object.keys(cloudPortaria).length > 0) {
+                        const localPortaria = await AppDB.getItem('PORTARIA_DB') || {};
+                        const mergedPortaria = { ...localPortaria, ...cloudPortaria };
+                        await AppDB.setItem('PORTARIA_DB', mergedPortaria);
+                    }
+                } catch (portariaCloudErr) {
+                    console.error("Erro ao carregar portaria do Supabase na inicialização:", portariaCloudErr);
+                }
+
                 // Indica que o Supabase está conectado e ativo mudando a aparência do botão
                 const btnCloud = document.getElementById('btnConfigSupabase');
                 if (btnCloud) {
@@ -73,6 +86,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (savedDatasets && savedDatasets.length > 0) {
             window.datasets = savedDatasets;
             const agg = buildAggregatedData(window.datasets);
+            await PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
+            
+            // Exibir aba de importação se o usuário logado for ADM
+            const userSession = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || 'null');
+            const tabImportPortaria = document.getElementById('tabImportPortaria');
+            if (tabImportPortaria) {
+                if (userSession && userSession.role === 'ADM') {
+                    tabImportPortaria.classList.remove('hidden');
+                } else {
+                    tabImportPortaria.classList.add('hidden');
+                }
+            }
+            
             loadData(agg);
             showToast(`✅ ${window.datasets.length} competência(s) carregada(s) do banco local!`, 'success');
         } else {
@@ -339,6 +365,19 @@ function navigateTo(section) {
             filterBar.style.display = 'none';
         } else {
             filterBar.style.display = 'flex';
+        }
+    }
+
+    // Ocultar ou Mostrar o Painel Executivo do Teto MAC
+    const tetoSection = document.getElementById('tetoMacSection');
+    if (tetoSection) {
+        if (section !== 'executivo') {
+            tetoSection.style.display = 'none';
+        } else {
+            // Se houver portaria carregada e dados, exibe
+            if (APP_STATE.portariaData && APP_STATE.data && APP_STATE.data.competencia !== 'Sem dados') {
+                tetoSection.style.display = 'block';
+            }
         }
     }
 
@@ -752,6 +791,138 @@ function renderDashboardExecutivo(d) {
     setEl('cntBoa',       counts.BOA);
     setEl('cntRegular',   counts.REGULAR);
     setEl('cntCritica',   counts.CRITICA);
+
+    // Renderizar Dashboard Executivo do Teto MAC
+    const portaria = APP_STATE.portariaData;
+    const tetoSection = document.getElementById('tetoMacSection');
+    
+    if (portaria && d.competencia !== 'Sem dados') {
+        if (tetoSection) tetoSection.style.display = 'block';
+        
+        const tetoAnual = portaria.tetoMacSemSamu;
+        const tetoMensal = tetoAnual / 12;
+        const faturamentoAprovado = r.valAprovado;
+        const restanteAnual = tetoAnual - faturamentoAprovado;
+        let numMeses = 1;
+        if (APP_STATE.data && APP_STATE.data.competencia && APP_STATE.data.competencia !== 'Sem dados') {
+            numMeses = APP_STATE.data.competencia.split(',').length;
+        }
+        const utilizacaoPct = tetoAnual > 0 ? (faturamentoAprovado / tetoAnual * 100) : 0;
+        const mediaMensal = faturamentoAprovado / numMeses;
+        const projecaoAnual = mediaMensal * 12;
+        const projecaoPct = tetoAnual > 0 ? (projecaoAnual / tetoAnual * 100) : 0;
+
+        // Produção do último mês
+        const ultimoMes = d.faturamentoMensal.length > 0 
+            ? d.faturamentoMensal[d.faturamentoMensal.length - 1] 
+            : null;
+        const prodMes = ultimoMes ? ultimoMes.valAprovado : 0;
+        const folgaMes = prodMes - tetoMensal;
+
+        // ===== LINHA 1 — Indicadores Executivos =====
+        setEl('lblTetoMacMunicipio', `${portaria.name} — ${portaria.uf} (${portaria.gestao})`);
+        setEl('valTetoMacAnual', fmt.moeda(tetoAnual));
+        setEl('valTetoMacAprovado', fmt.moeda(faturamentoAprovado));
+        setEl('descTetoMacAprovado', `Produção aprovada — ${numMeses} ${numMeses === 1 ? 'mês' : 'meses'}`);
+        setEl('valTetoMacUtilizacao', fmt.pct(utilizacaoPct));
+        setEl('valTetoMacRestante', fmt.moeda(restanteAnual));
+
+        // ===== BARRA DE PROGRESSO CENTRAL =====
+        const progressBar = document.getElementById('macProgressBar');
+        const progressPct = document.getElementById('macProgressPct');
+        if (progressBar) {
+            progressBar.style.width = Math.min(utilizacaoPct, 100) + '%';
+        }
+        if (progressPct) progressPct.textContent = fmt.pct(utilizacaoPct);
+        setEl('macProgressExec', fmt.moeda(faturamentoAprovado));
+        setEl('macProgressTeto', fmt.moeda(tetoAnual));
+        setEl('macProgressSaldo', fmt.moeda(restanteAnual));
+
+        // ===== LINHA 2 — Indicadores Analíticos =====
+        setEl('valTetoMacMensal', fmt.moeda(tetoMensal));
+        setEl('valTetoMacProdMes', fmt.moeda(prodMes));
+        if (ultimoMes) {
+            setEl('descTetoMacProdMes', `Competência: ${ultimoMes.nomeMes || ultimoMes.competencia}`);
+        }
+        setEl('valTetoMacFolgaMes', fmt.moeda(Math.abs(folgaMes)));
+        const folgaEl = document.getElementById('valTetoMacFolgaMes');
+        if (folgaEl) {
+            if (folgaMes >= 0) {
+                folgaEl.textContent = fmt.moeda(folgaMes);
+                folgaEl.style.color = '#059669'; // Verde
+                setEl('descTetoMacFolgaMes', 'Produção acima do teto mensal');
+            } else {
+                folgaEl.textContent = '- ' + fmt.moeda(Math.abs(folgaMes));
+                folgaEl.style.color = '#dc2626'; // Vermelho
+                setEl('descTetoMacFolgaMes', 'Produção abaixo do teto mensal');
+            }
+        }
+        setEl('valTetoMacMediaMes', fmt.moeda(mediaMensal));
+        setEl('descTetoMacMediaMes', `Executado ÷ ${numMeses} ${numMeses === 1 ? 'mês' : 'meses'}`);
+        setEl('descTetoMacProjecao', `Projeção de uso: ${fmt.pct(projecaoPct)} do Teto MAC`);
+        
+        // Colorir a projeção conforme o risco
+        const projecaoValEl = document.getElementById('valTetoMacProjecao');
+        if (projecaoValEl) {
+            if (projecaoPct >= 100) {
+                projecaoValEl.innerHTML = '✔ ' + fmt.moeda(projecaoAnual);
+                projecaoValEl.style.color = '#059669'; // Verde
+            } else if (projecaoPct >= 85) {
+                projecaoValEl.innerHTML = '⚠️ ' + fmt.moeda(projecaoAnual);
+                projecaoValEl.style.color = '#d97706'; // Amarelo
+            } else {
+                projecaoValEl.innerHTML = '🛑 ' + fmt.moeda(projecaoAnual);
+                projecaoValEl.style.color = '#dc2626'; // Vermelho
+            }
+        }
+
+        // ===== STATUS / SEMÁFORO =====
+        const statusTextEl = document.getElementById('txtTetoMacStatus');
+        const descStatusEl = document.getElementById('descTetoMacStatus');
+        const semaforoVerde = document.querySelector('.semaforo-verde');
+        const semaforoAmarelo = document.querySelector('.semaforo-amarelo');
+        const semaforoVermelho = document.querySelector('.semaforo-vermelho');
+
+        // Reset semáforo
+        [semaforoVerde, semaforoAmarelo, semaforoVermelho].forEach(d => { if(d) d.classList.remove('active'); });
+
+        // Determinar estado (verde/amarelo/vermelho) baseado na PROJEÇÃO
+        let macState = 'verde';
+        if (projecaoPct >= 100) {
+            macState = 'verde';
+            if (statusTextEl) {
+                statusTextEl.textContent = '🟢 RITMO IDEAL';
+                statusTextEl.style.color = '#059669';
+            }
+            if (descStatusEl) descStatusEl.textContent = `Ritmo de execução: Alto`;
+            if (semaforoVerde) semaforoVerde.classList.add('active');
+        } else if (projecaoPct >= 85) {
+            macState = 'amarelo';
+            if (statusTextEl) {
+                statusTextEl.textContent = '🟡 RITMO MODERADO';
+                statusTextEl.style.color = '#d97706';
+            }
+            if (descStatusEl) descStatusEl.textContent = `Ritmo de execução: Moderado`;
+            if (semaforoAmarelo) semaforoAmarelo.classList.add('active');
+        } else {
+            macState = 'vermelho';
+            if (statusTextEl) {
+                statusTextEl.textContent = '🔴 RITMO BAIXO (RISCO)';
+                statusTextEl.style.color = '#dc2626';
+            }
+            if (descStatusEl) descStatusEl.textContent = `Ritmo de execução: Baixo`;
+            if (semaforoVermelho) semaforoVermelho.classList.add('active');
+        }
+
+        // Aplicar classe de estado no dashboard
+        if (tetoSection) {
+            tetoSection.classList.remove('mac-state-verde', 'mac-state-amarelo', 'mac-state-vermelho');
+            tetoSection.classList.add(`mac-state-${macState}`);
+        }
+
+    } else {
+        if (tetoSection) tetoSection.style.display = 'none';
+    }
 }
 
 /* =========================================================
@@ -1697,6 +1868,7 @@ function bindImport() {
             await AppDB.setItem('datasets', window.datasets);
             await registerImport('Dados de Demonstração', 'SIA/SUS', DEMO_DATA.competencia);
             const agg = buildAggregatedData(window.datasets);
+            await PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
             loadData(agg);
             hideModal('modalImportar');
             showToast('✅ Dados demo salvos e carregados no banco!', 'success');
@@ -1774,10 +1946,72 @@ function bindImportSigtap() {
             
             if (APP_STATE.data) {
                 const agg = buildAggregatedData(window.datasets);
+                await PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
                 loadData(agg);
             }
         };
         reader.readAsText(file, 'iso-8859-1');
+    });
+}
+
+function bindImportPortaria() {
+    const input = document.getElementById('filePortariaInput');
+    const msgEl = document.getElementById('portariaProgressMsg');
+    if (!input) return;
+
+    input.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const userSession = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || 'null');
+        const isAdmin = userSession && userSession.role === 'ADM';
+        if (!isAdmin) {
+            showToast('❌ Permissão Negada: Apenas administradores podem importar a portaria.', 'error');
+            return;
+        }
+
+        showLoading('Processando Portaria PDF...');
+        if (msgEl) msgEl.textContent = 'Lendo e estruturando páginas do PDF...';
+
+        try {
+            const municipalities = await PortariaModule.parsePDF(file, (msg) => {
+                if (msgEl) msgEl.textContent = msg;
+            });
+
+            if (Object.keys(municipalities).length === 0) {
+                throw new Error("Nenhum município foi encontrado no PDF. Verifique se o arquivo corresponde à Portaria GM/MS 10.146/2026.");
+            }
+
+            await AppDB.setItem('PORTARIA_DB', municipalities);
+
+            if (SupabaseConfig.isConnected()) {
+                if (msgEl) msgEl.textContent = 'Enviando banco de portarias para a nuvem...';
+                await SupabaseService.savePortariaDb(municipalities);
+                
+                const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
+                if (user.username) {
+                    await SupabaseService.logAction(user.username, 'ARQUIVOS', 'IMPORTACAO_PORTARIA', `Portaria PDF (${file.name}) importada com ${Object.keys(municipalities).length} municípios e sincronizada na nuvem.`);
+                }
+            }
+
+            if (msgEl) msgEl.textContent = '';
+            hideLoading();
+            showToast(`✅ Portaria importada com sucesso! ${Object.keys(municipalities).length} municípios carregados no banco de dados.`, 'success');
+            
+            if (APP_STATE.data) {
+                const agg = buildAggregatedData(window.datasets);
+                await PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
+                loadData(agg);
+            }
+            hideModal('modalImportar');
+        } catch (err) {
+            console.error("Erro ao importar portaria:", err);
+            if (msgEl) msgEl.textContent = '';
+            hideLoading();
+            showToast('❌ Erro ao processar PDF: ' + err.message, 'error');
+        } finally {
+            input.value = '';
+        }
     });
 }
 
@@ -1822,6 +2056,7 @@ function processContent(content, fileName = 'arquivo') {
                 }
                 
                 const agg = buildAggregatedData(window.datasets);
+                await PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
                 loadData(agg);
                 
                 await registerImport(fileName, 'SIA/SUS', parsed.competencia);
@@ -2137,6 +2372,7 @@ function bindModals() {
                 showModal('modalImportar');
             } else {
                 const agg = buildAggregatedData(window.datasets);
+                await PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
                 loadData(agg);
             }
             
@@ -2259,6 +2495,10 @@ function bindReports() {
 
     document.getElementById('btnExportEficienciaPDF')?.addEventListener('click', () => {
         PDFExport.exportEficienciaPDF();
+    });
+
+    document.getElementById('btnExportTetoMacPDF')?.addEventListener('click', () => {
+        PDFExport.exportTetoMacPDF();
     });
 }
 

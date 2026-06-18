@@ -432,6 +432,79 @@ const PDFExport = {
         }, 800);
     },
 
+    exportTetoMacPDF() {
+        const d = APP_STATE.filteredData || APP_STATE.data;
+        const portaria = APP_STATE.portariaData;
+        if (!d || !portaria) { showToast('⚠️ Carregue os dados e a Portaria antes de exportar.', 'warn'); return; }
+
+        showLoading('Gerando PDF do Teto MAC...');
+
+        setTimeout(async () => {
+            try {
+                const scaarImg = window.SCAAR_LOGO_BASE64 || null;
+                const { jsPDF } = window.jspdf;
+
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const pageW = doc.internal.pageSize.getWidth();
+                const pageH = doc.internal.pageSize.getHeight();
+                const margin = 14;
+                let y = 36; // Header usa até y=30 mais ou menos
+
+                await this.drawUnifiedHeader(doc, d, 'Dashboard Executivo — Monitoramento do Teto MAC', pageW, margin);
+
+                // Elemento a ser capturado
+                const element = document.getElementById('tetoMacSection');
+                if (!element) throw new Error('Seção do Teto MAC não encontrada.');
+
+                // Esconder o botão de PDF temporariamente para não sair na impressão
+                const btnExport = document.getElementById('btnExportTetoMacPDF');
+                const btnDisplayOriginal = btnExport ? btnExport.style.display : '';
+                if (btnExport) btnExport.style.display = 'none';
+
+                // Capturar com html2canvas
+                const canvas = await html2canvas(element, { 
+                    scale: 2, 
+                    useCORS: true, 
+                    backgroundColor: '#ffffff' 
+                });
+
+                // Restaurar o botão
+                if (btnExport) btnExport.style.display = btnDisplayOriginal;
+
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+                // Calcular dimensões para caber na página (descontando header e footer)
+                const maxW = pageW - margin * 2;
+                const maxH = pageH - y - 15; // 15mm para o footer
+
+                let imgW = maxW;
+                let imgH = (canvas.height / canvas.width) * imgW;
+
+                // Redimensionar caso passe da altura máxima (para caber em 1 página)
+                if (imgH > maxH) {
+                    imgH = maxH;
+                    imgW = (canvas.width / canvas.height) * imgH;
+                }
+
+                // Centralizar horizontalmente se ficou menor que a largura máxima
+                const xPos = margin + (maxW - imgW) / 2;
+
+                doc.addImage(imgData, 'JPEG', xPos, y, imgW, imgH);
+
+                // Adicionar o rodapé da página
+                this.addFooter(doc, pageW, pageH, 1, 1, scaarImg);
+
+                doc.save(`ARGOS_Teto_MAC_${d.municipio}_${d.ano || '2026'}.pdf`);
+                showToast('✅ PDF do Teto MAC exportado com sucesso!', 'success');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ Erro ao gerar PDF do Teto MAC: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }, 800);
+    },
+
     async drawUnifiedHeader(doc, d, title, pageW, margin) {
         // Obter Município e UF com segurança
         const mun = d.municipio || (window.datasets && window.datasets[0] && window.datasets[0].municipio) || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal';

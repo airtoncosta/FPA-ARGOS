@@ -19,6 +19,10 @@
     <!-- jsPDF for PDF export -->
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.6.0/dist/jspdf.plugin.autotable.min.js"></script>
+    <!-- html2canvas for capturing UI screenshots to PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- PDF.js for parsing Portaria PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 
 <body>
@@ -304,6 +308,147 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ====== DASHBOARD EXECUTIVO DO TETO MAC ====== -->
+        <div class="mac-dashboard" id="tetoMacSection" style="display: none;">
+            <!-- HEADER -->
+            <div class="mac-dash-header">
+                <div class="mac-dash-title">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Dashboard Executivo — Monitoramento do Teto MAC</span>
+                    <span class="mac-dash-portaria">Portaria GM/MS nº 10.146/2026</span>
+                </div>
+                <div class="mac-dash-municipio-wrapper" style="display: flex; align-items: center; gap: 10px;">
+                    <div class="mac-dash-municipio" id="lblTetoMacMunicipio">-</div>
+                    <button class="btn-table-export" id="btnExportTetoMacPDF" title="Exportar Teto MAC em PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- LINHA 1 — INDICADORES EXECUTIVOS -->
+            <div class="mac-exec-row">
+                <div class="mac-kpi mac-kpi-executive mac-kpi-teto">
+                    <div class="mac-kpi-icon-wrap mac-icon-blue"><i class="fas fa-wallet"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Teto MAC Anual</span>
+                        <span class="mac-kpi-value" id="valTetoMacAnual">R$ 0,00</span>
+                        <span class="mac-kpi-sub">Limite financeiro do exercício</span>
+                    </div>
+                </div>
+                <div class="mac-kpi mac-kpi-executive mac-kpi-executado">
+                    <div class="mac-kpi-icon-wrap mac-icon-green"><i class="fas fa-chart-line"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Executado no Ano</span>
+                        <span class="mac-kpi-value" id="valTetoMacAprovado">R$ 0,00</span>
+                        <span class="mac-kpi-sub" id="descTetoMacAprovado">Produção aprovada acumulada</span>
+                    </div>
+                </div>
+                <div class="mac-kpi mac-kpi-executive mac-kpi-utilizacao" id="cardTetoMacUtilizacao">
+                    <div class="mac-kpi-icon-wrap mac-icon-dynamic" id="macIconUtilizacao"><i class="fas fa-tachometer-alt"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Utilização do Teto</span>
+                        <span class="mac-kpi-value mac-kpi-pct" id="valTetoMacUtilizacao">0,00%</span>
+                        <span class="mac-kpi-sub">Executado ÷ Teto Anual</span>
+                    </div>
+                </div>
+                <div class="mac-kpi mac-kpi-executive mac-kpi-saldo">
+                    <div class="mac-kpi-icon-wrap mac-icon-purple"><i class="fas fa-piggy-bank"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Saldo Disponível</span>
+                        <span class="mac-kpi-value" id="valTetoMacRestante">R$ 0,00</span>
+                        <span class="mac-kpi-sub">Valor restante do teto</span>
+                    </div>
+                </div>
+                <div class="mac-kpi mac-kpi-executive mac-kpi-status" id="cardTetoMacStatus">
+                    <div class="mac-kpi-semaforo" id="macSemaforo">
+                        <span class="semaforo-dot semaforo-verde"></span>
+                        <span class="semaforo-dot semaforo-amarelo"></span>
+                        <span class="semaforo-dot semaforo-vermelho"></span>
+                    </div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Status Orçamentário</span>
+                        <span class="mac-kpi-value mac-kpi-status-text" id="txtTetoMacStatus">SEM DADOS</span>
+                        <span class="mac-kpi-sub" id="descTetoMacStatus">Comparação com o limite</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD ESPECIAL — BARRA DE UTILIZAÇÃO DO TETO -->
+            <div class="mac-progress-card" id="macProgressCard">
+                <div class="mac-progress-header">
+                    <span class="mac-progress-title"><i class="fas fa-chart-bar"></i> UTILIZAÇÃO DO TETO MAC</span>
+                    <span class="mac-progress-pct" id="macProgressPct">0,00%</span>
+                </div>
+                <div class="mac-progress-bar-wrap">
+                    <div class="mac-progress-bar" id="macProgressBar" style="width: 0%;">
+                        <div class="mac-progress-glow"></div>
+                    </div>
+                </div>
+                <div class="mac-progress-footer">
+                    <span><i class="fas fa-info-circle"></i> Executado: <strong id="macProgressExec">R$ 0,00</strong></span>
+                    <span>Teto Anual: <strong id="macProgressTeto">R$ 0,00</strong></span>
+                    <span>Saldo: <strong id="macProgressSaldo">R$ 0,00</strong></span>
+                </div>
+            </div>
+
+            <!-- LINHA 2 — INDICADORES ANALÍTICOS -->
+            <div class="mac-analytics-row">
+                <div class="mac-kpi mac-kpi-analytic">
+                    <div class="mac-kpi-analytic-icon"><i class="fas fa-calendar-day"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Teto MAC Mensal</span>
+                        <span class="mac-kpi-value" id="valTetoMacMensal">R$ 0,00</span>
+                        <span class="mac-kpi-sub">Teto Anual ÷ 12</span>
+                    </div>
+                </div>
+                <div class="mac-kpi mac-kpi-analytic">
+                    <div class="mac-kpi-analytic-icon mac-analytic-green"><i class="fas fa-receipt"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Produção do Mês</span>
+                        <span class="mac-kpi-value" id="valTetoMacProdMes">R$ 0,00</span>
+                        <span class="mac-kpi-sub" id="descTetoMacProdMes">Último mês apurado</span>
+                    </div>
+                </div>
+                <div class="mac-kpi mac-kpi-analytic" id="cardTetoMacFolgaMes">
+                    <div class="mac-kpi-analytic-icon mac-analytic-teal"><i class="fas fa-balance-scale"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">SITUAÇÃO ORÇAMENTÁRIA</span>
+                        <span class="mac-kpi-value" id="valTetoMacFolgaMes">R$ 0,00</span>
+                        <span class="mac-kpi-sub" id="descTetoMacFolgaMes">Teto Mensal − Produção</span>
+                    </div>
+                </div>
+                <div class="mac-kpi mac-kpi-analytic">
+                    <div class="mac-kpi-analytic-icon mac-analytic-orange"><i class="fas fa-calculator"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Média Mensal Executada</span>
+                        <span class="mac-kpi-value" id="valTetoMacMediaMes">R$ 0,00</span>
+                        <span class="mac-kpi-sub" id="descTetoMacMediaMes">Executado ÷ meses</span>
+                    </div>
+                </div>
+                <div class="mac-kpi mac-kpi-analytic" id="cardTetoMacProjecao">
+                    <div class="mac-kpi-analytic-icon mac-analytic-indigo"><i class="fas fa-bullseye"></i></div>
+                    <div class="mac-kpi-content">
+                        <span class="mac-kpi-label">Projeção Anual</span>
+                        <span class="mac-kpi-value" id="valTetoMacProjecao">R$ 0,00</span>
+                        <span class="mac-kpi-sub" id="descTetoMacProjecao">Média × 12 meses</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRÁFICO DE EVOLUÇÃO -->
+            <div class="mac-chart-card">
+                <div class="mac-chart-header">
+                    <span><i class="fas fa-chart-area"></i> Evolução Mensal — Teto MAC vs Produção Aprovada</span>
+                    <div class="mac-chart-legend">
+                        <span class="mac-leg mac-leg-teto">Teto Mensal</span>
+                        <span class="mac-leg mac-leg-prod">Produção Aprovada</span>
+                        <span class="mac-leg mac-leg-acum">Acumulado Executado</span>
+                    </div>
+                </div>
+                <div style="height: 280px;"><canvas id="chartTetoMacMensal"></canvas></div>
             </div>
         </div>
 
@@ -728,8 +873,9 @@
                         </div>
                     </div>
                     <div style="height:280px;"><canvas id="chartEvolucaoMensal"></canvas></div>
-                </div>
             </div>
+
+
 
             <!-- CHARTS ROW 1.5 -->
             <div class="charts-row">
@@ -1563,6 +1709,7 @@
                     <button class="import-tab active" data-tab="txt">📄 Arquivo TXT</button>
                     <button class="import-tab" data-tab="manual">✏️ Entrada Manual</button>
                     <button class="import-tab" data-tab="demo">🎯 Dados Demo</button>
+                    <button class="import-tab hidden" id="tabImportPortaria" data-tab="portaria">📋 Portaria PDF</button>
                 </div>
 
                 <!-- TAB TXT -->
@@ -1598,6 +1745,24 @@
                     <button class="btn-primary btn-large" id="btnCarregarDemo">
                         <i class="fas fa-database"></i> Carregar Dados Demo — Bacabal/MA 2026
                     </button>
+                </div>
+
+                <!-- TAB PORTARIA PDF (APENAS ADM) -->
+                <div id="importTabPortaria" class="import-tab-content">
+                    <div class="demo-info" style="background: rgba(21, 101, 192, 0.05); border-left: 4px solid var(--sus-blue); color: var(--sus-blue); margin-bottom: 15px;">
+                        <i class="fas fa-info-circle"></i>
+                        <p>Importe o PDF oficial da Portaria GM/MS nº 10.146/2026 para atualizar os limites e tetos MAC de todos os municípios do Brasil.</p>
+                    </div>
+                    <div class="dropzone" id="dropzonePortaria">
+                        <i class="fas fa-file-pdf" style="color: #ef4444; font-size: 3rem; margin-bottom: 10px;"></i>
+                        <p>Arraste o arquivo PDF da Portaria aqui</p>
+                        <p class="drop-sub" style="margin-bottom: 15px;">ou clique para selecionar</p>
+                        <input type="file" id="filePortariaInput" accept=".pdf" style="display:none">
+                        <button class="btn-secondary" onclick="document.getElementById('filePortariaInput').click()">
+                            <i class="fas fa-folder-open"></i> Selecionar PDF
+                        </button>
+                    </div>
+                    <div id="portariaProgressMsg" style="text-align: center; margin-top: 15px; font-weight: 600; color: var(--gray-600); font-size: 0.9rem;"></div>
                 </div>
             </div>
         </div>
@@ -1725,6 +1890,7 @@
 
     <!-- Dicionários de Dados -->
     <script src="js/data.js"></script>
+    <script src="js/portaria.js"></script>
     <script src="js/sigtap.js"></script>
     <script src="js/cbo.js"></script>
     <script src="js/scaar_logo.js?v=3.0.2"></script>

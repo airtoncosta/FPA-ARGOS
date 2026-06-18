@@ -700,6 +700,155 @@ const ChartModule = {
     },
 
     /**
+     * Monitoramento do Teto MAC — Comparação do Faturamento Aprovado com o Teto Mensal
+     */
+    renderTetoMacMensal(data) {
+        const id = 'chartTetoMacMensal';
+        this.destroy(id);
+        const ctx = this.get(id);
+        if (!ctx) return;
+
+        const portaria = APP_STATE.portariaData;
+        if (!portaria) return;
+
+        const tetoAnual = portaria.tetoMacSemSamu;
+        const tetoMensal = tetoAnual / 12;
+
+        const meses = data.faturamentoMensal;
+        const labels = meses.map(m => m.nomeMes);
+        const aprovados = meses.map(m => m.valAprovado);
+
+        // Acumulado Executado
+        let acumulado = 0;
+        const acumulados = aprovados.map(v => { acumulado += v; return acumulado; });
+
+        // Cores dinâmicas das barras (verde se >= teto mensal, vermelho se < teto)
+        const backgroundColors = aprovados.map(val => 
+            val >= tetoMensal ? 'rgba(46, 125, 50, 0.75)' : 'rgba(198, 40, 40, 0.75)'
+        );
+        const borderColors = aprovados.map(val => 
+            val >= tetoMensal ? 'rgba(46, 125, 50, 1)' : 'rgba(198, 40, 40, 1)'
+        );
+
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Produção Aprovada',
+                        data: aprovados,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 1.5,
+                        borderRadius: 4,
+                        barThickness: 32,
+                        yAxisID: 'y',
+                        order: 2
+                    },
+                    {
+                        label: 'Teto MAC Mensal',
+                        data: labels.map(() => tetoMensal),
+                        type: 'line',
+                        borderColor: '#dc2626',
+                        borderWidth: 2.5,
+                        borderDash: [6, 4],
+                        pointRadius: 0,
+                        backgroundColor: 'transparent',
+                        fill: false,
+                        yAxisID: 'y',
+                        order: 0
+                    },
+                    {
+                        label: 'Acumulado Executado',
+                        data: acumulados,
+                        type: 'line',
+                        borderColor: '#1565C0',
+                        backgroundColor: 'rgba(21, 101, 192, 0.08)',
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#1565C0',
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        tension: 0.3,
+                        fill: true,
+                        yAxisID: 'y2',
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                layout: { padding: { bottom: 20 } },
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const val = fmt.moeda(ctx.parsed.y);
+                                if (ctx.datasetIndex === 0) {
+                                    const diff = ctx.parsed.y - tetoMensal;
+                                    const percent = ((ctx.parsed.y / tetoMensal) * 100).toFixed(1);
+                                    if (diff > 0) {
+                                        return `${ctx.dataset.label}: ${val} (Excedeu em ${fmt.moeda(diff)} / ${percent}%)`;
+                                    } else {
+                                        return `${ctx.dataset.label}: ${val} (${percent}% do teto mensal)`;
+                                    }
+                                }
+                                if (ctx.datasetIndex === 2) {
+                                    const pctTeto = ((ctx.parsed.y / tetoAnual) * 100).toFixed(1);
+                                    return `${ctx.dataset.label}: ${val} (${pctTeto}% do teto anual)`;
+                                }
+                                return `${ctx.dataset.label}: ${val}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        position: 'left',
+                        title: { display: true, text: 'Mensal (R$)', font: { size: 10, weight: '600' }, color: '#64748b' },
+                        ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k', font: { size: 10 } },
+                        grid: { color: 'rgba(0,0,0,.05)' }
+                    },
+                    y2: {
+                        position: 'right',
+                        title: { display: true, text: 'Acumulado (R$)', font: { size: 10, weight: '600' }, color: '#1565C0' },
+                        ticks: { callback: v => 'R$' + (v/1000000).toFixed(1) + 'M', color: '#1565C0', font: { size: 10 } },
+                        grid: { display: false }
+                    },
+                    x: { grid: { display: false } }
+                }
+            },
+            plugins: [{
+                id: 'datalabelsBottom',
+                afterDraw(chart, args, pluginOptions) {
+                    const { ctx } = chart;
+                    chart.data.datasets.forEach((dataset, i) => {
+                        if (i === 0) { // Produção Aprovada
+                            const meta = chart.getDatasetMeta(i);
+                            meta.data.forEach((bar, index) => {
+                                const val = dataset.data[index];
+                                if (val > 0) {
+                                    ctx.save();
+                                    ctx.fillStyle = '#1e293b';
+                                    ctx.font = 'bold 10px Inter, sans-serif';
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'top';
+                                    const text = 'R$ ' + (val/1000).toFixed(1) + 'k';
+                                    ctx.fillText(text, bar.x, chart.scales.x.bottom + 2);
+                                    ctx.restore();
+                                }
+                            });
+                        }
+                    });
+                }
+            }]
+        });
+        this.save(id, chart);
+    },
+
+    /**
      * Renderiza todos os gráficos de uma vez
      */
     renderAll(data) {
@@ -717,6 +866,7 @@ const ChartModule = {
         this.renderCbo(data);
         this.renderTopProcedimentosExec(data);
         this.renderTopProfissionaisExec(data);
+        this.renderTetoMacMensal(data);
     },
 
     /**
