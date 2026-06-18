@@ -461,17 +461,23 @@ const PDFExport = {
                 const btnDisplayOriginal = btnExport ? btnExport.style.display : '';
                 if (btnExport) btnExport.style.display = 'none';
 
+                // Esconder a tabela temporariamente para não sair na pág 1
+                const tableContainer = document.querySelector('#tetoMacSection .table-container');
+                const tcDisplayOriginal = tableContainer ? tableContainer.style.display : '';
+                if (tableContainer) tableContainer.style.display = 'none';
+
                 // Capturar com html2canvas
                 const canvas = await html2canvas(element, { 
-                    scale: 2, 
+                    scale: 3, 
                     useCORS: true, 
                     backgroundColor: '#ffffff' 
                 });
 
-                // Restaurar o botão
+                // Restaurar
                 if (btnExport) btnExport.style.display = btnDisplayOriginal;
+                if (tableContainer) tableContainer.style.display = tcDisplayOriginal;
 
-                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const imgData = canvas.toDataURL('image/jpeg', 0.98);
 
                 // Calcular dimensões para caber na página (descontando header e footer)
                 const maxW = pageW - margin * 2;
@@ -491,8 +497,69 @@ const PDFExport = {
 
                 doc.addImage(imgData, 'JPEG', xPos, y, imgW, imgH);
 
-                // Adicionar o rodapé da página
-                this.addFooter(doc, pageW, pageH, 1, 1, scaarImg);
+                // Adicionar o rodapé da página 1
+                this.addFooter(doc, pageW, pageH, 1, 2, scaarImg);
+
+                // ==== PÁGINA 2: Tabela Analítica ====
+                doc.addPage('a4', 'landscape');
+                await this.drawUnifiedHeader(doc, d, 'Detalhamento Mensal da Execução do Teto MAC', pageW, margin);
+                
+                const tableRows = [];
+                const tRowsDOM = document.querySelectorAll('#tbodyTetoMacMensal tr');
+                tRowsDOM.forEach(tr => {
+                    const tds = tr.querySelectorAll('td');
+                    if (tds.length === 8) {
+                        tableRows.push([
+                            tds[0].textContent.trim(),
+                            tds[1].textContent.trim(),
+                            tds[2].textContent.trim(),
+                            tds[3].textContent.trim(),
+                            tds[4].textContent.trim(),
+                            tds[5].textContent.trim(),
+                            tds[6].textContent.trim(),
+                            tds[7].textContent.trim().replace(/^(🟢|🟡|🔴|⚠️|✔)\s*/, '') // Limpar emoji do texto
+                        ]);
+                    } else if (tds.length === 1) { // Linha "Sem dados"
+                        tableRows.push([{ content: tds[0].textContent.trim(), colSpan: 8, styles: { halign: 'center' } }]);
+                    }
+                });
+
+                doc.autoTable({
+                    startY: 36,
+                    margin: { left: margin, right: margin },
+                    head: [['Competência', 'Teto Mensal', 'Produção Aprovada', 'Situação do Mês', 'Saldo Acumulado MAC', '% Alcance', 'Prod. Acumulada', 'Status']],
+                    body: tableRows,
+                    styles: { fontSize: 8, halign: 'center', lineWidth: 0.1, lineColor: [200, 200, 200], textColor: 0 },
+                    headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                    columnStyles: {
+                        0: { fontStyle: 'bold', halign: 'center' },
+                        1: { halign: 'center' },
+                        2: { halign: 'center' },
+                        3: { halign: 'center', fontStyle: 'bold' },
+                        4: { halign: 'center', fontStyle: 'bold' },
+                        5: { halign: 'center', fontStyle: 'bold' },
+                        6: { halign: 'center' },
+                        7: { halign: 'center', fontStyle: 'bold' }
+                    },
+                    alternateRowStyles: { fillColor: [245, 248, 250] },
+                    didParseCell: data => {
+                        // Colorir a coluna de Situação (3), Saldo Acumulado MAC (4) e Status (7)
+                        if (data.section === 'body') {
+                            const txt = data.cell.raw || '';
+                            if (data.column.index === 3 || data.column.index === 4) {
+                                if (String(txt).includes('-')) data.cell.styles.textColor = [220, 38, 38];
+                                else if (String(txt).includes('+') || String(txt).replace(/[R$\s.,]/g,'') !== '00') data.cell.styles.textColor = [5, 150, 105];
+                            }
+                            if (data.column.index === 7) {
+                                if (String(txt).includes('BAIXO') || String(txt).includes('EXTRAPOLOU')) data.cell.styles.textColor = [220, 38, 38];
+                                else if (String(txt).includes('MODERADO')) data.cell.styles.textColor = [217, 119, 6];
+                                else data.cell.styles.textColor = [5, 150, 105];
+                            }
+                        }
+                    }
+                });
+
+                this.addFooter(doc, pageW, pageH, 2, 2, scaarImg);
 
                 doc.save(`ARGOS_Teto_MAC_${d.municipio}_${d.ano || '2026'}.pdf`);
                 showToast('✅ PDF do Teto MAC exportado com sucesso!', 'success');

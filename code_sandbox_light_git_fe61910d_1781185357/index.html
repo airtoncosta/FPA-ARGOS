@@ -420,12 +420,12 @@
                         <span class="mac-kpi-sub" id="descTetoMacFolgaMes">Teto Mensal − Produção</span>
                     </div>
                 </div>
-                <div class="mac-kpi mac-kpi-analytic">
-                    <div class="mac-kpi-analytic-icon mac-analytic-orange"><i class="fas fa-calculator"></i></div>
+                <div class="mac-kpi mac-kpi-analytic" id="cardTetoMacSaldo">
+                    <div class="mac-kpi-analytic-icon" id="iconTetoMacSaldo"><i class="fas fa-wallet"></i></div>
                     <div class="mac-kpi-content">
-                        <span class="mac-kpi-label">Média Mensal Executada</span>
-                        <span class="mac-kpi-value" id="valTetoMacMediaMes">R$ 0,00</span>
-                        <span class="mac-kpi-sub" id="descTetoMacMediaMes">Executado ÷ meses</span>
+                        <span class="mac-kpi-label" id="lblTetoMacSaldo">Saldo Acumulado MAC</span>
+                        <span class="mac-kpi-value" id="valTetoMacSaldo">R$ 0,00</span>
+                        <span class="mac-kpi-sub" id="descTetoMacSaldo">-</span>
                     </div>
                 </div>
                 <div class="mac-kpi mac-kpi-analytic" id="cardTetoMacProjecao">
@@ -449,6 +449,30 @@
                     </div>
                 </div>
                 <div style="height: 280px;"><canvas id="chartTetoMacMensal"></canvas></div>
+            </div>
+
+            <!-- TABELA DE DETALHAMENTO MENSAL DO TETO MAC -->
+            <div class="table-container" style="margin-top: 24px;">
+                <div class="table-header-bar">
+                    <span><i class="fas fa-table"></i> Detalhamento Mensal da Execução do Teto MAC</span>
+                </div>
+                <table class="data-table" id="tableTetoMacMensal">
+                    <thead>
+                        <tr>
+                            <th class="text-center">Competência</th>
+                            <th class="text-center">Teto Mensal</th>
+                            <th class="text-center">Produção Aprovada</th>
+                            <th class="text-center">Situação do Mês</th>
+                            <th class="text-center">Saldo Acumulado MAC</th>
+                            <th class="text-center">% Alcance</th>
+                            <th class="text-center">Prod. Acumulada</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyTetoMacMensal">
+                        <!-- Injetado via JS -->
+                    </tbody>
+                </table>
             </div>
         </div>
 

@@ -4056,6 +4056,7 @@ body:not(.logged-in) #main-content {
 .mac-analytic-teal { background: #e0f2f1; color: #00796b; }
 .mac-analytic-orange { background: #fff7ed; color: #ea580c; }
 .mac-analytic-indigo { background: #eef2ff; color: #4338ca; }
+.mac-analytic-red { background: #fef2f2; color: #dc2626; }
 
 /* Chart Card */
 .mac-chart-card {

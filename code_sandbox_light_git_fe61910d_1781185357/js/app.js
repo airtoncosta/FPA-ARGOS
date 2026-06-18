@@ -812,6 +812,17 @@ function renderDashboardExecutivo(d) {
         const projecaoAnual = mediaMensal * 12;
         const projecaoPct = tetoAnual > 0 ? (projecaoAnual / tetoAnual * 100) : 0;
 
+        // Calcular Saldo Acumulado MAC (Global do Ano)
+        let perdaAcumuladaGlobal = 0;
+        const anoCorrente = String(d.ano || '2026');
+        if (d.faturamentoMensal) {
+            d.faturamentoMensal.forEach(m => {
+                if (String(m.competencia || '').includes(anoCorrente)) {
+                    perdaAcumuladaGlobal += (m.valAprovado - tetoMensal);
+                }
+            });
+        }
+
         // Produção do último mês
         const ultimoMes = d.faturamentoMensal.length > 0 
             ? d.faturamentoMensal[d.faturamentoMensal.length - 1] 
@@ -857,8 +868,31 @@ function renderDashboardExecutivo(d) {
                 setEl('descTetoMacFolgaMes', 'Produção abaixo do teto mensal');
             }
         }
-        setEl('valTetoMacMediaMes', fmt.moeda(mediaMensal));
-        setEl('descTetoMacMediaMes', `Executado ÷ ${numMeses} ${numMeses === 1 ? 'mês' : 'meses'}`);
+        // KPI: Saldo Acumulado MAC
+        const cardSaldo = document.getElementById('cardTetoMacSaldo');
+        const iconSaldo = document.getElementById('iconTetoMacSaldo');
+        const valSaldo = document.getElementById('valTetoMacSaldo');
+        const descSaldo = document.getElementById('descTetoMacSaldo');
+        
+        if (cardSaldo && valSaldo && descSaldo && iconSaldo) {
+            valSaldo.textContent = (perdaAcumuladaGlobal >= 0 ? '+' : '-') + ' ' + fmt.moeda(Math.abs(perdaAcumuladaGlobal));
+            
+            iconSaldo.className = 'mac-kpi-analytic-icon'; // Reset
+            
+            if (perdaAcumuladaGlobal >= 0) {
+                iconSaldo.classList.add('mac-analytic-green');
+                valSaldo.style.color = '#059669'; // Verde
+                descSaldo.textContent = 'VALOR GANHO TETO MAC';
+                descSaldo.style.color = '#059669';
+                cardSaldo.style.borderColor = '#059669';
+            } else {
+                iconSaldo.classList.add('mac-analytic-red');
+                valSaldo.style.color = '#dc2626'; // Vermelho
+                descSaldo.textContent = 'PERDA ACUMULADA MAC';
+                descSaldo.style.color = '#dc2626';
+                cardSaldo.style.borderColor = '#dc2626';
+            }
+        }
         setEl('descTetoMacProjecao', `Projeção de uso: ${fmt.pct(projecaoPct)} do Teto MAC`);
         
         // Colorir a projeção conforme o risco
@@ -920,9 +954,63 @@ function renderDashboardExecutivo(d) {
             tetoSection.classList.add(`mac-state-${macState}`);
         }
 
+        renderTabelaTetoMacMensal(d, tetoMensal, tetoAnual);
+
     } else {
         if (tetoSection) tetoSection.style.display = 'none';
     }
+}
+
+function renderTabelaTetoMacMensal(d, tetoMensal, tetoAnual) {
+    const tbody = document.getElementById('tbodyTetoMacMensal');
+    if (!tbody) return;
+
+    if (!d || !d.faturamentoMensal || d.faturamentoMensal.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sem dados para exibição</td></tr>';
+        return;
+    }
+
+    let prodAcumulada = 0;
+    let perdaAcumulada = 0;
+    const anoCorrente = String(d.ano || '2026');
+
+    tbody.innerHTML = d.faturamentoMensal.map(m => {
+        const prod = m.valAprovado;
+        const situacao = prod - tetoMensal;
+        const pctAlcance = tetoMensal > 0 ? (prod / tetoMensal) * 100 : 0;
+        
+        prodAcumulada += prod;
+        
+        const corSituacao = situacao >= 0 ? 'text-green' : 'text-red';
+        const sinalSituacao = situacao > 0 ? '+' : '';
+        
+        let txtPerdaAcumulada = '-';
+        let corPerda = '';
+        
+        const compStr = String(m.competencia || '');
+        if (compStr.includes(anoCorrente)) {
+            perdaAcumulada += situacao;
+            corPerda = perdaAcumulada >= 0 ? 'text-green' : 'text-red';
+            txtPerdaAcumulada = fmt.moeda(perdaAcumulada);
+            if (perdaAcumulada > 0) txtPerdaAcumulada = '+ ' + txtPerdaAcumulada;
+        }
+
+        let statusSelo = '';
+        if (pctAlcance >= 100) statusSelo = '<span class="status-badge-cell badge-excelente">🟢 ATINGIU TETO</span>';
+        else if (pctAlcance >= 85) statusSelo = '<span class="status-badge-cell badge-boa">🟡 MODERADO</span>';
+        else statusSelo = '<span class="status-badge-cell badge-critica">🔴 BAIXO</span>';
+
+        return `<tr>
+            <td class="text-center"><strong>${m.nomeMes || m.competencia}</strong></td>
+            <td class="text-center mono">${fmt.moeda(tetoMensal)}</td>
+            <td class="text-center mono">${fmt.moeda(prod)}</td>
+            <td class="text-center mono fw-bold ${corSituacao}">${sinalSituacao} ${fmt.moeda(situacao)}</td>
+            <td class="text-center mono fw-bold ${corPerda}">${txtPerdaAcumulada}</td>
+            <td class="text-center mono fw-bold">${fmt.pct(pctAlcance)}</td>
+            <td class="text-center mono">${fmt.moeda(prodAcumulada)}</td>
+            <td class="text-center">${statusSelo}</td>
+        </tr>`;
+    }).join('');
 }
 
 /* =========================================================
@@ -2517,15 +2605,20 @@ function getReportFilteredData() {
     
     if (hasLinhas) {
         let linhas = [];
+        let activeDatasets = [];
         window.datasets.forEach(d => {
             if (f.mes !== 'all' && d.competencia.split('/')[0] !== f.mes) return;
             if (f.ano !== 'all' && String(d.ano) !== String(f.ano) && (!d.competencia || !d.competencia.endsWith('/' + f.ano))) return;
+            activeDatasets.push(d);
             if (d.linhas) linhas = linhas.concat(d.linhas);
         });
 
         if (f.unidade !== 'all') linhas = linhas.filter(l => l.uId === f.unidade);
 
-        const agg = aggregateLinhas(linhas, window.datasets[0].competencia, window.datasets[0].ano);
+        const cmpString = activeDatasets.length > 0 ? activeDatasets.map(d => d.competencia).join(', ') : window.datasets[0].competencia;
+        const anoString = activeDatasets.length > 0 ? activeDatasets[0].ano : window.datasets[0].ano;
+
+        const agg = aggregateLinhas(linhas, cmpString, anoString);
         return agg;
     }
     
