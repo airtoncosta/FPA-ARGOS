@@ -881,94 +881,79 @@
                 </div>
             </div>
 
+            <!-- STATUS DISTRIBUTION (HEALTH CHECK) -->
+            <div class="status-summary-row">
+                <div class="status-card status-excelente" style="cursor: pointer;"
+                    onclick="setFilterStatus('EXCELENTE')" title="Filtrar unidades Excelentes">
+                    <div class="status-icon-wrap"><i class="fas fa-check-circle"></i></div>
+                    <div class="status-content">
+                        <div class="status-count" id="cntExcelente">0</div>
+                        <div class="status-label">Excelente ≥99%</div>
+                    </div>
+                </div>
+                <div class="status-card status-boa" style="cursor: pointer;" onclick="setFilterStatus('BOA')"
+                    title="Filtrar unidades Boas">
+                    <div class="status-icon-wrap"><i class="fas fa-check"></i></div>
+                    <div class="status-content">
+                        <div class="status-count" id="cntBoa">0</div>
+                        <div class="status-label">Boa 97–98,99%</div>
+                    </div>
+                </div>
+                <div class="status-card status-regular" style="cursor: pointer;" onclick="setFilterStatus('REGULAR')"
+                    title="Filtrar unidades Regulares">
+                    <div class="status-icon-wrap"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="status-content">
+                        <div class="status-count" id="cntRegular">0</div>
+                        <div class="status-label">Regular 95–96,99%</div>
+                    </div>
+                </div>
+                <div class="status-card status-critica" style="cursor: pointer;" onclick="setFilterStatus('CRITICA')"
+                    title="Filtrar unidades Críticas">
+                    <div class="status-icon-wrap"><i class="fas fa-times-circle"></i></div>
+                    <div class="status-content">
+                        <div class="status-count" id="cntCritica">0</div>
+                        <div class="status-label">Crítica &lt;95%</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- CHARTS ROW -->
             <div class="charts-row">
                 <div class="chart-card chart-full">
                     <div class="chart-header">
                         <span><i class="fas fa-chart-line"></i> Evolução Mensal — Valor Aprovado vs Valor
                             Apresentado</span>
-                        <div class="chart-legend-custom">
-                            <span class="leg leg-blue" style="cursor: pointer; transition: 0.3s;"
-                                onclick="toggleEvolucaoDataset(0, this)">Apresentado</span>
-                            <span class="leg leg-green" style="cursor: pointer; transition: 0.3s;"
-                                onclick="toggleEvolucaoDataset(1, this)">Aprovado</span>
-                            <span class="leg leg-red" style="cursor: pointer; transition: 0.3s;"
-                                onclick="toggleEvolucaoDataset(2, this)">Glosado</span>
-                        </div>
                     </div>
                     <div style="height:280px;"><canvas id="chartEvolucaoMensal"></canvas></div>
+                </div>
             </div>
 
-
-
-            <!-- CHARTS ROW 1.5 -->
+            <!-- CHARTS ROW 2: Produção Mensal (Trend) -->
             <div class="charts-row">
                 <div class="chart-card chart-full">
                     <div class="chart-header">
-                        <span><i class="fas fa-chart-pie"></i> Participação por Unidade</span>
-                    </div>
-                    <div style="height:320px;"><canvas id="chartParticipacaoUnidade"></canvas></div>
-                </div>
-            </div>
-
-            <!-- CHARTS ROW 1.6 (Top 20) -->
-            <div class="charts-row">
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <span><i class="fas fa-stethoscope"></i> Top 20 Procedimentos</span>
-                    </div>
-                    <div style="height:600px;"><canvas id="chartTopProcedimentosExec"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <span><i class="fas fa-user-md"></i> Top 20 Profissionais</span>
-                    </div>
-                    <div style="height:600px;"><canvas id="chartTopProfissionaisExec"></canvas></div>
-                </div>
-            </div>
-
-            <!-- CHARTS ROW 2 -->
-            <div class="charts-row">
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <span><i class="fas fa-chart-bar"></i> Produção Mensal — Quantidade</span>
+                        <span><i class="fas fa-chart-line"></i> Produção Mensal — Quantidade</span>
                     </div>
                     <div style="height:260px;"><canvas id="chartProducaoMensal"></canvas></div>
                 </div>
+            </div>
+
+            <!-- CHARTS ROW 3: Rankings (Top 10 Unidades vs Top 10 Procedimentos) -->
+            <div class="charts-row">
                 <div class="chart-card">
                     <div class="chart-header">
                         <span><i class="fas fa-trophy"></i> Top 10 Unidades — Valor Aprovado</span>
                     </div>
-                    <div style="height:260px;"><canvas id="chartTopUnidades"></canvas></div>
+                    <div style="height:380px;"><canvas id="chartTopUnidades"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <span><i class="fas fa-stethoscope"></i> Top 10 Procedimentos</span>
+                    </div>
+                    <div style="height:380px;"><canvas id="chartTopProcedimentosExec"></canvas></div>
                 </div>
             </div>
 
-            <!-- STATUS DISTRIBUTION -->
-            <div class="status-summary-row">
-                <div class="status-card status-excelente" style="cursor: pointer;"
-                    onclick="setFilterStatus('EXCELENTE')" title="Filtrar unidades Excelentes">
-                    <i class="fas fa-check-circle"></i>
-                    <div class="status-count" id="cntExcelente">0</div>
-                    <div class="status-label">Excelente ≥99%</div>
-                </div>
-                <div class="status-card status-boa" style="cursor: pointer;" onclick="setFilterStatus('BOA')"
-                    title="Filtrar unidades Boas">
-                    <i class="fas fa-check"></i>
-                    <div class="status-count" id="cntBoa">0</div>
-                    <div class="status-label">Boa 97–98,99%</div>
-                </div>
-                <div class="status-card status-regular" style="cursor: pointer;" onclick="setFilterStatus('REGULAR')"
-                    title="Filtrar unidades Regulares">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <div class="status-count" id="cntRegular">0</div>
-                    <div class="status-label">Regular 95–96,99%</div>
-                </div>
-                <div class="status-card status-critica" style="cursor: pointer;" onclick="setFilterStatus('CRITICA')"
-                    title="Filtrar unidades Críticas">
-                    <i class="fas fa-times-circle"></i>
-                    <div class="status-count" id="cntCritica">0</div>
-                    <div class="status-label">Crítica &lt;95%</div>
-                </div>
             </div>
         </section>
 

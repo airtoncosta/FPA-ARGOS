@@ -132,7 +132,7 @@ const ChartModule = {
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { display: false },
+                    legend: { position: 'top' },
                     tooltip: {
                         callbacks: {
                             label: ctx => {
@@ -210,7 +210,7 @@ const ChartModule = {
     },
 
     /**
-     * Produção Mensal — Barras agrupadas
+     * Produção Mensal — Quantidade (Evolução Temporal)
      */
     renderProducaoMensal(data) {
         const id = 'chartProducaoMensal';
@@ -226,27 +226,36 @@ const ChartModule = {
                 labels: meses.map(m => m.nomeMes),
                 datasets: [
                     {
+                        type: 'line',
                         label: 'Apresentados',
                         data: meses.map(m => m.qtdApresentada),
-                        backgroundColor: ARGOS_COLORS.sky,
-                        borderRadius: 4, borderSkipped: false
+                        borderColor: ARGOS_COLORS.blue,
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointBackgroundColor: ARGOS_COLORS.blue,
+                        pointRadius: 4,
+                        tension: 0.3
                     },
                     {
+                        type: 'bar',
                         label: 'Aprovados',
                         data: meses.map(m => m.qtdAprovada),
                         backgroundColor: ARGOS_COLORS.green,
-                        borderRadius: 4, borderSkipped: false
+                        borderRadius: 4
                     },
                     {
+                        type: 'bar',
                         label: 'Glosados',
                         data: meses.map(m => m.qtdGlosada),
                         backgroundColor: ARGOS_COLORS.red,
-                        borderRadius: 4, borderSkipped: false
+                        borderRadius: 4
                     }
                 ]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { position: 'top' } },
                 scales: {
                     y: { ticks: { callback: v => fmt.numero(v), color: '#334155', font: { weight: '600' } }, grid: { color: 'rgba(0,0,0,.05)' } },
@@ -274,7 +283,7 @@ const ChartModule = {
         const chart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: top10.map(u => u.nome.length > 20 ? u.nome.substring(0,18) + '…' : u.nome),
+                labels: top10.map(u => splitChartLabel(u.nome, 40)),
                 datasets: [{
                     label: 'Valor Aprovado',
                     data: top10.map(u => u.valAprovado),
@@ -291,7 +300,7 @@ const ChartModule = {
                 },
                 scales: {
                     x: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
-                    y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+                    y: { ticks: { font: { size: 10 }, color: '#334155' }, grid: { display: false } }
                 }
             }
         });
@@ -868,7 +877,7 @@ const ChartModule = {
     },
 
     /**
-     * Top 20 Procedimentos (Executivo)
+     * Top 10 Procedimentos (Executivo)
      */
     renderTopProcedimentosExec(data) {
         const id = 'chartTopProcedimentosExec';
@@ -876,18 +885,18 @@ const ChartModule = {
         const ctx = this.get(id);
         if (!ctx || !data.procedimentos) return;
 
-        const top20 = [...data.procedimentos]
+        const top10 = [...data.procedimentos]
             .filter(p => p.valAprovado > 0)
             .sort((a,b) => b.valAprovado - a.valAprovado)
-            .slice(0, 20);
+            .slice(0, 10);
 
         const chart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: top20.map(p => splitChartLabel(p.descricao, 35)),
+                labels: top10.map(p => splitChartLabel(p.descricao, 35)),
                 datasets: [{
                     label: 'Valor Aprovado',
-                    data: top20.map(p => p.valAprovado),
+                    data: top10.map(p => p.valAprovado),
                     backgroundColor: ARGOS_COLORS.blue,
                     borderRadius: 4
                 }]
@@ -901,7 +910,7 @@ const ChartModule = {
                 },
                 scales: {
                     x: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
-                    y: { ticks: { font: { size: 9 }, autoSkip: false }, grid: { display: false } }
+                    y: { ticks: { font: { size: 9 }, autoSkip: false, color: '#334155' }, grid: { display: false } }
                 }
             }
         });

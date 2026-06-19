@@ -117,6 +117,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         await renderArquivosManager();
+        
+        // Inicializar o estado visual correto da aba ativa
+        navigateTo('executivo');
     } catch(e) {
         console.error(e);
         showToast('⚠️ Erro ao acessar o banco de dados local.', 'warn');
@@ -1742,6 +1745,12 @@ function renderDashboardRegulacao(d) {
 function bindFilters() {
     document.getElementById('btnAplicarFiltros')?.addEventListener('click', aplicarFiltros);
     document.getElementById('btnLimparFiltros')?.addEventListener('click', limparFiltros);
+    
+    const filterIds = ['filterAno', 'filterMes', 'filterUnidade', 'filterProcedimento', 'filterCbo', 'filterStatus'];
+    filterIds.forEach(id => {
+        document.getElementById(id)?.addEventListener('change', updateFilterSummary);
+    });
+
     updateFilterSummary();
 }
 
@@ -1805,7 +1814,7 @@ function updateFilterSummary() {
 
             if (isActive) {
                 activeCount++;
-                activePills.push(`<span class="selected-pill-item"><i class="fas ${f.icon}"></i> ${text}</span>`);
+                activePills.push(`<span class="selected-pill-item"><i class="fas ${f.icon}"></i> <b>${f.name}:</b> ${text}</span>`);
             }
         }
     });
