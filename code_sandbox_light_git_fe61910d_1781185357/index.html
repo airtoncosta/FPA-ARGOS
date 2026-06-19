@@ -218,11 +218,27 @@
 
         <!-- FILTER BAR -->
         <div id="filter-bar">
-            <div class="filter-card-header">
-                <span class="filter-header-title">
-                    <i class="fas fa-sliders-h"></i> FILTROS
-                </span>
-                <span class="filter-badge" id="filter-active-count">0 ativos</span>
+            <div class="filter-card-header" style="flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 15px; flex: 1;">
+                    <span class="filter-header-title">
+                        <i class="fas fa-sliders-h"></i> FILTROS
+                    </span>
+                    <span class="filter-badge" id="filter-active-count">0 ativos</span>
+                    
+                    <div class="filter-selected-pills" id="filterSelectedPillsContainer" style="color: rgba(255, 255, 255, 0.85); margin-left: auto;">
+                        <i class="fas fa-tag" style="color: rgba(255, 255, 255, 0.6);"></i> Selecionado:
+                        <span class="text-muted" style="font-size: 0.8rem; margin-left: 6px; color: rgba(255, 255, 255, 0.6) !important;">Nenhum filtro ativo</span>
+                    </div>
+                </div>
+                
+                <div class="filter-action-buttons" style="display: flex; gap: 8px;">
+                    <button class="btn-filter-clear" id="btnLimparFiltros" style="padding: 4px 10px; font-size: 0.75rem;">
+                        <i class="fas fa-times"></i> Limpar
+                    </button>
+                    <button class="btn-filter-apply" id="btnAplicarFiltros" style="padding: 4px 10px; font-size: 0.75rem; background: #ffffff; color: var(--sus-blue); border: 1px solid #ffffff;">
+                        <i class="fas fa-filter"></i> Aplicar
+                    </button>
+                </div>
             </div>
             <div class="filter-card-body">
                 <div class="filter-inputs-grid">
@@ -292,22 +308,7 @@
                     </div>
                 </div>
 
-                <div class="filter-divider"></div>
 
-                <div class="filter-card-footer">
-                    <div class="filter-selected-pills" id="filterSelectedPillsContainer">
-                        <i class="fas fa-tag"></i> Selecionado:
-                        <span class="text-muted" style="font-size: 0.8rem; margin-left: 6px;">Nenhum filtro ativo</span>
-                    </div>
-                    <div class="filter-action-buttons">
-                        <button class="btn-filter-clear" id="btnLimparFiltros">
-                            <i class="fas fa-times"></i> Limpar
-                        </button>
-                        <button class="btn-filter-apply" id="btnAplicarFiltros">
-                            <i class="fas fa-filter"></i> Aplicar filtros
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -445,7 +446,6 @@
                     <div class="mac-chart-legend">
                         <span class="mac-leg mac-leg-teto">Teto Mensal</span>
                         <span class="mac-leg mac-leg-prod">Produção Aprovada</span>
-                        <span class="mac-leg mac-leg-acum">Acumulado Executado</span>
                     </div>
                 </div>
                 <div style="height: 280px;"><canvas id="chartTetoMacMensal"></canvas></div>

@@ -338,7 +338,6 @@ body {
 #main-content {
     grid-area: main;
     padding: 20px 24px;
-    overflow-x: hidden;
 }
 
 /* =========================================================
@@ -353,6 +352,13 @@ body {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    transition: box-shadow 0.2s ease;
+}
+
+#filter-bar.is-sticky {
+    position: sticky;
+    top: calc(var(--header-h) + 10px);
+    z-index: 90;
 }
 
 .filter-card-header {
@@ -498,29 +504,34 @@ body {
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
-    color: var(--gray-500);
+    color: rgba(255, 255, 255, 0.9);
     font-size: 0.72rem;
     font-weight: 600;
 }
 
 .filter-selected-pills i {
-    color: var(--gray-400);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.filter-selected-pills .text-muted {
+    color: rgba(255, 255, 255, 0.7) !important;
 }
 
 .selected-pill-item {
-    background: #EBF2FB;
-    color: var(--sus-blue);
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
     font-size: 0.75rem;
     font-weight: 700;
     padding: 4px 10px;
-    border-radius: 12px;
-    display: flex;
+    border-radius: 20px;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .selected-pill-item i {
-    color: var(--sus-blue);
+    color: #ffffff;
     font-size: 0.7rem;
 }
 
@@ -3879,7 +3890,8 @@ body:not(.logged-in) #main-content {
 
 .mac-kpi-sub {
     font-size: 0.67rem;
-    color: var(--gray-400);
+    font-weight: 500;
+    color: var(--gray-600);
     margin-top: 3px;
 }
 

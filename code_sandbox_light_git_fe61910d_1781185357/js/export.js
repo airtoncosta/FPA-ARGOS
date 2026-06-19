@@ -466,6 +466,23 @@ const PDFExport = {
                 const tcDisplayOriginal = tableContainer ? tableContainer.style.display : '';
                 if (tableContainer) tableContainer.style.display = 'none';
 
+                // Aumentar a altura do gráfico temporariamente para preencher melhor o PDF
+                const chartCanvas = document.getElementById('chartTetoMacMensal');
+                const chartDiv = chartCanvas ? chartCanvas.parentElement : null;
+                const originalHeight = chartDiv ? chartDiv.style.height : '';
+                let chartInstance = null;
+                if (window.Chart) {
+                    chartInstance = Chart.getChart('chartTetoMacMensal');
+                }
+                
+                if (chartDiv) {
+                    chartDiv.style.height = '500px';
+                    if (chartInstance) {
+                        chartInstance.resize();
+                        chartInstance.update('none');
+                    }
+                }
+
                 // Capturar com html2canvas
                 const canvas = await html2canvas(element, { 
                     scale: 3, 
@@ -473,9 +490,16 @@ const PDFExport = {
                     backgroundColor: '#ffffff' 
                 });
 
-                // Restaurar
+                // Restaurar estado original
                 if (btnExport) btnExport.style.display = btnDisplayOriginal;
                 if (tableContainer) tableContainer.style.display = tcDisplayOriginal;
+                if (chartDiv) {
+                    chartDiv.style.height = originalHeight || '280px';
+                    if (chartInstance) {
+                        chartInstance.resize();
+                        chartInstance.update('none');
+                    }
+                }
 
                 const imgData = canvas.toDataURL('image/jpeg', 0.98);
 

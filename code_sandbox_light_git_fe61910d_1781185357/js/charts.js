@@ -150,10 +150,10 @@ const ChartModule = {
                 scales: {
                     y: {
                         position: 'left',
-                        ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' },
+                        ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k', color: '#334155', font: { weight: '600' } },
                         grid: { color: 'rgba(0,0,0,.05)' }
                     },
-                    x: { grid: { display: false } }
+                    x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: '600' } } }
                 }
             }
         });
@@ -249,8 +249,8 @@ const ChartModule = {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'top' } },
                 scales: {
-                    y: { ticks: { callback: v => fmt.numero(v) }, grid: { color: 'rgba(0,0,0,.05)' } },
-                    x: { grid: { display: false } }
+                    y: { ticks: { callback: v => fmt.numero(v), color: '#334155', font: { weight: '600' } }, grid: { color: 'rgba(0,0,0,.05)' } },
+                    x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: '600' } } }
                 }
             }
         });
@@ -339,8 +339,8 @@ const ChartModule = {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'top' } },
                 scales: {
-                    y: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
-                    x: { grid: { display: false } }
+                    y: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k', color: '#334155', font: { weight: '600' } } },
+                    x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: '600' } } }
                 }
             }
         });
@@ -506,9 +506,9 @@ const ChartModule = {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'top' } },
                 scales: {
-                    y: { ticks: { callback: v => 'R$' + v.toFixed(0) } },
+                    y: { ticks: { callback: v => 'R$' + v.toFixed(0), color: '#334155', font: { weight: '600' } } },
                     y2: { position: 'right', grid: { display: false } },
-                    x: { grid: { display: false } }
+                    x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: '600' } } }
                 }
             }
         });
@@ -592,8 +592,8 @@ const ChartModule = {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { position: 'top' } },
                 scales: {
-                    y: { ticks: { callback: v => fmt.numero(v) } },
-                    x: { grid: { display: false } }
+                    y: { ticks: { callback: v => fmt.numero(v), color: '#334155', font: { weight: '600' } } },
+                    x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: '600' } } }
                 }
             }
         });
@@ -637,8 +637,8 @@ const ChartModule = {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
-                    y: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
-                    x: { grid: { display: false } }
+                    y: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k', color: '#334155', font: { weight: '600' } } },
+                    x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: '600' } } }
                 }
             }
         });
@@ -714,7 +714,14 @@ const ChartModule = {
         const tetoAnual = portaria.tetoMacSemSamu;
         const tetoMensal = tetoAnual / 12;
 
-        const meses = data.faturamentoMensal;
+        // Filtrar meses para não exibir informações anteriores a JAN/2026
+        const meses = data.faturamentoMensal.filter(m => {
+            if (!m.competencia) return false;
+            const parts = m.competencia.split('/');
+            const year = parseInt(parts[parts.length - 1], 10);
+            return year >= 2026;
+        });
+        
         const labels = meses.map(m => m.nomeMes);
         const aprovados = meses.map(m => m.valAprovado);
 
@@ -751,28 +758,13 @@ const ChartModule = {
                         data: labels.map(() => tetoMensal),
                         type: 'line',
                         borderColor: '#dc2626',
-                        borderWidth: 2.5,
+                        borderWidth: 0,
                         borderDash: [6, 4],
                         pointRadius: 0,
                         backgroundColor: 'transparent',
                         fill: false,
                         yAxisID: 'y',
                         order: 0
-                    },
-                    {
-                        label: 'Acumulado Executado',
-                        data: acumulados,
-                        type: 'line',
-                        borderColor: '#1565C0',
-                        backgroundColor: 'rgba(21, 101, 192, 0.08)',
-                        borderWidth: 2.5,
-                        pointBackgroundColor: '#1565C0',
-                        pointRadius: 5,
-                        pointHoverRadius: 7,
-                        tension: 0.3,
-                        fill: true,
-                        yAxisID: 'y2',
-                        order: 1
                     }
                 ]
             },
@@ -795,10 +787,6 @@ const ChartModule = {
                                         return `${ctx.dataset.label}: ${val} (${percent}% do teto mensal)`;
                                     }
                                 }
-                                if (ctx.datasetIndex === 2) {
-                                    const pctTeto = ((ctx.parsed.y / tetoAnual) * 100).toFixed(1);
-                                    return `${ctx.dataset.label}: ${val} (${pctTeto}% do teto anual)`;
-                                }
                                 return `${ctx.dataset.label}: ${val}`;
                             }
                         }
@@ -808,19 +796,29 @@ const ChartModule = {
                     y: {
                         position: 'left',
                         title: { display: true, text: 'Mensal (R$)', font: { size: 10, weight: '600' }, color: '#64748b' },
-                        ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k', font: { size: 10 } },
+                        ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k', color: '#334155', font: { size: 10, weight: '600' } },
                         grid: { color: 'rgba(0,0,0,.05)' }
                     },
-                    y2: {
-                        position: 'right',
-                        title: { display: true, text: 'Acumulado (R$)', font: { size: 10, weight: '600' }, color: '#1565C0' },
-                        ticks: { callback: v => 'R$' + (v/1000000).toFixed(1) + 'M', color: '#1565C0', font: { size: 10 } },
-                        grid: { display: false }
-                    },
-                    x: { grid: { display: false } }
+                    x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: '600' } } }
                 }
             },
             plugins: [{
+                id: 'horizontalTetoMacLine',
+                beforeDraw(chart) {
+                    const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+                    const yPos = y.getPixelForValue(tetoMensal);
+                    
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(left, yPos);
+                    ctx.lineTo(right, yPos);
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeStyle = '#dc2626';
+                    ctx.setLineDash([6, 4]);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }, {
                 id: 'datalabelsBottom',
                 afterDraw(chart, args, pluginOptions) {
                     const { ctx } = chart;

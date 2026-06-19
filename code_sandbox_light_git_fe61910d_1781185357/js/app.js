@@ -366,6 +366,13 @@ function navigateTo(section) {
         } else {
             filterBar.style.display = 'flex';
         }
+        
+        // Ativar o modo sticky (deslizante) apenas no módulo Visão Geral (executivo)
+        if (section === 'executivo') {
+            filterBar.classList.add('is-sticky');
+        } else {
+            filterBar.classList.remove('is-sticky');
+        }
     }
 
     // Ocultar ou Mostrar o Painel Executivo do Teto MAC
@@ -797,16 +804,24 @@ function renderDashboardExecutivo(d) {
     const tetoSection = document.getElementById('tetoMacSection');
     
     if (portaria && d.competencia !== 'Sem dados') {
-        if (tetoSection) tetoSection.style.display = 'block';
+        if (tetoSection && APP_STATE.activeSection === 'executivo') tetoSection.style.display = 'block';
         
         const tetoAnual = portaria.tetoMacSemSamu;
         const tetoMensal = tetoAnual / 12;
-        const faturamentoAprovado = r.valAprovado;
+        
+        const anoCorrente = String(d.ano || '2026');
+        
+        // CORREÇÃO: Considerar apenas a produção do ano corrente para os indicadores do Teto MAC anual
+        const fatAnoCorrente = d.faturamentoMensal.filter(m => {
+            const cmp = String(m.competencia || m.nomeMes || '');
+            return cmp.includes(anoCorrente) || cmp.endsWith(anoCorrente);
+        });
+
+        const faturamentoAprovado = fatAnoCorrente.reduce((acc, m) => acc + m.valAprovado, 0);
         const restanteAnual = tetoAnual - faturamentoAprovado;
-        let numMeses = 1;
-        if (APP_STATE.data && APP_STATE.data.competencia && APP_STATE.data.competencia !== 'Sem dados') {
-            numMeses = APP_STATE.data.competencia.split(',').length;
-        }
+        
+        const numMeses = fatAnoCorrente.length || 1;
+        
         const utilizacaoPct = tetoAnual > 0 ? (faturamentoAprovado / tetoAnual * 100) : 0;
         const mediaMensal = faturamentoAprovado / numMeses;
         const projecaoAnual = mediaMensal * 12;
@@ -814,7 +829,6 @@ function renderDashboardExecutivo(d) {
 
         // Calcular Saldo Acumulado MAC (Global do Ano)
         let perdaAcumuladaGlobal = 0;
-        const anoCorrente = String(d.ano || '2026');
         if (d.faturamentoMensal) {
             d.faturamentoMensal.forEach(m => {
                 if (String(m.competencia || '').includes(anoCorrente)) {
@@ -970,11 +984,24 @@ function renderTabelaTetoMacMensal(d, tetoMensal, tetoAnual) {
         return;
     }
 
+    // Filtrar meses para não exibir informações anteriores a JAN/2026
+    const mesesFiltrados = d.faturamentoMensal.filter(m => {
+        if (!m.competencia) return false;
+        const parts = m.competencia.split('/');
+        const year = parseInt(parts[parts.length - 1], 10);
+        return year >= 2026;
+    });
+
+    if (mesesFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Sem dados para exibição a partir de JAN/2026</td></tr>';
+        return;
+    }
+
     let prodAcumulada = 0;
     let perdaAcumulada = 0;
     const anoCorrente = String(d.ano || '2026');
 
-    tbody.innerHTML = d.faturamentoMensal.map(m => {
+    tbody.innerHTML = mesesFiltrados.map(m => {
         const prod = m.valAprovado;
         const situacao = prod - tetoMensal;
         const pctAlcance = tetoMensal > 0 ? (prod / tetoMensal) * 100 : 0;
