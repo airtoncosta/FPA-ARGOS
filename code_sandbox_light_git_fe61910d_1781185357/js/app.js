@@ -2147,6 +2147,17 @@ function processContent(content, fileName = 'arquivo') {
             const parsed = Parser.parseTXT(content);
             if (parsed && parsed.unidades && parsed.unidades.length > 0) {
                 if (!window.datasets) window.datasets = [];
+
+                // VERIFICAÇÃO DE SEGURANÇA: MUNICÍPIO
+                if (window.datasets.length > 0) {
+                    const municipioExistente = window.datasets[0].municipio;
+                    if (parsed.municipio && municipioExistente && parsed.municipio.trim().toUpperCase() !== municipioExistente.trim().toUpperCase()) {
+                        hideLoading();
+                        showSecurityAlertModal(parsed.municipio, municipioExistente);
+                        showToast('❌ Importação bloqueada por divergência de município!', 'error');
+                        return;
+                    }
+                }
                 
                 // Evitar Duplicidade
                 if (window.datasets.some(d => d.competencia === parsed.competencia)) {
@@ -2878,3 +2889,89 @@ window.confirmDeleteImport = function(id, fileName, importDate, competencia) {
     
     showModal('modalConfirmarExclusao');
 };
+
+/* =========================================================
+   ALERTA DE SEGURANÇA MUNICÍPIO
+   ========================================================= */
+function showSecurityAlertModal(municipioTentado, municipioExistente) {
+    const existing = document.getElementById('securityAlertModalOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'securityAlertModalOverlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+    overlay.style.zIndex = '999999';
+    overlay.style.display = 'flex';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+    overlay.style.backdropFilter = 'blur(4px)';
+
+    const modalBox = document.createElement('div');
+    modalBox.style.backgroundColor = '#1a1d24'; // dark theme bg
+    modalBox.style.border = '2px solid #e74c3c';
+    modalBox.style.borderRadius = '12px';
+    modalBox.style.padding = '30px';
+    modalBox.style.maxWidth = '600px';
+    modalBox.style.width = '90%';
+    modalBox.style.color = '#fff';
+    modalBox.style.boxShadow = '0 0 40px rgba(231, 76, 60, 0.4)';
+    modalBox.style.textAlign = 'center';
+    modalBox.style.fontFamily = 'Inter, system-ui, sans-serif';
+
+    modalBox.innerHTML = `
+        <div style="font-size: 3rem; margin-bottom: 10px;">🚨</div>
+        <h2 style="color: #e74c3c; margin-top: 0; font-size: 1.6rem; text-transform: uppercase; font-weight: 800;">Alerta Crítico de Segurança</h2>
+        <h3 style="color: #ff9f43; margin-bottom: 25px; font-weight: 600;">BLOQUEIO DE IMPORTAÇÃO</h3>
+        
+        <p style="font-size: 1.1rem; line-height: 1.5; color: #ced4da; margin-bottom: 15px;">
+            Você está tentando importar um arquivo do município de:
+        </p>
+        <div style="background: rgba(231, 76, 60, 0.1); border: 1px dashed #e74c3c; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+            <span style="font-size: 1.8rem; font-weight: 800; color: #e74c3c; letter-spacing: 1px;">${municipioTentado}</span>
+        </div>
+
+        <p style="font-size: 1.1rem; line-height: 1.5; color: #ced4da; margin-bottom: 15px;">
+            No entanto, o sistema já possui dados carregados do município de:
+        </p>
+        <div style="background: rgba(46, 204, 113, 0.1); border: 1px dashed #2ecc71; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+            <span style="font-size: 1.8rem; font-weight: 800; color: #2ecc71; letter-spacing: 1px;">${municipioExistente}</span>
+        </div>
+
+        <p style="font-size: 0.95rem; color: #adb5bd; margin-bottom: 30px; padding: 0 15px; line-height: 1.5;">
+            Por motivos de segurança e integridade, não é permitido misturar dados de municípios diferentes no mesmo ambiente.<br>Limpe a base de dados atual primeiro se desejar importar dados de um novo município.
+        </p>
+
+        <button id="btnSecurityAlertOk" style="background-color: #e74c3c; color: #fff; border: none; padding: 14px 40px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: transform 0.2s, background 0.2s; box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);">
+            ENTENDI E CANCELAR IMPORTAÇÃO
+        </button>
+    `;
+
+    overlay.appendChild(modalBox);
+    document.body.appendChild(overlay);
+
+    const btn = document.getElementById('btnSecurityAlertOk');
+    
+    btn.onmouseover = () => btn.style.backgroundColor = '#c0392b';
+    btn.onmouseout = () => btn.style.backgroundColor = '#e74c3c';
+    btn.onmousedown = () => btn.style.transform = 'scale(0.95)';
+    btn.onmouseup = () => btn.style.transform = 'scale(1)';
+
+    btn.addEventListener('click', () => {
+        overlay.style.transition = 'opacity 0.2s';
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.remove(), 200);
+    });
+    
+    if (typeof modalBox.animate === 'function') {
+        modalBox.animate([
+            { transform: 'scale(0.8)', opacity: 0 },
+            { transform: 'scale(1)', opacity: 1 }
+        ], { duration: 300, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' });
+    }
+}
+
