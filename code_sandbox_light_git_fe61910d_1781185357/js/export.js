@@ -421,7 +421,7 @@ const PDFExport = {
 
                 // A logomarca já é adicionada dinamicamente na página 1 no drawUnifiedHeader
 
-                doc.save(`ARGOS_Executivo_${d.municipio}_${d.ano || '2026'}.pdf`);
+                doc.save(`ARGOS_Executivo_${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'}_${d.ano || '2026'}.pdf`);
                 showToast('✅ PDF exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
@@ -585,7 +585,7 @@ const PDFExport = {
 
                 this.addFooter(doc, pageW, pageH, 2, 2, scaarImg);
 
-                doc.save(`ARGOS_Teto_MAC_${d.municipio}_${d.ano || '2026'}.pdf`);
+                doc.save(`ARGOS_Teto_MAC_${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'}_${d.ano || '2026'}.pdf`);
                 showToast('✅ PDF do Teto MAC exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
@@ -764,7 +764,7 @@ const PDFExport = {
                     this.addFooter(doc, pageW, pageH, i, totalPages, scaarImg);
                 }
 
-                doc.save(`ARGOS_Procedimentos_${d.municipio}_${d.ano || '2026'}.pdf`);
+                doc.save(`ARGOS_Procedimentos_${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'}_${d.ano || '2026'}.pdf`);
                 showToast('✅ PDF de Procedimentos exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
@@ -868,7 +868,7 @@ const PDFExport = {
                     this.addFooter(doc, pageW, pageH, i, totalPages, scaarImg);
                 }
 
-                doc.save(`ARGOS_Profissionais_${d.municipio}_${d.ano || '2026'}.pdf`);
+                doc.save(`ARGOS_Profissionais_${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'}_${d.ano || '2026'}.pdf`);
                 showToast('✅ PDF de Profissionais exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
@@ -983,7 +983,7 @@ const PDFExport = {
                     this.addFooter(doc, pageW, pageH, i, totalPages, scaarImg);
                 }
 
-                doc.save(`ARGOS_Unidades_${d.municipio}_${d.ano || '2026'}.pdf`);
+                doc.save(`ARGOS_Unidades_${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'}_${d.ano || '2026'}.pdf`);
                 showToast('✅ PDF de Unidades exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
@@ -1133,7 +1133,7 @@ const PDFExport = {
                     this.addFooter(doc, pageW, pageH, i, totalPages, scaarImg);
                 }
 
-                doc.save(`ARGOS_Eficiencia_${d.municipio}_${d.ano || '2026'}.pdf`);
+                doc.save(`ARGOS_Eficiencia_${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'}_${d.ano || '2026'}.pdf`);
                 showToast('✅ PDF de Eficiência exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
@@ -1147,7 +1147,7 @@ const PDFExport = {
     drawCards(doc, d, y, pageW, margin) {
         const gap = 4;
         const totalW = pageW - 2 * margin;
-        const rowHeight = 22;
+        const rowHeight = 24;
         const r = d.resumo;
 
         // --- ROW 1: 4 Cards ---
@@ -1157,22 +1157,22 @@ const PDFExport = {
             { 
                 lbl: 'PROCEDIMENTOS\nAPROVADOS', val: this.formatN(r.qtdAprovada), 
                 trend: `${this.formatP(r.pctAprovacaoQtd)} de aprovação`, trendColor: [46, 125, 50],
-                bc: [27, 94, 32], icbg: [232, 245, 233], iconType: 'check'
+                bc: [27, 94, 32], icbg: [220, 252, 231], iconType: 'check'
             },
             { 
                 lbl: 'PROCEDIMENTOS\nAPRESENTADOS', val: this.formatN(r.qtdApresentada), 
                 trend: 'Total acumulado', trendColor: [100, 116, 139],
-                bc: [13, 71, 161], icbg: [235, 242, 250], iconType: 'list'
+                bc: [37, 99, 235], icbg: [219, 234, 254], iconType: 'list'
             },
             { 
                 lbl: 'UNIDADES\nPRODUTORAS', val: d.unidades.length.toString(), 
-                trend: `${d.municipio} / ${d.uf}`, trendColor: [100, 116, 139],
-                bc: [26, 35, 126], icbg: [232, 234, 246], iconType: 'building'
+                trend: `${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'} / ${d.uf || (APP_STATE.data && APP_STATE.data.uf) || 'MA'}`, trendColor: [100, 116, 139],
+                bc: [67, 56, 202], icbg: [224, 231, 255], iconType: 'building'
             },
             { 
                 lbl: 'TAXA DE GLOSA', val: this.formatP(r.pctGlosaQtd), 
-                trend: '% de procedimentos glosados', trendColor: [198, 40, 40], valColor: [198, 40, 40],
-                bc: [183, 28, 28], icbg: [253, 237, 237], iconType: 'percent'
+                trend: '% de procedimentos glosados', trendColor: [220, 38, 38], valColor: [220, 38, 38],
+                bc: [220, 38, 38], icbg: [254, 226, 226], iconType: 'percent'
             }
         ];
 
@@ -1183,44 +1183,41 @@ const PDFExport = {
         const cards2 = [
             { 
                 lbl: 'VALOR APROVADO', val: this.formatM(r.valAprovado), 
-                trend: 'Faturamento líquido', trendColor: [148, 163, 184], valColor: [30, 41, 59],
-                bc: [46, 125, 50], icbg: [232, 245, 233], iconType: 'money'
+                trend: 'Faturamento líquido', trendColor: [100, 116, 139], valColor: [15, 23, 42],
+                bc: [22, 163, 74], icbg: [220, 252, 231], iconType: 'money'
             },
             { 
                 lbl: 'VALOR APRESENTADO', val: this.formatM(r.valApresentado), 
-                trend: 'Total bruto produzido', trendColor: [148, 163, 184], valColor: [30, 41, 59],
-                bc: [100, 116, 139], icbg: [235, 242, 250], iconType: 'money'
+                trend: 'Total bruto produzido', trendColor: [100, 116, 139], valColor: [15, 23, 42],
+                bc: [37, 99, 235], icbg: [219, 234, 254], iconType: 'money'
             },
             { 
                 lbl: 'TAXA DE APROVAÇÃO', val: this.formatP(r.pctAprovacaoQtd), 
-                trendColor: [148, 163, 184], valColor: [46, 125, 50],
-                bc: [0, 105, 92], icbg: [224, 242, 241], iconType: 'percent', isProg: true
+                trendColor: [100, 116, 139], valColor: [22, 163, 74],
+                bc: [13, 148, 136], icbg: [204, 251, 241], iconType: 'percent', isProg: true
             },
             { 
                 lbl: 'PROCEDIMENTOS\nGLOSADOS', val: this.formatN(r.qtdGlosada), 
-                trend: `${this.formatP(r.pctGlosaQtd)} de glosa`, trendColor: [230, 81, 0], valColor: [30, 41, 59],
-                bc: [183, 28, 28], icbg: [253, 237, 237], iconType: 'cross'
+                trend: `${this.formatP(r.pctGlosaQtd)} de glosa`, trendColor: [234, 88, 12], valColor: [15, 23, 42],
+                bc: [220, 38, 38], icbg: [254, 226, 226], iconType: 'cross'
             },
             { 
                 lbl: 'VALOR GLOSADO', val: this.formatM(r.valGlosado), 
-                trend: 'Valor não aprovado', trendColor: [148, 163, 184], valColor: [30, 41, 59],
-                bc: [230, 81, 0], icbg: [255, 243, 224], iconType: 'money'
+                trend: 'Valor não aprovado', trendColor: [100, 116, 139], valColor: [15, 23, 42],
+                bc: [234, 88, 12], icbg: [255, 237, 213], iconType: 'money'
             }
         ];
 
         const drawCard = (c, i, cx, cy, cardW) => {
             doc.setDrawColor(226, 232, 240);
             doc.setFillColor(255, 255, 255);
-            doc.roundedRect(cx, cy, cardW, rowHeight, 2, 2, 'FD');
+            doc.roundedRect(cx, cy, cardW, rowHeight, 3, 3, 'FD');
             
-            doc.setFillColor(...c.bc);
-            doc.roundedRect(cx, cy, 1.5, rowHeight, 1, 1, 'F');
-            
-            const icX = cx + 4;
-            const icY = cy + 4;
             const icS = 14;
+            const icX = cx + 5;
+            const icY = cy + (rowHeight - icS) / 2;
             doc.setFillColor(...c.icbg);
-            doc.roundedRect(icX, icY, icS, icS, 2, 2, 'F');
+            doc.roundedRect(icX, icY, icS, icS, 2.5, 2.5, 'F');
             
             doc.setDrawColor(...c.bc);
             doc.setLineWidth(1.2);
@@ -1250,28 +1247,29 @@ const PDFExport = {
                 doc.text('R$', icX + 7, icY + 9.5, { align: 'center' });
             }
             
-            const textX = icX + icS + 3;
+            const textX = icX + icS + 3.5;
             
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(6.5);
             doc.setTextColor(100, 116, 139);
-            doc.text(c.lbl, textX, cy + 6);
+            const isMultiLine = c.lbl.includes('\n');
+            doc.text(c.lbl, textX, cy + (isMultiLine ? 6 : 7.5));
             
-            doc.setFontSize(cardW < 60 ? 9.5 : 14);
-            doc.setTextColor(...(c.valColor || [30, 41, 59]));
-            doc.text(c.val, textX, cy + 14.5);
+            doc.setFontSize(cardW < 60 ? 10 : 13);
+            doc.setTextColor(...(c.valColor || [15, 23, 42]));
+            doc.text(c.val, textX, cy + 15.5);
             
             if (c.isProg) {
                 doc.setFillColor(226, 232, 240);
-                doc.rect(textX, cy + 17.5, cardW - (textX - cx) - 4, 3, 'F');
-                doc.setFillColor(46, 125, 50);
-                const pW = (cardW - (textX - cx) - 4) * (r.pctAprovacaoQtd / 100);
-                doc.rect(textX, cy + 17.5, pW > 0 ? pW : 0, 3, 'F');
+                doc.roundedRect(textX, cy + 18.5, cardW - (textX - cx) - 5, 2.5, 1, 1, 'F');
+                doc.setFillColor(22, 163, 74);
+                const pW = (cardW - (textX - cx) - 5) * (r.pctAprovacaoQtd / 100);
+                if (pW > 0) doc.roundedRect(textX, cy + 18.5, pW, 2.5, 1, 1, 'F');
             } else {
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(6.5);
                 doc.setTextColor(...c.trendColor);
-                doc.text(c.trend, textX, cy + 19.5);
+                doc.text(c.trend, textX, cy + 20);
             }
         };
 
@@ -1432,7 +1430,7 @@ const ExcelExport = {
                     this.addRegulacao(wb, d);
                 }
 
-                XLSX.writeFile(wb, `ARGOS_${d.municipio}_${d.competencia?.replace(/\s/g, '_') || d.ano}.xlsx`);
+                XLSX.writeFile(wb, `ARGOS_${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'}_${d.competencia?.replace(/\s/g, '_') || d.ano}.xlsx`);
                 showToast('✅ Excel exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
@@ -1447,7 +1445,7 @@ const ExcelExport = {
         const r = d.resumo;
         const rows = [
             ['ARGOS FPA — SIA/SUS'],
-            [`Município: ${d.municipio} — ${d.uf}`, '', `Competência: ${d.competencia}`],
+            [`Município: ${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'} — ${d.uf}`, '', `Competência: ${d.competencia}`],
             [],
             ['RESUMO GERAL DO PERÍODO'],
             ['Indicador', 'Valor'],
