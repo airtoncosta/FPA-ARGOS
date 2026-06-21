@@ -801,9 +801,15 @@ function getFilteredData() {
     if (hasLinhas) {
         let linhas = [];
         window.datasets.forEach(d => {
-            if (f.ano !== 'all' && String(d.ano) !== String(f.ano) && (!d.competencia || !d.competencia.endsWith('/'+f.ano))) return;
-            
             let dtLinhas = d.linhas || [];
+            
+            if (f.ano !== 'all') {
+                dtLinhas = dtLinhas.filter(l => {
+                    const lAno = l.cmp ? l.cmp.split('/')[1] : String(d.ano);
+                    return lAno === String(f.ano);
+                });
+            }
+
             if (f.mes !== 'all') {
                 dtLinhas = dtLinhas.filter(l => {
                     const lMes = l.mes || (l.cmp ? l.cmp.split('/')[0] : '');
@@ -830,13 +836,36 @@ function getFilteredData() {
         if (f.procedimento !== 'all') linhas = linhas.filter(l => l.proc === f.procedimento);
         if (f.cbo !== 'all') linhas = linhas.filter(l => l.cbo === f.cbo);
 
+        if (linhas.length === 0) {
+            return {
+                competencia: f.mes !== 'all' ? `${f.mes}/${f.ano !== 'all' ? f.ano : (window.datasets[0] ? window.datasets[0].ano : '')}` : '',
+                ano: f.ano,
+                municipio: window.datasets[0] ? window.datasets[0].municipio : '',
+                uf: window.datasets[0] ? window.datasets[0].uf : '',
+                unidades: [], faturamentoMensal: [], procedimentos: [], cbos: [],
+                resumo: { qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0, valApresentado: 0, valAprovado: 0, valGlosado: 0, pctAprovacaoQtd: 0, pctGlosaQtd: 0, totalUnidades: 0 }
+            };
+        }
+
         const cmpRef = linhas[0].cmp || (window.datasets[0] ? window.datasets[0].competencia : '');
         const anoRef = linhas[0].cmp ? linhas[0].cmp.split('/')[1] : (window.datasets[0] ? window.datasets[0].ano : '');
-        const agg = aggregateLinhas(linhas, cmpRef, anoRef, window.datasets[0] ? window.datasets[0].municipio : '', window.datasets[0] ? window.datasets[0].uf : '');
+        let agg = aggregateLinhas(linhas, cmpRef, anoRef, window.datasets[0] ? window.datasets[0].municipio : '', window.datasets[0] ? window.datasets[0].uf : '');
         
         if (f.status !== 'all') {
-            agg.unidades = agg.unidades.filter(u => classificarStatus(u.pctAprovacaoVal).status === f.status.toUpperCase());
-            agg.resumo = calcularResumo(agg.unidades, agg.faturamentoMensal);
+            const statusMatchUnits = agg.unidades.filter(u => classificarStatus(u.pctAprovacaoVal).status === f.status.toUpperCase()).map(u => u.id);
+            const newLinhas = linhas.filter(l => statusMatchUnits.includes(l.uId));
+            
+            if (newLinhas.length !== linhas.length) {
+                if (newLinhas.length === 0) {
+                    agg.unidades = [];
+                    agg.faturamentoMensal = [];
+                    agg.procedimentos = [];
+                    agg.cbos = [];
+                    agg.resumo = { qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0, valApresentado: 0, valAprovado: 0, valGlosado: 0, pctAprovacaoQtd: 0, pctGlosaQtd: 0, totalUnidades: 0 };
+                } else {
+                    agg = aggregateLinhas(newLinhas, cmpRef, anoRef, window.datasets[0] ? window.datasets[0].municipio : '', window.datasets[0] ? window.datasets[0].uf : '');
+                }
+            }
         }
         return agg;
     }
@@ -852,7 +881,16 @@ function getFilteredData() {
         });
     }
     if (f.ano !== 'all') {
-        dts = dts.filter(d => String(d.ano) === String(f.ano) || (d.competencia && d.competencia.endsWith('/' + f.ano)));
+        dts = dts.filter(d => {
+            if (String(d.ano) === String(f.ano) || (d.competencia && d.competencia.endsWith('/' + f.ano))) return true;
+            if (d.faturamentoMensal && d.faturamentoMensal.length > 0) {
+                return d.faturamentoMensal.some(m => {
+                    const mAno = m.competencia ? m.competencia.split('/')[1] : (m.nomeMes && m.nomeMes.includes('/') ? m.nomeMes.split('/')[1] : '');
+                    return mAno === String(f.ano);
+                });
+            }
+            return false;
+        });
     }
     
     let agg = buildAggregatedData(dts);
@@ -863,28 +901,59 @@ function getFilteredData() {
     let procedimentos = [...agg.procedimentos];
     let cbos = [...(agg.cbos || [])];
 
+    let validUnitIds = null;
+    
+    if (f.status !== 'all') {
+        validUnitIds = unidades.filter(u => classificarStatus(u.pctAprovacaoVal).status === f.status.toUpperCase()).map(u => u.id);
+    }
+    
     if (f.unidade !== 'all') {
-        const uId = f.unidade;
-        unidades = unidades.filter(u => u.id === uId);
-        
+        if (validUnitIds === null) {
+            validUnitIds = [f.unidade];
+        } else {
+            validUnitIds = validUnitIds.includes(f.unidade) ? [f.unidade] : [];
+        }
+    }
+
+    if (validUnitIds !== null) {
+        unidades = unidades.filter(u => validUnitIds.includes(u.id));
+
         faturamento = faturamento.map(m => {
-            const val = m.valoresPorUnidade && m.valoresPorUnidade[uId] ? m.valoresPorUnidade[uId] : { valApresentado: 0, valAprovado: 0, valGlosado: 0, qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0 };
+            let val = { valApresentado: 0, valAprovado: 0, valGlosado: 0, qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0 };
+            validUnitIds.forEach(uId => {
+                if (m.valoresPorUnidade && m.valoresPorUnidade[uId]) {
+                    val.valApresentado += m.valoresPorUnidade[uId].valApresentado || 0;
+                    val.valAprovado += m.valoresPorUnidade[uId].valAprovado || 0;
+                    val.valGlosado += m.valoresPorUnidade[uId].valGlosado || 0;
+                    val.qtdApresentada += m.valoresPorUnidade[uId].qtdApresentada || 0;
+                    val.qtdAprovada += m.valoresPorUnidade[uId].qtdAprovada || 0;
+                    val.qtdGlosada += m.valoresPorUnidade[uId].qtdGlosada || 0;
+                }
+            });
             return { ...m, ...val, pctAprovado: val.valApresentado > 0 ? (val.valAprovado / val.valApresentado * 100) : 0 };
         });
 
         procedimentos = procedimentos.map(p => {
-            const val = p.valoresPorUnidade && p.valoresPorUnidade[uId] ? p.valoresPorUnidade[uId] : { valAprovado: 0, qtdAprovada: 0 };
+            let val = { valAprovado: 0, qtdAprovada: 0 };
+            validUnitIds.forEach(uId => {
+                if (p.valoresPorUnidade && p.valoresPorUnidade[uId]) {
+                    val.valAprovado += p.valoresPorUnidade[uId].valAprovado || 0;
+                    val.qtdAprovada += p.valoresPorUnidade[uId].qtdAprovada || 0;
+                }
+            });
             return { ...p, ...val };
         }).filter(p => p.valAprovado > 0 || p.qtdAprovada > 0).sort((a,b) => b.valAprovado - a.valAprovado);
 
         cbos = cbos.map(c => {
-            const val = c.valoresPorUnidade && c.valoresPorUnidade[uId] ? c.valoresPorUnidade[uId] : { valAprovado: 0, qtdAprovada: 0 };
+            let val = { valAprovado: 0, qtdAprovada: 0 };
+            validUnitIds.forEach(uId => {
+                if (c.valoresPorUnidade && c.valoresPorUnidade[uId]) {
+                    val.valAprovado += c.valoresPorUnidade[uId].valAprovado || 0;
+                    val.qtdAprovada += c.valoresPorUnidade[uId].qtdAprovada || 0;
+                }
+            });
             return { ...c, ...val };
         }).filter(c => c.valAprovado > 0 || c.qtdAprovada > 0).sort((a,b) => b.valAprovado - a.valAprovado);
-    }
-
-    if (f.status !== 'all') {
-        unidades = unidades.filter(u => classificarStatus(u.pctAprovacaoVal).status === f.status.toUpperCase());
     }
 
     const resumo = calcularResumo(unidades, faturamento);
@@ -1053,9 +1122,18 @@ function renderDashboardExecutivo(d) {
             progressBar.style.width = Math.min(utilizacaoPct, 100) + '%';
         }
         if (progressPct) progressPct.textContent = fmt.pct(utilizacaoPct);
-        setEl('macProgressExec', fmt.moeda(faturamentoAprovado));
-        setEl('macProgressTeto', fmt.moeda(tetoAnual));
-        setEl('macProgressSaldo', fmt.moeda(restanteAnual));
+        
+        // Target percentage up to the latest competence month
+        const progressMeta = document.getElementById('macProgressMeta');
+        if (progressMeta) {
+            if (ultimoMes && numMeses > 0) {
+                const targetPct = Math.round((numMeses / 12) * 100);
+                const compStr = ultimoMes.competencia || 'atual';
+                progressMeta.textContent = `Meta até ${compStr}: ${targetPct}%`;
+            } else {
+                progressMeta.textContent = '';
+            }
+        }
 
         // ===== LINHA 2 — Indicadores Analíticos =====
         setEl('valTetoMacMensal', fmt.moeda(tetoMensal));
@@ -1081,24 +1159,31 @@ function renderDashboardExecutivo(d) {
         const iconSaldo = document.getElementById('iconTetoMacSaldo');
         const valSaldo = document.getElementById('valTetoMacSaldo');
         const descSaldo = document.getElementById('descTetoMacSaldo');
+        const badgeSaldo = document.getElementById('badgeTetoMacSaldo');
         
         if (cardSaldo && valSaldo && descSaldo && iconSaldo) {
             valSaldo.textContent = (perdaAcumuladaGlobal >= 0 ? '+' : '-') + ' ' + fmt.moeda(Math.abs(perdaAcumuladaGlobal));
             
-            iconSaldo.className = 'mac-kpi-analytic-icon'; // Reset
+            iconSaldo.className = ''; // Reset
             
             if (perdaAcumuladaGlobal >= 0) {
-                iconSaldo.classList.add('mac-analytic-green');
-                valSaldo.style.color = '#059669'; // Verde
+                iconSaldo.className = 'fas fa-check-circle mac-impact-icon';
+                cardSaldo.classList.remove('mac-impact-highlight-red');
+                cardSaldo.classList.add('mac-impact-highlight-green');
+                valSaldo.style.color = ''; 
                 descSaldo.textContent = 'VALOR GANHO TETO MAC';
-                descSaldo.style.color = '#059669';
-                cardSaldo.style.borderColor = '#059669';
+                descSaldo.style.color = '';
+                cardSaldo.style.borderColor = '';
+                if(badgeSaldo) badgeSaldo.textContent = 'Positivo';
             } else {
-                iconSaldo.classList.add('mac-analytic-red');
-                valSaldo.style.color = '#dc2626'; // Vermelho
+                iconSaldo.className = 'fas fa-times-circle mac-impact-icon';
+                cardSaldo.classList.remove('mac-impact-highlight-green');
+                cardSaldo.classList.add('mac-impact-highlight-red');
+                valSaldo.style.color = ''; 
                 descSaldo.textContent = 'PERDA ACUMULADA MAC';
-                descSaldo.style.color = '#dc2626';
-                cardSaldo.style.borderColor = '#dc2626';
+                descSaldo.style.color = '';
+                cardSaldo.style.borderColor = '';
+                if(badgeSaldo) badgeSaldo.textContent = 'Negativo';
             }
         }
         setEl('descTetoMacProjecao', `Projeção de uso: ${fmt.pct(projecaoPct)} do Teto MAC`);
@@ -1965,8 +2050,8 @@ function limparFiltros() {
     document.getElementById('filterUnidade').value = 'all';
     if(document.getElementById('filterProcedimento')) document.getElementById('filterProcedimento').value = 'all';
     if(document.getElementById('filterCbo')) document.getElementById('filterCbo').value = 'all';
-    document.getElementById('filterStatus').value  = 'all';
-    renderAll(APP_STATE.data);
+    if(document.getElementById('filterStatus')) document.getElementById('filterStatus').value  = 'all';
+    renderAll(getFilteredData());
     updateFilterSummary();
     showToast('Filtros limpos.', 'success');
 }
@@ -1984,7 +2069,8 @@ function updateFilterSummary() {
         { id: 'filterMes', name: 'Competência', icon: 'fa-calendar-check', isDefault: true },
         { id: 'filterUnidade', name: 'Unidade', icon: 'fa-hospital', isDefault: true },
         { id: 'filterProcedimento', name: 'Procedimento', icon: 'fa-stethoscope', isDefault: true },
-        { id: 'filterCbo', name: 'Profissional', icon: 'fa-user-circle', isDefault: true }
+        { id: 'filterCbo', name: 'Profissional', icon: 'fa-user-circle', isDefault: true },
+        { id: 'filterStatus', name: 'Status', icon: 'fa-star', isDefault: false }
     ];
 
     let activePills = [];

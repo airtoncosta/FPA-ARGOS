@@ -470,6 +470,6 @@ let APP_STATE = {
     data: null,
     filteredData: null,
     activeSection: 'executivo',
-    filters: { ano: 'all', mes: 'all', unidade: 'all', status: 'all' },
+    filters: { ano: 'all', mes: 'all', unidade: 'all', procedimento: 'all', cbo: 'all', status: 'all' },
     chartsInstances: {}
 };

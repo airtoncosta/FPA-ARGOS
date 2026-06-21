@@ -4127,48 +4127,55 @@ body:not(.logged-in) #main-content {
 }
 
 .mac-kpi {
-    background: var(--white);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-sm);
-    padding: 16px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px;
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    transition: all 0.25s ease;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center; /* Centered horizontally */
+    text-align: left;
+    gap: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
 }
 
 .mac-kpi:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
+    box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+    transform: translateY(-4px);
+    border-color: #cbd5e1;
 }
 
 .mac-kpi-icon-wrap {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.15rem;
+    font-size: 1.25rem;
     flex-shrink: 0;
+    box-shadow: inset 0 2px 4px 0 rgba(255, 255, 255, 0.3);
 }
 
-.mac-icon-blue { background: #ebf2fb; color: var(--sus-blue); }
-.mac-icon-green { background: #ecfdf5; color: #059669; }
-.mac-icon-purple { background: #f3e8ff; color: #7c3aed; }
-.mac-icon-dynamic { background: #ecfdf5; color: #059669; }
+.mac-icon-blue { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; }
+.mac-icon-green { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); color: #16a34a; }
+.mac-icon-purple { background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); color: #9333ea; }
+.mac-icon-dynamic { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); color: #16a34a; }
 
 .mac-kpi-content {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
     min-width: 0;
-    flex: 1;
+    /* Removed flex: 1 to allow centering */
 }
 
 .mac-kpi-label {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--gray-500);
     text-transform: uppercase;
@@ -4177,7 +4184,7 @@ body:not(.logged-in) #main-content {
 }
 
 .mac-kpi-value {
-    font-size: 1.2rem;
+    font-size: 1.35rem;
     font-weight: 800;
     color: #0f172a;
     line-height: 1.2;
@@ -4193,7 +4200,7 @@ body:not(.logged-in) #main-content {
 }
 
 .mac-kpi-sub {
-    font-size: 0.67rem;
+    font-size: 0.75rem;
     font-weight: 500;
     color: var(--gray-600);
     margin-top: 3px;
@@ -4241,11 +4248,11 @@ body:not(.logged-in) #main-content {
 
 /* Progress Card — Utilização do Teto */
 .mac-progress-card {
-    margin: 16px 18px;
+    margin: 12px 18px;
     background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius);
-    padding: 18px 22px;
+    padding: 12px 18px;
     box-shadow: var(--shadow-sm);
 }
 
@@ -4253,7 +4260,7 @@ body:not(.logged-in) #main-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
 }
 
 .mac-progress-title {
@@ -4272,7 +4279,7 @@ body:not(.logged-in) #main-content {
 }
 
 .mac-progress-pct {
-    font-size: 2rem;
+    font-size: 1.8rem;
     font-weight: 900;
     letter-spacing: -1px;
     color: #059669;
@@ -4280,9 +4287,9 @@ body:not(.logged-in) #main-content {
 
 .mac-progress-bar-wrap {
     width: 100%;
-    height: 28px;
+    height: 18px;
     background: #e2e8f0;
-    border-radius: 14px;
+    border-radius: 9px;
     overflow: hidden;
     position: relative;
     box-shadow: inset 0 2px 6px rgba(0,0,0,0.08);
@@ -4290,7 +4297,7 @@ body:not(.logged-in) #main-content {
 
 .mac-progress-bar {
     height: 100%;
-    border-radius: 14px;
+    border-radius: 9px;
     background: linear-gradient(90deg, #22c55e, #16a34a);
     transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.6s ease;
     position: relative;
@@ -4305,7 +4312,7 @@ body:not(.logged-in) #main-content {
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35));
     animation: macProgressGlow 2s infinite;
-    border-radius: 0 14px 14px 0;
+    border-radius: 0 9px 9px 0;
 }
 
 @keyframes macProgressGlow {
@@ -4313,23 +4320,85 @@ body:not(.logged-in) #main-content {
     50% { opacity: 1; }
 }
 
-.mac-progress-footer {
+.mac-progress-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 24px;
+}
+
+.mac-metric-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
     display: flex;
-    justify-content: space-between;
-    margin-top: 10px;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mac-metric-box:hover {
+    background: #ffffff;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+}
+
+.mac-metric-label {
     font-size: 0.75rem;
-    color: var(--gray-500);
-    font-weight: 500;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.mac-progress-footer strong {
-    color: var(--gray-700);
-    font-weight: 700;
+.mac-metric-label i {
+    color: #94a3b8;
+    font-size: 0.85rem;
 }
 
-.mac-progress-footer i {
-    color: var(--sus-blue-light);
-    margin-right: 3px;
+.mac-metric-value {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.mac-metric-saldo {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-color: #bbf7d0;
+}
+
+.mac-metric-saldo .mac-metric-label {
+    color: #166534;
+}
+
+.mac-metric-saldo .mac-metric-label i {
+    color: #22c55e;
+}
+
+.mac-metric-saldo .mac-metric-value {
+    color: #14532d;
+}
+
+.mac-metric-deficit {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    border-color: #fecaca;
+}
+
+.mac-metric-deficit .mac-metric-label {
+    color: #991b1b;
+}
+
+.mac-metric-deficit .mac-metric-label i {
+    color: #ef4444;
+}
+
+.mac-metric-deficit .mac-metric-value {
+    color: #7f1d1d;
 }
 
 /* Analytics Row */
@@ -4373,6 +4442,121 @@ body:not(.logged-in) #main-content {
 .mac-analytic-orange { background: #fff7ed; color: #ea580c; }
 .mac-analytic-indigo { background: #eef2ff; color: #4338ca; }
 .mac-analytic-red { background: #fef2f2; color: #dc2626; }
+
+/* Impacto Financeiro (Light Theme Base) */
+.mac-impact-container {
+    margin: 0 18px 18px;
+    background: #ffffff;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+}
+
+.mac-impact-header {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--gray-700);
+    padding: 0 4px;
+}
+
+.mac-impact-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.mac-impact-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.mac-impact-highlight-green {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important;
+    border-color: #bbf7d0 !important;
+}
+
+.mac-impact-highlight-red {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%) !important;
+    border-color: #fecaca !important;
+}
+
+.mac-impact-card-top {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    width: 100%;
+}
+
+.mac-impact-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--gray-500);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mac-impact-highlight-green .mac-impact-title { color: #166534; }
+.mac-impact-highlight-red .mac-impact-title { color: #991b1b; }
+
+.mac-impact-icon {
+    color: var(--gray-400);
+    font-size: 1.1rem;
+}
+
+.mac-impact-highlight-green .mac-impact-icon { color: #22c55e; }
+.mac-impact-highlight-red .mac-impact-icon { color: #ef4444; }
+
+.mac-impact-value {
+    font-size: 1.35rem; /* Apenas 2 tamanho maior que o KPI padrão (1.15rem) */
+    font-weight: 800;
+    color: var(--gray-800);
+    line-height: 1.2;
+}
+
+.mac-impact-highlight-green .mac-impact-value { color: #0f5132 !important; }
+.mac-impact-highlight-red .mac-impact-value { color: #7f1d1d !important; }
+
+.mac-impact-sub {
+    font-size: 0.8rem;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+.mac-impact-highlight-green .mac-impact-sub { color: #15803d; }
+.mac-impact-highlight-red .mac-impact-sub { color: #b91c1c; }
+
+.mac-impact-badge {
+    background: rgba(34, 197, 94, 0.15);
+    color: #16a34a;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.mac-impact-highlight-red .mac-impact-badge {
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+}
 
 /* Chart Card */
 .mac-chart-card {
@@ -4460,18 +4644,21 @@ body:not(.logged-in) #main-content {
 @media (max-width: 1200px) {
     .mac-exec-row { grid-template-columns: repeat(3, 1fr); }
     .mac-analytics-row { grid-template-columns: repeat(3, 1fr); }
+    .mac-impact-cards { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 900px) {
     .mac-exec-row { grid-template-columns: repeat(2, 1fr); }
     .mac-analytics-row { grid-template-columns: repeat(2, 1fr); }
+    .mac-impact-cards { grid-template-columns: repeat(2, 1fr); }
     .mac-progress-pct { font-size: 1.5rem; }
 }
 
 @media (max-width: 600px) {
     .mac-exec-row,
-    .mac-analytics-row { grid-template-columns: 1fr; }
-    .mac-progress-footer { flex-direction: column; gap: 4px; }
+    .mac-analytics-row,
+    .mac-impact-cards { grid-template-columns: 1fr; }
+    .mac-progress-metrics { grid-template-columns: 1fr; gap: 10px; margin-top: 16px; }
     .mac-dash-header { flex-direction: column; text-align: center; }
 }
 

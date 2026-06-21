@@ -226,40 +226,76 @@ const ChartModule = {
                 labels: meses.map(m => m.nomeMes),
                 datasets: [
                     {
-                        type: 'line',
+                        type: 'bar',
                         label: 'Apresentados',
                         data: meses.map(m => m.qtdApresentada),
-                        borderColor: ARGOS_COLORS.blue,
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        borderDash: [5, 5],
-                        pointBackgroundColor: ARGOS_COLORS.blue,
-                        pointRadius: 4,
-                        tension: 0.3
+                        backgroundColor: ARGOS_COLORS.blueMid,
+                        borderRadius: 4,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.85
                     },
                     {
                         type: 'bar',
                         label: 'Aprovados',
                         data: meses.map(m => m.qtdAprovada),
                         backgroundColor: ARGOS_COLORS.green,
-                        borderRadius: 4
+                        borderRadius: 4,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.85
                     },
                     {
                         type: 'bar',
                         label: 'Glosados',
                         data: meses.map(m => m.qtdGlosada),
                         backgroundColor: ARGOS_COLORS.red,
-                        borderRadius: 4
+                        borderRadius: 4,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.85
                     }
                 ]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { position: 'top' } },
+                plugins: { 
+                    legend: { 
+                        position: 'top',
+                        labels: { 
+                            usePointStyle: true, 
+                            boxWidth: 8, 
+                            padding: 20, 
+                            font: { size: 12, weight: '500', family: "'Inter', sans-serif" } 
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                        titleColor: '#0f172a',
+                        bodyColor: '#334155',
+                        borderColor: '#cbd5e1',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 4,
+                        usePointStyle: true,
+                        callbacks: {
+                            label: function(ctx) {
+                                let label = ctx.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (ctx.parsed.y !== null) { label += fmt.numero(ctx.parsed.y); }
+                                return label;
+                            }
+                        }
+                    }
+                },
                 scales: {
-                    y: { ticks: { callback: v => fmt.numero(v), color: '#334155', font: { weight: '600' } }, grid: { color: 'rgba(0,0,0,.05)' } },
-                    x: { grid: { display: false }, ticks: { color: '#334155', font: { weight: '600' } } }
+                    y: { 
+                        beginAtZero: true,
+                        ticks: { callback: v => fmt.numero(v), color: '#64748b', font: { size: 11 } }, 
+                        grid: { color: '#f1f5f9', drawBorder: false } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: '#475569', font: { weight: '600', size: 11 } } 
+                    }
                 }
             }
         });

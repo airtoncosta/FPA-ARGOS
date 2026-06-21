@@ -71,7 +71,7 @@ const MunicipioContext = {
             if (!todos || todos.length === 0) return [];
 
             // Verifica acesso multi-município
-            if (userSession && userSession.acesso_multi_municipio) {
+            if (this.temAcessoMulti(userSession)) {
                 return todos;
             }
 
@@ -219,6 +219,7 @@ const MunicipioContext = {
      */
     temAcessoMulti(userSession) {
         if (!userSession) return false;
+        if (userSession.role === 'ADM' || userSession.role === 'SUPERINTENDENTE') return true;
         return userSession.acesso_multi_municipio === true;
     },
 
