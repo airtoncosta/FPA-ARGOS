@@ -79,6 +79,7 @@ const UsersModule = {
         const ativos = this.users.filter(u => u.status === 'ATIVO').length;
         const bloqueados = this.users.filter(u => u.status === 'BLOQUEADO').length;
         const admins = this.users.filter(u => u.role === 'ADM').length;
+        const superints = this.users.filter(u => u.role === 'SUPERINTENDENTE').length;
         const gerentes = this.users.filter(u => u.role === 'GERENTE').length;
 
         const updateEl = (id, val) => {
@@ -90,6 +91,7 @@ const UsersModule = {
         updateEl('kpiAtivosUsers', ativos);
         updateEl('kpiBloqueadosUsers', bloqueados);
         updateEl('kpiAdminUsers', admins);
+        updateEl('kpiSuperintUsers', superints);
         updateEl('kpiComumUsers', gerentes);
     },
 
@@ -124,6 +126,7 @@ const UsersModule = {
 
             // Role Badge
             let roleBadge = `<span class="badge-action" style="background:#fff3e0;color:#ef6c00;">Administrador</span>`;
+            if (u.role === 'SUPERINTENDENTE') roleBadge = `<span class="badge-action" style="background:rgba(224, 64, 251, 0.12);color:#e040fb; border: 1px solid rgba(224, 64, 251, 0.25);">Superintendente</span>`;
             if (u.role === 'GERENTE') roleBadge = `<span class="badge-action" style="background:#e3f2fd;color:#1565c0;">Gerente</span>`;
 
             // Data último login
@@ -161,7 +164,7 @@ const UsersModule = {
 
         // Zerar tentativas (se não for o próprio usuário, sempre visível para facilitar auditoria)
         if (!isMe) {
-            html += `<button class="btn-user-action btn-reset-attempts" style="background:#fffde7;color:#f57f17;border:1px solid #ffe082;" title="Zerar Tentativas Falhas" onclick="UsersModule.resetFailedAttempts('${user.username}')" onmouseover="this.style.background='#f57f17'; this.style.color='#fff';" onmouseout="this.style.background='#fffde7'; this.style.color='#f57f17';"><i class="fas fa-redo"></i></button>`;
+            html += `<button class="btn-user-action btn-reset-attempts" title="Zerar Tentativas Falhas" onclick="UsersModule.resetFailedAttempts('${user.username}')"><i class="fas fa-redo"></i></button>`;
         }
 
         // Bloquear (Se não for eu mesmo)
@@ -203,6 +206,71 @@ const UsersModule = {
         const divPassword = document.getElementById('divUserPassword');
         const passInput = document.getElementById('userPassword');
         
+        // v4.0: Campos multi-município
+        const divMulti = document.getElementById('divMultiMunicipio');
+        const chkMulti = document.getElementById('userMultiMunicipio');
+        const selectVinculado = document.getElementById('userMunicipioVinculado');
+        const divVinculado = document.getElementById('divMunicipioVinculado');
+        const roleSelect = document.getElementById('userRole');
+
+        // Permissões Customizadas para Superintendente
+        const divPermissoesCustom = document.getElementById('divPermissoesCustom');
+        const chkPermUsuarios = document.getElementById('permUsuarios');
+        const chkPermImportar = document.getElementById('permImportar');
+        const chkPermLimparDB = document.getElementById('permLimparDB');
+        const chkPermConfigSupabase = document.getElementById('permConfigSupabase');
+        
+        // Mostrar campos dependendo da role selecionada no dropdown
+        const handleRoleChange = () => {
+            const r = roleSelect.value;
+            if (r === 'SUPERINTENDENTE') {
+                if(divPermissoesCustom) divPermissoesCustom.style.display = 'block';
+                if(divMulti) divMulti.style.display = 'none';
+                if(divVinculado) divVinculado.style.display = 'none';
+            } else if (r === 'GERENTE') {
+                if(divPermissoesCustom) divPermissoesCustom.style.display = 'none';
+                if(divMulti) divMulti.style.display = 'block';
+                if(chkMulti && chkMulti.checked) {
+                    if(divVinculado) divVinculado.style.display = 'none';
+                } else {
+                    if(divVinculado) divVinculado.style.display = 'block';
+                }
+            } else { // ADM
+                if(divPermissoesCustom) divPermissoesCustom.style.display = 'none';
+                if(divMulti) divMulti.style.display = 'block';
+                if(chkMulti && chkMulti.checked) {
+                    if(divVinculado) divVinculado.style.display = 'none';
+                } else {
+                    if(divVinculado) divVinculado.style.display = 'block';
+                }
+            }
+        };
+
+        if(roleSelect) roleSelect.onchange = handleRoleChange;
+        
+        // Popular dropdown de municípios vinculados
+        if (selectVinculado && window.MUNICIPIOS_BR) {
+            const options = ['<option value="Bacabal-MA">Bacabal-MA</option>'];
+            Object.keys(window.MUNICIPIOS_BR).sort().forEach(uf => {
+                window.MUNICIPIOS_BR[uf].forEach(nome => {
+                    const val = `${nome}-${uf}`;
+                    if (val !== 'Bacabal-MA') {
+                        options.push(`<option value="${val}">${val}</option>`);
+                    }
+                });
+            });
+            selectVinculado.innerHTML = options.join('');
+        }
+        
+        // Toggle: esconder dropdown quando checkbox marcado (Apenas para ADM)
+        if (chkMulti && divVinculado) {
+            chkMulti.onchange = () => {
+                if(roleSelect.value === 'ADM') {
+                    divVinculado.style.display = chkMulti.checked ? 'none' : 'block';
+                }
+            };
+        }
+        
         form.reset();
 
         if (userLogin) {
@@ -213,7 +281,18 @@ const UsersModule = {
             document.getElementById('userOriginalLogin').value = user.username;
             document.getElementById('userName').value = user.name;
             document.getElementById('userEmail').value = user.email;
-            document.getElementById('userRole').value = user.role;
+            if(roleSelect) roleSelect.value = user.role || 'GERENTE';
+            
+            // v4.0: Preencher campos multi-município e permissões
+            if (chkMulti) chkMulti.checked = user.acesso_multi_municipio === true;
+            if (selectVinculado) selectVinculado.value = user.municipio_vinculado || 'Bacabal-MA';
+            
+            if (chkPermUsuarios) chkPermUsuarios.checked = user.perm_usuarios || false;
+            if (chkPermImportar) chkPermImportar.checked = user.perm_importar || false;
+            if (chkPermLimparDB) chkPermLimparDB.checked = user.perm_limpar_db || false;
+            if (chkPermConfigSupabase) chkPermConfigSupabase.checked = user.perm_config_supabase || false;
+
+            handleRoleChange();
             
             // Ocultar campo de senha na edição
             divPassword.style.display = 'none';
@@ -223,6 +302,18 @@ const UsersModule = {
             document.getElementById('userOriginalLogin').value = '';
             divPassword.style.display = 'block';
             passInput.setAttribute('required', 'true');
+            
+            // v4.0: Reset para novo usuário
+            if (chkMulti) chkMulti.checked = false;
+            if (selectVinculado) selectVinculado.value = 'Bacabal-MA';
+            
+            if (chkPermUsuarios) chkPermUsuarios.checked = true;
+            if (chkPermImportar) chkPermImportar.checked = true;
+            if (chkPermLimparDB) chkPermLimparDB.checked = false;
+            if (chkPermConfigSupabase) chkPermConfigSupabase.checked = false;
+            
+            if(roleSelect) roleSelect.value = 'GERENTE';
+            handleRoleChange();
         }
 
         modal.classList.remove('hidden');
@@ -240,8 +331,8 @@ const UsersModule = {
         const email = document.getElementById('userEmail').value.trim();
         const role = document.getElementById('userRole').value;
         
-        // O username será baseado no email
-        const username = email;
+        // O username será baseado no email para novos usuários, mas preservado na edição
+        const username = originalLogin ? originalLogin : email;
 
         const isOnline = window.SupabaseConfig && window.SupabaseConfig.isConnected();
         const loggedUser = this.getCurrentUser();
@@ -262,7 +353,13 @@ const UsersModule = {
                     name: name,
                     email: email,
                     username: username,
-                    role: role
+                    role: role,
+                    acesso_multi_municipio: document.getElementById('userMultiMunicipio')?.checked || false,
+                    municipio_vinculado: document.getElementById('userMunicipioVinculado')?.value || 'Bacabal-MA',
+                    perm_usuarios: document.getElementById('permUsuarios')?.checked || false,
+                    perm_importar: document.getElementById('permImportar')?.checked || false,
+                    perm_limpar_db: document.getElementById('permLimparDB')?.checked || false,
+                    perm_config_supabase: document.getElementById('permConfigSupabase')?.checked || false
                 };
 
                 if (isOnline) {
@@ -278,6 +375,16 @@ const UsersModule = {
                 } else {
                     this.users[userIndex] = updatedUser;
                     this.saveUsersLocal();
+                }
+
+                // Se o usuário editou a si mesmo, atualizar a sessão ativa no navegador
+                if (loggedUser && loggedUser.username === username) {
+                    if (sessionStorage.getItem('argos_user')) {
+                        sessionStorage.setItem('argos_user', JSON.stringify(updatedUser));
+                    }
+                    if (localStorage.getItem('argos_user')) {
+                        localStorage.setItem('argos_user', JSON.stringify(updatedUser));
+                    }
                 }
 
                 await this.loadUsers();
@@ -311,7 +418,13 @@ const UsersModule = {
                 password: password,
                 role: role,
                 status: 'ATIVO',
-                createdAt: created
+                createdAt: created,
+                acesso_multi_municipio: document.getElementById('userMultiMunicipio')?.checked || false,
+                municipio_vinculado: document.getElementById('userMunicipioVinculado')?.value || 'Bacabal-MA',
+                perm_usuarios: document.getElementById('permUsuarios')?.checked || false,
+                perm_importar: document.getElementById('permImportar')?.checked || false,
+                perm_limpar_db: document.getElementById('permLimparDB')?.checked || false,
+                perm_config_supabase: document.getElementById('permConfigSupabase')?.checked || false
             };
 
             if (isOnline) {

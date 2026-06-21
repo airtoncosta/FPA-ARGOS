@@ -44,6 +44,7 @@ const AccountModule = {
             if(elRole) {
                 let roleName = user.role;
                 if(roleName === 'ADM') roleName = 'Administrador (ADM)';
+                if(roleName === 'SUPERINTENDENTE') roleName = 'Superintendente';
                 if(roleName === 'GERENTE') roleName = 'Gerente do Sistema';
                 elRole.textContent = roleName;
             }

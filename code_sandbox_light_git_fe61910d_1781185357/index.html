@@ -132,17 +132,16 @@
                 <span id="lblCompetencia">Jan–Abr / 2026</span>
             </div>
             <div class="header-actions">
-                <button class="btn-header" id="btnImportar" title="Importar TXT SIA/SUS">
+                <button class="btn-header-premium btn-premium-import" id="btnImportar" title="Importar TXT SIA/SUS">
                     <i class="fas fa-file-import"></i><span>Importar</span>
                 </button>
-                <button class="btn-header" id="btnLimparDados" title="Limpar Banco de Dados" style="color: #ffcccc;">
-                    <i class="fas fa-trash"></i><span>Limpar DB</span>
+                <button class="btn-header-premium btn-premium-clear" id="btnLimparDados" title="Limpar Banco de Dados">
+                    <i class="fas fa-trash-alt"></i><span>Limpar Dados</span>
                 </button>
-                <button class="btn-header btn-argos" id="btnArgosAI" title="IA Analítica Argos">
+                <button class="btn-header-premium btn-premium-ai" id="btnArgosAI" title="IA Analítica Argos">
                     <i class="fas fa-robot"></i><span>Argos IA</span>
                 </button>
-                <button class="btn-header" id="btnConfigSupabase" title="Conexão Supabase (Nuvem)"
-                    style="color: #3ecf8e; border: 1px solid rgba(62, 207, 142, 0.3); border-radius: 4px; padding: 4px 8px;">
+                <button class="btn-header-premium btn-premium-db" id="btnConfigSupabase" title="Conexão Supabase (Nuvem)">
                     <i class="fas fa-database"></i><span>Supabase</span>
                 </button>
             </div>
@@ -549,9 +548,10 @@
                     <div class="section-badge">Cadastre gerentes e usuários comuns, defina permissões e gerencie acessos
                     </div>
                 </div>
-                <button class="btn-filter-apply" id="btnNovoUsuario"
-                    style="background: linear-gradient(135deg, var(--sus-blue) 0%, var(--sus-blue-light) 100%);">
-                    <i class="fas fa-user-plus"></i> Novo Usuário
+                <button class="btn-premium-novo-usuario" id="btnNovoUsuario">
+                    <span class="btn-glow"></span>
+                    <i class="fas fa-user-plus"></i> 
+                    <span class="btn-text">Novo Usuário</span>
                 </button>
             </div>
 
@@ -559,11 +559,11 @@
             <div id="users-list-container">
                 <!-- KPI CARDS -->
                 <div class="kpi-grid"
-                    style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 20px; gap: 20px;">
+                    style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 20px; gap: 15px;">
                     <div class="kpi-card-user sus-blue">
                         <div class="kpi-body-user">
                             <div class="kpi-value-user" id="kpiTotalUsers">0</div>
-                            <div class="kpi-label-user">Total de Usuários</div>
+                            <div class="kpi-label-user">Total</div>
                         </div>
                         <div class="kpi-icon-wrapper" style="background: rgba(21, 101, 192, 0.08); color: var(--sus-blue);">
                             <i class="fas fa-users"></i>
@@ -572,7 +572,7 @@
                     <div class="kpi-card-user sus-sky">
                         <div class="kpi-body-user">
                             <div class="kpi-value-user" id="kpiAtivosUsers">0</div>
-                            <div class="kpi-label-user">Usuários Ativos</div>
+                            <div class="kpi-label-user">Ativos</div>
                         </div>
                         <div class="kpi-icon-wrapper" style="background: rgba(3, 169, 244, 0.08); color: var(--sus-sky);">
                             <i class="fas fa-user-check"></i>
@@ -581,7 +581,7 @@
                     <div class="kpi-card-user red">
                         <div class="kpi-body-user">
                             <div class="kpi-value-user" id="kpiBloqueadosUsers">0</div>
-                            <div class="kpi-label-user">Contas Bloqueadas</div>
+                            <div class="kpi-label-user">Bloqueados</div>
                         </div>
                         <div class="kpi-icon-wrapper" style="background: rgba(239, 68, 68, 0.08); color: #ef4444;">
                             <i class="fas fa-user-slash"></i>
@@ -590,10 +590,19 @@
                     <div class="kpi-card-user orange">
                         <div class="kpi-body-user">
                             <div class="kpi-value-user" id="kpiAdminUsers">0</div>
-                            <div class="kpi-label-user">Administradores</div>
+                            <div class="kpi-label-user">Admins</div>
                         </div>
                         <div class="kpi-icon-wrapper" style="background: rgba(245, 124, 0, 0.08); color: #f57c00;">
                             <i class="fas fa-user-shield"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-card-user" style="border-bottom: 3px solid #e040fb;">
+                        <div class="kpi-body-user">
+                            <div class="kpi-value-user" id="kpiSuperintUsers" style="color: #e040fb;">0</div>
+                            <div class="kpi-label-user">Superints</div>
+                        </div>
+                        <div class="kpi-icon-wrapper" style="background: rgba(224, 64, 251, 0.08); color: #e040fb;">
+                            <i class="fas fa-user-tie"></i>
                         </div>
                     </div>
                     <div class="kpi-card-user grey">
@@ -724,45 +733,84 @@
         <div id="modalUser" class="modal-overlay hidden">
             <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
-                    <h3 id="modalUserTitle">Novo Usuário</h3>
+                    <h3 id="modalUserTitle"><i class="fas fa-user-circle"></i> Novo Usuário</h3>
                     <button class="btn-close-modal" id="btnCloseModalUser"><i class="fas fa-times"></i></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" style="padding: 24px;">
                     <form id="formUser">
                         <input type="hidden" id="userOriginalLogin">
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Nome Completo</label>
-                            <input type="text" id="userName" class="form-control"
-                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" required>
+                        
+                        <div class="premium-input-group">
+                            <input type="text" id="userName" class="premium-input" placeholder=" " required>
+                            <label for="userName"><i class="fas fa-id-card"></i> Nome Completo</label>
                         </div>
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">E-mail / Login</label>
-                            <input type="text" id="userEmail" class="form-control"
-                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" required>
+                        
+                        <div class="premium-input-group">
+                            <input type="email" id="userEmail" class="premium-input" placeholder=" " required>
+                            <label for="userEmail"><i class="fas fa-envelope"></i> E-mail / Login</label>
                         </div>
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Perfil de
-                                Acesso</label>
-                            <select id="userRole" class="form-control"
-                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        
+                        <div class="form-group" style="margin-bottom: 24px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 700; color: var(--gray-500); font-size: 0.8rem; text-transform: uppercase;">
+                                <i class="fas fa-shield-alt"></i> Perfil de Acesso
+                            </label>
+                            <select id="userRole" class="premium-select">
                                 <option value="ADM">Administrador</option>
+                                <option value="SUPERINTENDENTE">Superintendente</option>
                                 <option value="GERENTE">Gerente</option>
                             </select>
                         </div>
-                        <div class="form-group" style="margin-bottom: 15px;" id="divUserPassword">
-                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Senha Inicial</label>
-                            <input type="text" id="userPassword" class="form-control"
-                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
-                                placeholder="Ex: Senha@123">
-                            <small style="color: var(--gray-500);">A senha deve ter letras, números e caractere
-                                especial.</small>
+                        
+                        <!-- Permissões Customizadas (Apenas para Superintendente) -->
+                        <div id="divPermissoesCustom" style="margin-bottom: 24px; display: none; background: rgba(248, 250, 252, 0.5); border: 1px solid rgba(226, 232, 240, 0.8); border-radius: 16px; padding: 16px;">
+                            <label style="display: block; margin-bottom: 12px; font-weight: 700; color: #475569; font-size: 0.8rem; text-transform: uppercase;"><i class="fas fa-sliders-h"></i> Permissões do Superintendente</label>
+                            
+                            <div class="premium-toggle-wrapper">
+                                <div class="premium-toggle-label"><i class="fas fa-users-cog" style="color: #64748B;"></i> Menus de Administração</div>
+                                <input type="checkbox" id="permUsuarios" class="premium-toggle">
+                            </div>
+                            <div class="premium-toggle-wrapper">
+                                <div class="premium-toggle-label"><i class="fas fa-file-import" style="color: #64748B;"></i> Arquivos e Importações</div>
+                                <input type="checkbox" id="permImportar" class="premium-toggle">
+                            </div>
+                            <div class="premium-toggle-wrapper">
+                                <div class="premium-toggle-label"><i class="fas fa-trash-alt" style="color: #ef4444;"></i> Limpar Banco de Dados</div>
+                                <input type="checkbox" id="permLimparDB" class="premium-toggle" style="background: rgba(239, 68, 68, 0.2);">
+                            </div>
+                            <div class="premium-toggle-wrapper">
+                                <div class="premium-toggle-label"><i class="fas fa-cloud" style="color: #3b82f6;"></i> Configurar Nuvem (Supabase)</div>
+                                <input type="checkbox" id="permConfigSupabase" class="premium-toggle">
+                            </div>
                         </div>
-                        <div style="text-align: right; margin-top: 20px;">
-                            <button type="button" class="btn-filter-clear" id="btnCancelUser"
-                                style="padding: 8px 15px; border-radius: 4px; border: none; cursor: pointer;">Cancelar</button>
-                            <button type="submit" class="btn-filter-apply"
-                                style="padding: 8px 15px; margin-left: 10px; border-radius: 4px; border: none; cursor: pointer;">Salvar
-                                Usuário</button>
+
+                        <!-- CAMPOS MULTI-MUNICÍPIO (v4.0) -->
+                        <div id="divMultiMunicipio" style="margin-bottom: 24px; display: none;">
+                            <div class="premium-toggle-wrapper" style="border-color: #93c5fd; background: rgba(239, 246, 255, 0.5);">
+                                <div class="premium-toggle-label" style="color: #1e40af;"><i class="fas fa-globe-americas"></i> Acesso Multi-Município</div>
+                                <input type="checkbox" id="userMultiMunicipio" class="premium-toggle">
+                            </div>
+                            <div id="divMunicipioVinculado" style="margin-top: 12px;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 700; color: var(--gray-500); font-size: 0.8rem; text-transform: uppercase;">Município Vinculado</label>
+                                <select id="userMunicipioVinculado" class="premium-select">
+                                    <option value="Bacabal-MA">Bacabal-MA</option>
+                                </select>
+                                <small style="display: block; margin-top: 6px; color: var(--gray-400); font-size: 0.75rem;"><i class="fas fa-info-circle"></i> Define qual município o usuário acessa por padrão.</small>
+                            </div>
+                        </div>
+
+                        <div class="premium-input-group" id="divUserPassword">
+                            <input type="text" id="userPassword" class="premium-input" placeholder=" ">
+                            <label for="userPassword"><i class="fas fa-key"></i> Senha Inicial</label>
+                            <small style="display: block; margin-top: 6px; color: var(--gray-400); font-size: 0.75rem; padding-left: 14px;">A senha deve ter letras, números e caractere especial.</small>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 32px;">
+                            <button type="button" class="btn-filter-clear" id="btnCancelUser" style="padding: 10px 20px; border-radius: 8px; font-size: 0.95rem;">Cancelar</button>
+                            <button type="submit" class="btn-premium-novo-usuario" style="padding: 10px 24px; border: none;">
+                                <span class="btn-glow"></span>
+                                <span class="btn-text">Salvar Usuário</span>
+                                <i class="fas fa-check"></i>
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -1612,6 +1660,25 @@
                 <div class="section-badge">Gestão e Histórico de Cargas do Sistema</div>
             </div>
 
+            <!-- BARRA DE CONTEXTO MUNICÍPIO (v4.0) -->
+            <div class="municipio-context-bar">
+                <span class="section-badge municipio-badge-ativo" id="badgeMunicipioAtivo">
+                    📍 Sem município selecionado
+                </span>
+                <div class="municipio-context-tabs" id="municipioContextTabs">
+                    <button class="ctx-tab active" data-ctx="local">📂 Dados Locais</button>
+                    <button class="ctx-tab" data-ctx="outros" id="tabOutrosMunicipios">🌐 Outros Municípios</button>
+                </div>
+                <div id="painelOutrosMunicipios" class="painel-outros-municipios hidden">
+                    <select id="selectMunicipioCarregar" class="select-municipio-carregar">
+                        <option value="">Selecione um município...</option>
+                    </select>
+                    <button id="btnCarregarMunicipioSelecionado" class="btn-primary btn-sm">
+                        <i class="fas fa-cloud-download-alt"></i> Carregar
+                    </button>
+                </div>
+            </div>
+
             <div class="arquivos-grid">
                 <!-- Card 1: Logomarca do PDF -->
                 <div class="arquivos-card logo-pdf">
@@ -1643,6 +1710,30 @@
                         <button class="btn-secondary" id="btnExcluirLogo"
                             style="font-size: 0.8rem; padding: 6px 12px; color: var(--sus-red); border-color: rgba(198,40,40,0.3);"><i
                                 class="fas fa-trash-alt"></i> Excluir</button>
+                    </div>
+                </div>
+
+                <!-- Card 1.5: Bases de Dados na Nuvem -->
+                <div class="arquivos-card db-nuvem">
+                    <div class="arquivos-card-header">
+                        <div class="arquivos-card-icon"><i class="fas fa-server"></i></div>
+                        <div class="arquivos-card-title">
+                            <h3>Bases de Dados na Nuvem</h3>
+                            <span>Municípios com faturamentos processados</span>
+                        </div>
+                    </div>
+                    <div class="arquivos-card-body" style="align-items: flex-start;">
+                        <div id="listaBasesNuvem" class="db-nuvem-list">
+                            <div class="text-center text-muted" style="padding: 20px; width: 100%;">
+                                <i class="fas fa-spinner fa-spin" style="margin-bottom: 8px;"></i><br>
+                                <span style="font-size: 0.8rem;">Carregando bases...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="arquivos-card-actions">
+                        <button class="btn-secondary" onclick="showModal('modalImportar')" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; border-color: rgba(14,165,233,0.3); color: #0ea5e9;">
+                            <i class="fas fa-cloud-upload-alt"></i> Importar arquivo de outros municípios
+                        </button>
                     </div>
                 </div>
 
@@ -1706,11 +1797,43 @@
 
     </main>
 
+    <!-- ===== MODAL SELEÇÃO UF/MUNICÍPIO PARA LOGO (v4.0) ===== -->
+    <div id="modalSelecionarMunicipioLogo" class="modal-overlay hidden">
+        <div class="modal-box modal-medium" style="max-width: 500px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-radius: 16px 16px 0 0;">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;"><i class="fas fa-map-marker-alt"></i> Vincular Logo ao Município</h3>
+                <button class="modal-close" id="btnFecharModalLogoMunicipio" style="background: none; border: none; color: rgba(255,255,255,0.8); cursor: pointer; font-size: 1.1rem;"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 20px 24px;">
+                <p style="margin-top: 0; margin-bottom: 18px; font-size: 0.9rem; color: #64748b; line-height: 1.5;">Selecione o município ao qual esta logomarca será vinculada. A logo aparecerá nos relatórios PDF gerados para esse município.</p>
+                <div style="display: grid; grid-template-columns: 100px 1fr; gap: 12px; margin-bottom: 20px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.82rem; margin-bottom: 5px; color: #334155;">UF</label>
+                        <select id="logoSelectUf" style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;">
+                            <option value="">UF</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.82rem; margin-bottom: 5px; color: #334155;">Município</label>
+                        <select id="logoSelectMunicipio" disabled style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;">
+                            <option value="">Selecione primeiro a UF</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <button class="btn-primary" id="btnConfirmarMunicipioLogo" disabled style="padding: 10px 24px; border-radius: 6px; font-weight: 600;">
+                        <i class="fas fa-check"></i> Selecionar Arquivo de Logo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== MODAL IMPORTAR ===== -->
     <div id="modalImportar" class="modal-overlay hidden">
         <div class="modal-box modal-large">
             <div class="modal-header">
-                <h3><i class="fas fa-file-import"></i> Importar Dados SIA/SUS</h3>
+                <h3><i class="fas fa-file-import"></i> Importar Dados SIA/SUS (v2)</h3>
                 <button class="modal-close" id="btnFecharImportar"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
@@ -1723,12 +1846,30 @@
 
                 <!-- TAB TXT -->
                 <div id="importTabTxt" class="import-tab-content active">
-                    <div class="dropzone" id="dropzone">
+                    <!-- SELETOR RÁPIDO DE MUNICÍPIO (v4.0) -->
+                    <div id="municipioQuickSelect" class="municipio-quick-select hidden">
+                        <div class="quick-select-header">
+                            <i class="fas fa-bolt" style="color: #f59e0b;"></i>
+                            <span class="quick-select-label">Já temos dados salvos na nuvem para:</span>
+                        </div>
+                        <div class="quick-select-row">
+                            <select id="selectMunicipioQuickLoad" class="quick-select-dropdown">
+                                <option value="">Selecione um município...</option>
+                            </select>
+                            <button class="btn-primary btn-sm" id="btnQuickLoadMunicipio">
+                                <i class="fas fa-download"></i> Carregar
+                            </button>
+                        </div>
+                        <div class="quick-select-divider">
+                            <span>ou importe um novo arquivo</span>
+                        </div>
+                    </div>
+                    <div class="dropzone" id="dropzone" onclick="var fi=document.getElementById('fileInput'); fi.value=''; fi.click()">
                         <i class="fas fa-cloud-upload-alt"></i>
                         <p>Arraste o arquivo TXT da Síntese SIA/SUS aqui</p>
                         <p class="drop-sub">ou clique para selecionar</p>
-                        <input type="file" id="fileInput" accept=".txt,.csv" style="display:none">
-                        <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">
+                        <input type="file" id="fileInput" accept=".txt,.csv" style="display:none" onclick="event.stopPropagation()">
+                        <button type="button" class="btn-secondary" onclick="event.stopPropagation(); var fi=document.getElementById('fileInput'); fi.value=''; fi.click()">
                             <i class="fas fa-folder-open"></i> Selecionar Arquivo
                         </button>
                     </div>
@@ -1878,6 +2019,29 @@
             </div>
         </div>
     </div>
+    <!-- MODAL NUVEM OU LOCAL -->
+    <div id="modalCloudOrLocal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width: 450px; text-align: center;">
+            <div class="modal-header">
+                <h3><i class="fas fa-cloud-upload-alt"></i> Salvar na Nuvem?</h3>
+                <button class="modal-close" onclick="hideModal('modalCloudOrLocal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <p>O município <strong><span id="lblCloudOrLocalMunicipio"></span></strong> não foi encontrado na Nuvem.</p>
+                <p style="margin-top: 12px; color: #64748b; font-size: 0.95rem;">
+                    Deseja enviar esses dados para o banco de dados principal (Supabase) para que fiquem salvos permanentemente e disponíveis no Multi-Município?
+                </p>
+                <div style="display: flex; gap: 12px; justify-content: center; margin-top: 24px;">
+                    <button id="btnCloudOrLocalApenasLocal" class="btn-secondary">
+                        <i class="fas fa-desktop"></i> Apenas Local
+                    </button>
+                    <button id="btnCloudOrLocalSalvarNuvem" class="btn-primary">
+                        <i class="fas fa-cloud"></i> Salvar na Nuvem
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- ===== TOAST ===== -->
     <div id="toast" class="toast hidden"></div>
@@ -1902,20 +2066,22 @@
     <script src="js/portaria.js"></script>
     <script src="js/sigtap.js"></script>
     <script src="js/cbo.js"></script>
-    <script src="js/scaar_logo.js?v=3.0.2"></script>
+    <script src="js/scaar_logo.js?v=4.0.0"></script>
+    <script src="js/municipios-br.js"></script>
 
     <!-- Parsers e Motores Auxiliares -->
     <script src="js/parser.js"></script>
     <script src="js/charts.js"></script>
-    <script src="js/export.js?v=3.0.3"></script>
+    <script src="js/export.js?v=4.0.0"></script>
 
     <!-- Módulos de Interface (Telas) -->
     <script src="js/login.js"></script>
     <script src="js/account.js"></script>
     <script src="js/users.js"></script>
+    <script src="js/municipio-context.js"></script>
 
     <!-- Script Principal da Aplicação -->
-    <script src="js/app.js?v=3.0.3"></script>
+    <script src="js/app.js?v=4.0.0"></script>
 
 </body>
 

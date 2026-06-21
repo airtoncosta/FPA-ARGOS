@@ -128,7 +128,9 @@ const SupabaseService = {
                     name: user.name,
                     password: user.password,
                     role: user.role,
-                    status: user.status || 'ATIVO'
+                    status: user.status || 'ATIVO',
+                    acesso_multi_municipio: user.acesso_multi_municipio || false,
+                    municipio_vinculado: user.municipio_vinculado || 'Bacabal-MA'
                 }, { onConflict: 'username' });
 
             if (error) throw error;
@@ -486,6 +488,293 @@ const SupabaseService = {
             console.error('Erro ao carregar Portaria do Supabase:', e);
             return null;
         }
+    },
+
+    /* =========================================================
+       MULTI-MUNICÍPIO (v4.0)
+       ========================================================= */
+
+    /**
+     * Helper para normalizar strings (remover acentos e colocar tudo em maiúsculo)
+     */
+    normalizeMunicipio(str) {
+        if (!str) return '';
+        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    },
+
+    /**
+     * Registra um município no catálogo ou retorna o ID se já existir
+     * @returns {Promise<string>} UUID do município
+     */
+    async registrarMunicipio(nome, uf) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        const normalizedNome = this.normalizeMunicipio(nome);
+        const normalizedUf = uf.trim().toUpperCase();
+
+        // 1. Tentar encontrar primeiro ignorando acentos e case
+        const { data: allMunis } = await this.client
+            .from('municipios_sistema')
+            .select('id, nome')
+            .eq('uf', normalizedUf);
+            
+        if (allMunis && allMunis.length > 0) {
+            const found = allMunis.find(m => this.normalizeMunicipio(m.nome) === normalizedNome);
+            if (found) return found.id;
+        }
+
+        // 2. Se não encontrar, insere a versão em maiúsculas (padrão)
+        const nomeParaInserir = nome.trim().toUpperCase();
+        
+        // INSERT ON CONFLICT DO NOTHING
+        await this.client
+            .from('municipios_sistema')
+            .insert({ nome: nomeParaInserir, uf: normalizedUf })
+            .select()
+            .maybeSingle();
+
+        // SELECT para garantir retorno do id caso tenha dado conflito simultâneo
+        const { data, error } = await this.client
+            .from('municipios_sistema')
+            .select('id')
+            .eq('nome', nomeParaInserir)
+            .eq('uf', normalizedUf)
+            .limit(1)
+            .single();
+
+        if (error) throw error;
+        return data.id;
+    },
+
+    /**
+     * Lista todos os municípios cadastrados no catálogo
+     * @returns {Promise<Array<{ id, nome, uf }>>}
+     */
+    async listarMunicipios() {
+        if (!this.init()) return [];
+
+        const { data, error } = await this.client
+            .from('municipios_sistema')
+            .select('*')
+            .order('nome');
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    /**
+     * Busca o resumo de todas as bases de dados (municípios que têm produção)
+     * e as respectivas competências salvas.
+     */
+    async listarResumoBasesNuvem() {
+        if (!this.init()) return [];
+        
+        try {
+            // Buscamos a produção e fazemos o join com os municípios
+            const { data, error } = await this.client
+                .from('producao_sia')
+                .select(`
+                    competencia,
+                    municipio_id,
+                    municipios_sistema ( id, nome, uf )
+                `)
+                .order('competencia', { ascending: false });
+
+            if (error) throw error;
+            if (!data) return [];
+
+            // Agregamos por município
+            const map = {};
+            data.forEach(row => {
+                if (!row.municipios_sistema) return;
+                const m = row.municipios_sistema;
+                if (!map[m.id]) {
+                    map[m.id] = {
+                        id: m.id,
+                        nome: m.nome,
+                        uf: m.uf,
+                        competencias: []
+                    };
+                }
+                if (!map[m.id].competencias.includes(row.competencia)) {
+                    map[m.id].competencias.push(row.competencia);
+                }
+            });
+
+            const result = Object.values(map).sort((a, b) => a.nome.localeCompare(b.nome));
+            
+            // Ordenação Cronológica das Competências
+            const mesesMap = {
+                'JAN': 1, 'FEV': 2, 'MAR': 3, 'ABR': 4, 'MAI': 5, 'JUN': 6,
+                'JUL': 7, 'AGO': 8, 'SET': 9, 'OUT': 10, 'NOV': 11, 'DEZ': 12
+            };
+            
+            result.forEach(m => {
+                m.competencias.sort((a, b) => {
+                    const parseComp = (c) => {
+                        const [mes, ano] = c.split('/');
+                        return (parseInt(ano) * 100) + (mesesMap[mes.toUpperCase()] || 0);
+                    };
+                    return parseComp(a) - parseComp(b); // Ordem crescente
+                });
+            });
+
+            return result;
+        } catch (e) {
+            console.error('Erro ao listar resumo de bases da nuvem:', e);
+            return [];
+        }
+    },
+
+    /**
+     * Salva dados de produção SIA/SUS para um município/competência (upsert)
+     */
+    async saveProducaoSia(municipioId, competencia, nomeArquivo, dadosJson, importadoPor) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        const payload = {
+            municipio_id: municipioId,
+            competencia,
+            nome_arquivo: nomeArquivo,
+            dados_json: dadosJson,
+            importado_por: importadoPor,
+            importado_em: new Date().toISOString()
+        };
+
+        const { data, error } = await this.client
+            .from('producao_sia')
+            .upsert(payload, { onConflict: 'municipio_id,competencia' })
+            .select();
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Carrega todas as competências de produção de um município
+     */
+    async loadProducaoSia(municipioId) {
+        if (!this.init()) return [];
+
+        const { data, error } = await this.client
+            .from('producao_sia')
+            .select('*')
+            .eq('municipio_id', municipioId)
+            .order('competencia');
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    /**
+     * Exclui uma competência de produção de um município
+     */
+    async deleteProducaoSia(municipioId, competencia) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        const { error } = await this.client
+            .from('producao_sia')
+            .delete()
+            .eq('municipio_id', municipioId)
+            .eq('competencia', competencia);
+
+        if (error) throw error;
+    },
+
+    /**
+     * Exclui todas as competências de produção de um município
+     */
+    async deleteAllProducaoSia(municipioId) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        const { error } = await this.client
+            .from('producao_sia')
+            .delete()
+            .eq('municipio_id', municipioId);
+
+        if (error) throw error;
+    },
+
+    /**
+     * Salva logomarca vinculada a um município (desativa anteriores)
+     */
+    async saveLogoPorMunicipio(municipioId, base64) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        // Desativar logos anteriores deste município
+        await this.client
+            .from('logomarcas_municipio')
+            .update({ ativa: false })
+            .eq('municipio_id', municipioId);
+
+        // Inserir nova logo como ativa
+        const { data, error } = await this.client
+            .from('logomarcas_municipio')
+            .insert({ municipio_id: municipioId, logo_base64: base64, ativa: true })
+            .select();
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Carrega a logomarca ativa de um município
+     */
+    async loadLogoPorMunicipio(municipioId) {
+        if (!this.init()) return null;
+
+        const { data, error } = await this.client
+            .from('logomarcas_municipio')
+            .select('*')
+            .eq('municipio_id', municipioId)
+            .eq('ativa', true)
+            .limit(1)
+            .maybeSingle();
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Carrega o histórico de logos de um município (últimas 10)
+     */
+    async loadLogoHistoryPorMunicipio(municipioId) {
+        if (!this.init()) return [];
+
+        const { data, error } = await this.client
+            .from('logomarcas_municipio')
+            .select('*')
+            .eq('municipio_id', municipioId)
+            .order('criado_em', { ascending: false })
+            .limit(10);
+
+        if (error) throw error;
+        return data || [];
+    },
+
+    async deleteLogoPorMunicipio(logoId) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        const { error } = await this.client
+            .from('logomarcas_municipio')
+            .delete()
+            .eq('id', logoId);
+
+        if (error) throw error;
+    },
+
+    /**
+     * Limpa a logomarca do município (desativa)
+     */
+    async clearLogoPorMunicipio(municipioId) {
+        if (!this.init()) throw new Error('Supabase não configurado.');
+
+        const { error } = await this.client
+            .from('logomarcas_municipio')
+            .update({ ativa: false })
+            .eq('municipio_id', municipioId);
+
+        if (error) throw error;
     }
 };
 

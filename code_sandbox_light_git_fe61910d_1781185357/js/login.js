@@ -16,7 +16,11 @@ const ARGOS_USERS = [
         email: 'francileide@fpa.gov.br',
         name: 'Francileide',
         password: 'francileide@2026',
-        role: 'GERENTE'
+        role: 'SUPERINTENDENTE',
+        perm_usuarios: true,
+        perm_importar: true,
+        perm_limpar_db: false,
+        perm_config_supabase: false
     },
     {
         username: 'jessica',
@@ -117,7 +121,8 @@ const LoginModule = {
 
         // Botão de Logout no cabeçalho
         if (btnLogout) {
-            btnLogout.addEventListener('click', () => {
+            btnLogout.addEventListener('click', (e) => {
+                e.stopPropagation(); // Evita que o clique se propague e abra o perfil
                 this.handleLogout();
             });
         }
@@ -215,7 +220,12 @@ const LoginModule = {
                     username: user.username,
                     email: user.email,
                     name: user.name,
-                    role: user.role
+                    role: user.role,
+                    perm_usuarios: user.perm_usuarios,
+                    perm_importar: user.perm_importar,
+                    perm_limpar_db: user.perm_limpar_db,
+                    perm_config_supabase: user.perm_config_supabase,
+                    municipio_vinculado: user.municipio_vinculado
                 };
 
                 if (rememberMe) {
@@ -283,7 +293,12 @@ const LoginModule = {
             username: user.username,
             email: user.email,
             name: user.name,
-            role: user.role
+            role: user.role,
+            perm_usuarios: user.perm_usuarios,
+            perm_importar: user.perm_importar,
+            perm_limpar_db: user.perm_limpar_db,
+            perm_config_supabase: user.perm_config_supabase,
+            municipio_vinculado: user.municipio_vinculado
         };
 
         if (rememberMe) {
@@ -314,6 +329,10 @@ const LoginModule = {
                 userRoleHeader.style.color = '#ff8a80'; // Vermelho suave / Coral
                 userRoleHeader.style.backgroundColor = 'rgba(255, 138, 128, 0.12)';
                 userRoleHeader.style.border = '1px solid rgba(255, 138, 128, 0.25)';
+            } else if (user.role === 'SUPERINTENDENTE') {
+                userRoleHeader.style.color = '#e040fb'; // Roxo vibrante/Premium
+                userRoleHeader.style.backgroundColor = 'rgba(224, 64, 251, 0.12)';
+                userRoleHeader.style.border = '1px solid rgba(224, 64, 251, 0.25)';
             } else if (user.role === 'GERENTE') {
                 userRoleHeader.style.color = '#82b1ff'; // Azul suave
                 userRoleHeader.style.backgroundColor = 'rgba(130, 177, 255, 0.12)';
@@ -368,6 +387,11 @@ const LoginModule = {
     },
 
     applyPermissions(role) {
+        // Obter usuário da sessão para pegar as permissões customizadas
+        const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
+        let user = {};
+        try { if(userStr) user = JSON.parse(userStr); } catch(e){}
+
         // Obter elementos interativos para restrição
         const btnLimpar = document.getElementById('btnLimparDados');
         const btnSupabase = document.getElementById('btnConfigSupabase');
@@ -378,6 +402,17 @@ const LoginModule = {
         const btnUploadSigtap = document.getElementById('btnUploadSigtap');
         const tabImportPortaria = document.getElementById('tabImportPortaria');
         const navMenuAdmin = document.getElementById('navMenuAdmin'); // Container do Menu Administração
+
+        // Resetar para hidden (segurança)
+        if (btnLimpar) btnLimpar.classList.add('hidden');
+        if (btnSupabase) btnSupabase.classList.add('hidden');
+        if (btnImportar) btnImportar.classList.add('hidden');
+        if (btnImportarPage) btnImportarPage.classList.add('hidden');
+        if (btnUploadLogo) btnUploadLogo.classList.add('hidden');
+        if (btnExcluirLogo) btnExcluirLogo.classList.add('hidden');
+        if (btnUploadSigtap) btnUploadSigtap.classList.add('hidden');
+        if (tabImportPortaria) tabImportPortaria.classList.add('hidden');
+        if (navMenuAdmin) navMenuAdmin.style.display = 'none';
 
         // ADM -> Acesso a tudo
         if (role === 'ADM') {
@@ -391,17 +426,34 @@ const LoginModule = {
             if (tabImportPortaria) tabImportPortaria.classList.remove('hidden');
             if (navMenuAdmin) navMenuAdmin.style.display = 'block';
         }
-        // GERENTE -> Não limpa DB nem configura Supabase, não acessa usuários
-        else if (role === 'GERENTE') {
-            if (btnLimpar) btnLimpar.classList.add('hidden');
-            if (btnSupabase) btnSupabase.classList.add('hidden');
+        // SUPERINTENDENTE -> Acesso Customizado
+        else if (role === 'SUPERINTENDENTE') {
+            if (btnLimpar) btnLimpar.classList.remove('hidden');
             if (btnImportar) btnImportar.classList.remove('hidden');
             if (btnImportarPage) btnImportarPage.classList.remove('hidden');
+            
+            if (user.perm_config_supabase && btnSupabase) btnSupabase.classList.remove('hidden');
+            
+            // Habilitado para SUPERINTENDENTE conforme solicitado
             if (btnUploadLogo) btnUploadLogo.classList.remove('hidden');
             if (btnExcluirLogo) btnExcluirLogo.classList.remove('hidden');
             if (btnUploadSigtap) btnUploadSigtap.classList.remove('hidden');
-            if (tabImportPortaria) tabImportPortaria.classList.add('hidden');
-            if (navMenuAdmin) navMenuAdmin.style.display = 'none';
+            
+            if (user.perm_importar) {
+                if (tabImportPortaria) tabImportPortaria.classList.remove('hidden');
+            }
+            
+            if (user.perm_usuarios && navMenuAdmin) {
+                navMenuAdmin.style.display = 'block';
+            }
+        }
+        // GERENTE -> Apenas Importação local / Visualização restrita
+        else if (role === 'GERENTE') {
+            if (btnImportar) btnImportar.classList.remove('hidden');
+            if (btnImportarPage) btnImportarPage.classList.remove('hidden');
+            // Oculta completamente o card do SIGTAP e Portaria para GERENTE
+            const cardSigtap = document.querySelector('.arquivos-card.sigtap');
+            if (cardSigtap) cardSigtap.style.display = 'none';
         }
     },
 
@@ -465,19 +517,36 @@ const LoginModule = {
 
         sessionStorage.removeItem('argos_user');
         localStorage.removeItem('argos_user');
-        this.showToast('ℹ️ Você saiu do sistema.', 'info');
-
-        // Retorna a navegação para a seção inicial default (Dashboard Executivo)
-        if (window.navigateTo) {
-            window.navigateTo('executivo');
+        
+        // Limpar dados de sessão e cache local para não manter dados do usuário anterior
+        if (window.MunicipioContext) {
+            window.MunicipioContext.limparAtivo();
         }
 
-        // Limpa a tela Minha Conta imediatamente ao deslogar
-        if (window.AccountModule) {
-            await window.AccountModule.refreshAccountView();
+        if (window.AppDB) {
+            try {
+                const municipioAtivo = window.MunicipioContext ? window.MunicipioContext.getAtivo() : null;
+                if (municipioAtivo && municipioAtivo.id) {
+                    await window.AppDB.removeItem('datasets_' + municipioAtivo.id);
+                }
+                await window.AppDB.removeItem('datasets');
+                
+                const imports = await window.AppDB.getItem('imported_files') || [];
+                const globais = imports.filter(i => i.type === 'SIGTAP' || i.type === 'PORTARIA');
+                await window.AppDB.setItem('imported_files', globais);
+            } catch (err) {
+                console.error("Erro ao limpar dados locais na saída:", err);
+            }
         }
 
         this.showLoginUI();
+        this.showToast('ℹ️ Você saiu do sistema.', 'info');
+
+        // Aguarda meio segundo para o usuário ver o toast e a tela, e então recarrega a página 
+        // para garantir que toda a memória (gráficos, variáveis globais) seja limpa.
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
     },
 
     async logAction(username, action) {
