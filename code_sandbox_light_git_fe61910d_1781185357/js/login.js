@@ -390,7 +390,7 @@ const LoginModule = {
         // Obter usuário da sessão para pegar as permissões customizadas
         const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
         let user = {};
-        try { if(userStr) user = JSON.parse(userStr); } catch(e){}
+        try { if (userStr) user = JSON.parse(userStr); } catch (e) { }
 
         // Obter elementos interativos para restrição
         const btnLimpar = document.getElementById('btnLimparDados');
@@ -431,18 +431,18 @@ const LoginModule = {
             if (btnLimpar) btnLimpar.classList.remove('hidden');
             if (btnImportar) btnImportar.classList.remove('hidden');
             if (btnImportarPage) btnImportarPage.classList.remove('hidden');
-            
+
             if (user.perm_config_supabase && btnSupabase) btnSupabase.classList.remove('hidden');
-            
+
             // Habilitado para SUPERINTENDENTE conforme solicitado
             if (btnUploadLogo) btnUploadLogo.classList.remove('hidden');
             if (btnExcluirLogo) btnExcluirLogo.classList.remove('hidden');
             if (btnUploadSigtap) btnUploadSigtap.classList.remove('hidden');
-            
+
             if (user.perm_importar) {
                 if (tabImportPortaria) tabImportPortaria.classList.remove('hidden');
             }
-            
+
             if (user.perm_usuarios && navMenuAdmin) {
                 navMenuAdmin.style.display = 'block';
             }
@@ -517,7 +517,7 @@ const LoginModule = {
 
         sessionStorage.removeItem('argos_user');
         localStorage.removeItem('argos_user');
-        
+
         // Limpar dados de sessão e cache local para não manter dados do usuário anterior
         if (window.MunicipioContext) {
             window.MunicipioContext.limparAtivo();
@@ -530,7 +530,7 @@ const LoginModule = {
                     await window.AppDB.removeItem('datasets_' + municipioAtivo.id);
                 }
                 await window.AppDB.removeItem('datasets');
-                
+
                 const imports = await window.AppDB.getItem('imported_files') || [];
                 const globais = imports.filter(i => i.type === 'SIGTAP' || i.type === 'PORTARIA');
                 await window.AppDB.setItem('imported_files', globais);
