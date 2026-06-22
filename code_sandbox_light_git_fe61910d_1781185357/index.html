@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ARGOS FPA — SIA/SUS Bacabal-MA</title>
+    <title>ARGOS - Monitoramento Inteligente. Gestão Eficiente</title>
+    <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="stylesheet" href="css/style.css">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
@@ -47,7 +48,7 @@
                         <div class="radar-dot"></div>
                     </div>
                 </div>
-                <h1 class="login-title"><span class="argos-highlight-login">ARGOS</span> FPA</h1>
+                <h1 class="login-title"><span class="argos-highlight-login">ARGOS</span></h1>
                 <p class="login-subtitle">Monitoramento Inteligente. Gestão Eficiente.</p>
                 <p class="login-instruction">Faça login para acessar o sistema</p>
             </div>
@@ -114,11 +115,13 @@
     <!-- ===== TOP HEADER ===== -->
     <header id="main-header">
         <div class="header-brand">
-            <div class="brand-logo">
-                <img src="img/olho-cyber.png" alt="Argos Logo">
-            </div>
             <div class="brand-info">
-                <span class="brand-name"><span class="argos-highlight">ARGOS</span> FPA</span>
+                <div class="brand-top-row" style="display: flex; align-items: center; gap: 0px;">
+                    <span class="brand-name"><span class="argos-highlight">ARGOS</span></span>
+                    <div class="brand-logo">
+                        <img src="img/olho-cyber.png" alt="Argos Logo">
+                    </div>
+                </div>
                 <span class="brand-sub">Monitoramento Inteligente. Gestão Eficiente.</span>
             </div>
         </div>
@@ -1207,13 +1210,26 @@
                 <h2><i class="fas fa-stethoscope"></i> Todos os Procedimentos</h2>
             </div>
             <div class="table-container">
-                <div class="table-header-bar">
-                    <span><i class="fas fa-list"></i> Todos os Procedimentos</span>
-                    <div class="table-controls">
-                        <input type="text" id="searchProc" placeholder="🔍 Buscar procedimento/código..."
-                            class="table-search">
+                <div class="table-header-bar" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div style="display: flex; gap: 20px; align-items: center;">
+                        <span style="white-space: nowrap;"><i class="fas fa-list"></i> Todos os Procedimentos</span>
+                        <div class="table-controls" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="searchProc" placeholder="🔍 Buscar..."
+                                class="table-search" style="width: 140px;">
+                            
+                            <!-- Filtro e Botão do Relatório Mensal de Subgrupo -->
+                            <select id="filterSubgrupoPDF" class="table-filter-select" style="max-width: 300px; font-size: 0.8rem; padding: 6px 10px; height: auto;">
+                                <option value="">Selecione o Subgrupo para Exportar...</option>
+                            </select>
+                            <button class="btn-table-export" id="btnExportSubgrupoPDF"
+                                title="Exportar Relatório Mensal do Subgrupo (PDF)" style="background: #dc2626; color: #ffffff; padding: 6px 12px; border: none; border-radius: 4px; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                                <i class="fas fa-file-pdf" style="color: #ffffff;"></i> Subgrupo em PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div>
                         <button class="btn-table-export" id="btnExportProcPDF"
-                            title="Exportar tabela de procedimentos para PDF">
+                            title="Exportar tabela atual de procedimentos para PDF">
                             <i class="fas fa-file-pdf"></i> PDF
                         </button>
                     </div>

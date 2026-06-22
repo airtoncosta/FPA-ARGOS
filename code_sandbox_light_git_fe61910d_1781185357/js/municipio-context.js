@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — municipio-context.js
+ * ARGOS — municipio-context.js
  * Módulo de contexto multi-município
  * Gerencia o município ativo da sessão, troca de contexto,
  * e carregamento de dados/logo por município.

@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — login.js
+ * ARGOS — login.js
  * Gerenciamento de Autenticação, Perfis de Usuário e Segurança de Acesso
  */
 

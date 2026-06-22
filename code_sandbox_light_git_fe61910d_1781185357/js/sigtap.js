@@ -95,5 +95,81 @@ const SIGTAP = {
     "0202080030": "Antibiograma p/ Micobactérias"
 };
 
+const SIGTAP_SUBGRUPOS = {
+    // GRUPO 01
+    "0101": "Ações de Promoção e Prevenção em Saúde",
+    "0102": "Acolhimento com Classificação de Risco",
+
+    // GRUPO 02
+    "0201": "Coleta de Material",
+    "0202": "Diagnóstico em Laboratório Clínico",
+    "0203": "Diagnóstico por Anatomia Patológica e Citopatologia",
+    "0204": "Diagnóstico por Radiologia",
+    "0205": "Diagnóstico por Ultrassonografia",
+    "0206": "Diagnóstico por Tomografia",
+    "0207": "Diagnóstico por Ressonância Magnética",
+    "0208": "Diagnóstico por Medicina Nuclear In Vivo",
+    "0209": "Diagnóstico por Endoscopia",
+    "0210": "Diagnóstico por Radiologia Intervencionista",
+    "0211": "Métodos Diagnósticos em Especialidades",
+    "0212": "Diagnóstico e Acompanhamento em Odontologia",
+    "0213": "Diagnóstico e Acompanhamento em Transplantes",
+    "0214": "Exames de Triagem Neonatal",
+
+    // GRUPO 03
+    "0301": "Consultas / Atendimentos / Acompanhamentos",
+    "0302": "Fisioterapia",
+    "0303": "Tratamentos Clínicos (Outras Especialidades)",
+    "0304": "Tratamento em Oncologia",
+    "0305": "Tratamento em Nefrologia",
+    "0306": "Hemoterapia",
+    "0307": "Tratamentos Odontológicos",
+    "0308": "Tratamento de Lesões, Envenenamentos e Outros",
+    "0309": "Terapias Especializadas",
+    "0310": "Parto e Nascimento",
+
+    // GRUPO 04
+    "0401": "Pequenas Cirurgias e Cirurgias de Pele/Mucosa",
+    "0402": "Cirurgia de Glândulas Endócrinas",
+    "0403": "Cirurgia do Sistema Nervoso Central e Periférico",
+    "0404": "Cirurgia das Vias Aéreas Superiores, da Cabeça e do Pescoço",
+    "0405": "Cirurgia do Aparelho da Visão",
+    "0406": "Cirurgia do Aparelho Circulatório",
+    "0407": "Cirurgia do Aparelho Digestivo e Parede Abdominal",
+    "0408": "Cirurgia do Sistema Osteomuscular",
+    "0409": "Cirurgia do Aparelho Geniturinário",
+    "0410": "Cirurgia de Mama",
+    "0411": "Cirurgia Obstétrica",
+    "0412": "Cirurgia Torácica",
+    "0413": "Cirurgia Reparadora",
+    "0414": "Cirurgia Bucomaxilofacial",
+    "0415": "Outras Cirurgias",
+    "0416": "Cirurgia em Oncologia",
+
+    // GRUPO 05
+    "0501": "Coleta e Processamento de Órgãos, Tecidos e Células",
+    "0502": "Avaliação de Doador Vivo",
+    "0503": "Transplantes",
+    "0504": "Acompanhamento Pós-transplante",
+    "0505": "Busca Ativa de Doadores",
+    "0506": "Outros Relacionados a Transplantes",
+
+    // GRUPO 06
+    "0601": "Medicamentos",
+    "0602": "Materiais Especiais",
+    "0603": "Medicamentos para Doenças Endêmicas e Outros",
+    "0604": "Componentes do Sangue e Hemoderivados",
+
+    // GRUPO 07
+    "0701": "Órteses, Próteses e Materiais Especiais (OPM)",
+    "0702": "OPM em Odontologia",
+
+    // GRUPO 08
+    "0801": "Ações Relacionadas ao Estabelecimento de Saúde",
+    "0802": "Ações Relacionadas ao Profissional de Saúde",
+    "0803": "Ações Relacionadas ao Paciente"
+};
+
 // Expor globalmente para os scripts
 window.SIGTAP = SIGTAP;
+window.SIGTAP_SUBGRUPOS = SIGTAP_SUBGRUPOS;

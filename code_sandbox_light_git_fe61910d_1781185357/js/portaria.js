@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — portaria.js
+ * ARGOS — portaria.js
  * Módulo para gerenciamento, importação e consulta da Portaria de Teto MAC
  */
 

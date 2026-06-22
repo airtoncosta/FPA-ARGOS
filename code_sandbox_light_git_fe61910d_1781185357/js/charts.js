@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — charts.js
+ * ARGOS — charts.js
  * Módulo de gráficos Chart.js — Identidade Visual SUS
  */
 

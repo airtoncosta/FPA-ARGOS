@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — app.js v4.0
+ * ARGOS — app.js v4.0
  * Lógica principal da aplicação — SIA/SUS Multi-Município
  */
 
@@ -3021,6 +3021,30 @@ function bindReports() {
 
     document.getElementById('btnExportTetoMacPDF')?.addEventListener('click', () => {
         PDFExport.exportTetoMacPDF();
+    });
+
+    // Preencher combobox de subgrupos e adicionar listener
+    const comboSubgrupo = document.getElementById('filterSubgrupoPDF');
+    if (comboSubgrupo && window.SIGTAP_SUBGRUPOS) {
+        Object.keys(window.SIGTAP_SUBGRUPOS).sort().forEach(key => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = `${key} — ${window.SIGTAP_SUBGRUPOS[key]}`;
+            comboSubgrupo.appendChild(opt);
+        });
+    }
+
+    document.getElementById('btnExportSubgrupoPDF')?.addEventListener('click', () => {
+        const sel = document.getElementById('filterSubgrupoPDF')?.value;
+        if (!sel) {
+            showToast('⚠️ Selecione um subgrupo antes de exportar.', 'warn');
+            return;
+        }
+        if (PDFExport.exportRelatorioMensalSubgrupoPDF) {
+            PDFExport.exportRelatorioMensalSubgrupoPDF(sel);
+        } else {
+            showToast('❌ Erro: Função de exportação não implementada.', 'error');
+        }
     });
 }
 

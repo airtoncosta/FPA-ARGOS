@@ -1,4 +1,4 @@
-# ARGOS FPA
+# ARGOS
 ## Plataforma Inteligente de Controle, Avaliação, Auditoria e Regulação do SUS
 
 **Município:** Bacabal — MA  

@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — supabase-service.js
+ * ARGOS — supabase-service.js
  * Serviços e queries de integração com o banco de dados do Supabase
  */
 

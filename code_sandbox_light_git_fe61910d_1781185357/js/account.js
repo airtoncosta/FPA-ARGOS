@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — account.js
+ * ARGOS — account.js
  * Gerenciamento da tela "Minha Conta" e Histórico de Ações
  */
 

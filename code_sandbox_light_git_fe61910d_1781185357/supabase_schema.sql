@@ -1,5 +1,5 @@
 -- =========================================================
--- ARGOS FPA — SCRIPT DE BANCO DE DADOS (SUPABASE / POSTGRES)
+-- ARGOS — SCRIPT DE BANCO DE DADOS (SUPABASE / POSTGRES)
 -- Copie e cole este script no SQL Editor do seu projeto Supabase
 -- =========================================================
 

@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — data.js
+ * ARGOS — data.js
  * Dados de demonstração baseados no Consolidado Real
  * Bacabal/MA — Janeiro a Abril de 2026 — SIA/SUS
  */

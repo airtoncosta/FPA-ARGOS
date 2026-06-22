@@ -1,5 +1,5 @@
-﻿/**
- * ARGOS FPA — municipios-br.js
+/**
+ * ARGOS — municipios-br.js
  * Lista estática de todos os municípios do Brasil por UF (fonte: IBGE)
  * Gerado automaticamente — NÃO editar manualmente
  */

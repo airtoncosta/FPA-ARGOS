@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const inputFile = 'C:\\ARGOS FPA\\TabelaUnificada_202606_v2606091427\\tb_procedimento.txt';
+const inputFile = 'C:\\ARGOS\\TabelaUnificada_202606_v2606091427\\tb_procedimento.txt';
 const outputFile = 'js/sigtap.js';
 
 console.log('Reading ' + inputFile + '...');

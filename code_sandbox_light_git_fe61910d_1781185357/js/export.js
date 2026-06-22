@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — export.js
+ * ARGOS — export.js
  * Exportação PDF profissional e Excel gerencial
  * Secretaria Municipal de Saúde — Bacabal/MA
  */
@@ -645,7 +645,7 @@ const PDFExport = {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(219, 234, 254);
-        doc.text(`Sistema: ARGOS FPA via Síntese SIA/SUS | Município: ${mun} - ${uf}`, margin + 40, 21.5);
+        doc.text(`Sistema: ARGOS via Síntese SIA/SUS | Município: ${mun} - ${uf}`, margin + 40, 21.5);
         doc.text(`Competência: ${d.competencia}${filterText}`, margin + 40, 26);
 
         // Adicionar logo ativa
@@ -769,6 +769,180 @@ const PDFExport = {
             } catch(e) {
                 console.error(e);
                 showToast('❌ Erro ao gerar PDF de Procedimentos: ' + e.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }, 800);
+    },
+
+    exportRelatorioMensalSubgrupoPDF(subgrupoPrefix) {
+        const d = APP_STATE.filteredData || APP_STATE.data;
+        if (!d) { showToast('⚠️ Carregue os dados antes de exportar.', 'warn'); return; }
+
+        showLoading('Gerando PDF Mensal do Subgrupo...');
+
+        setTimeout(async () => {
+            try {
+                const scaarImg = window.SCAAR_LOGO_BASE64 || null;
+                const { jsPDF } = window.jspdf;
+
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+                const pageW = doc.internal.pageSize.getWidth();
+                const pageH = doc.internal.pageSize.getHeight();
+                const margin = 14;
+                
+                const nomeSubgrupo = window.SIGTAP_SUBGRUPOS && window.SIGTAP_SUBGRUPOS[subgrupoPrefix] ? window.SIGTAP_SUBGRUPOS[subgrupoPrefix] : 'Subgrupo ' + subgrupoPrefix;
+
+                // Filtrar linhas
+                let linhas = [];
+                if (window.datasets && window.datasets.length > 0) {
+                    window.datasets.forEach(ds => {
+                        if (ds.linhas) linhas = linhas.concat(ds.linhas);
+                    });
+                } else if (d.linhas) {
+                    linhas = d.linhas;
+                }
+                
+                if (!linhas || linhas.length === 0) {
+                    showToast('⚠️ Nenhuma linha de detalhe encontrada nos dados carregados.', 'warn');
+                    hideLoading();
+                    return;
+                }
+
+                // Aplicar filtros da interface (APP_STATE.filters)
+                const f = APP_STATE && APP_STATE.filters ? APP_STATE.filters : null;
+                if (f) {
+                    if (f.ano && f.ano !== 'all') {
+                        linhas = linhas.filter(l => {
+                            const lAno = l.cmp ? l.cmp.split('/')[1] : '';
+                            return lAno === String(f.ano);
+                        });
+                    }
+                    if (f.mes && f.mes !== 'all') {
+                        linhas = linhas.filter(l => {
+                            const lMes = l.mes || (l.cmp ? l.cmp.split('/')[0] : '');
+                            return lMes === f.mes;
+                        });
+                    }
+                    if (f.unidade && f.unidade !== 'all') {
+                        linhas = linhas.filter(l => String(l.uId) === String(f.unidade));
+                    }
+                    if (f.cbo && f.cbo !== 'all') {
+                        linhas = linhas.filter(l => String(l.cbo) === String(f.cbo));
+                    }
+                    // Ignoramos f.procedimento, pois o usuário está requerendo o Subgrupo (que engloba vários)
+                }
+
+                linhas = linhas.filter(l => String(l.proc).startsWith(subgrupoPrefix));
+
+                if (linhas.length === 0) {
+                    showToast(`⚠️ Nenhuma produção encontrada para o subgrupo ${subgrupoPrefix} nestes dados.`, 'warn');
+                    hideLoading();
+                    return;
+                }
+
+                // Obter competências únicas
+                const compSet = new Set();
+                linhas.forEach(l => compSet.add(l.cmp));
+                // Ordenar competências por ano e mês
+                const comps = Array.from(compSet).sort((a,b) => {
+                    const partsA = a.split('/');
+                    const partsB = b.split('/');
+                    const valA = partsA.length === 2 ? partsA[1] + partsA[0] : a;
+                    const valB = partsB.length === 2 ? partsB[1] + partsB[0] : b;
+                    return valA.localeCompare(valB);
+                });
+
+                // Agrupar por procedimento
+                const procAgrupados = {};
+                linhas.forEach(l => {
+                    const cleanCode = String(l.proc).replace(/\D/g, '');
+                    if (!procAgrupados[cleanCode]) {
+                        const desc = (window.SIGTAP && window.SIGTAP[cleanCode]) || 'Procedimento ' + cleanCode;
+                        procAgrupados[cleanCode] = { codigo: cleanCode, descricao: desc, totaisPorComp: {}, totalGeral: 0 };
+                        comps.forEach(c => procAgrupados[cleanCode].totaisPorComp[c] = 0);
+                    }
+                    procAgrupados[cleanCode].totaisPorComp[l.cmp] += l.qtdAprovada;
+                    procAgrupados[cleanCode].totalGeral += l.qtdAprovada;
+                });
+
+                // Converter para array de linhas para a tabela
+                const rows = [];
+                const totaisGerais = { total: 0 };
+                comps.forEach(c => totaisGerais[c] = 0);
+
+                Object.values(procAgrupados)
+                    .sort((a,b) => b.totalGeral - a.totalGeral)
+                    .forEach(p => {
+                        const row = [ p.codigo, p.descricao ];
+                        comps.forEach(c => {
+                            const val = p.totaisPorComp[c];
+                            row.push(val > 0 ? val.toLocaleString('pt-BR') : '-');
+                            totaisGerais[c] += val;
+                        });
+                        row.push(p.totalGeral.toLocaleString('pt-BR'));
+                        totaisGerais.total += p.totalGeral;
+                        rows.push(row);
+                    });
+
+                // Linha TOTAL do subgrupo (última linha, destacada)
+                const totalRow = [ `TOTAL ${subgrupoPrefix}`, 'Todos os procedimentos do subgrupo' ];
+                comps.forEach(c => totalRow.push(totaisGerais[c].toLocaleString('pt-BR')));
+                totalRow.push(totaisGerais.total.toLocaleString('pt-BR'));
+                rows.push(totalRow);
+
+                const mesesMap = {
+                    '01':'DEZ', '02':'FEV', '03':'MAR', '04':'ABR', '05':'MAI', '06':'JUN',
+                    '07':'JUL', '08':'AGO', '09':'SET', '10':'OUT', '11':'NOV', '12':'DEZ'
+                };
+                mesesMap['01'] = 'JAN'; // Corrigido bug no map
+                
+                const formatadasComps = comps.map(cmp => {
+                    const partes = cmp.split('/');
+                    return partes.length === 2 ? (mesesMap[partes[0]] || partes[0]) + '/' + partes[1] : cmp;
+                });
+
+                const headRow = ['Código', 'Descrição', ...formatadasComps, 'TOTAL GERAL'];
+
+                // Renderizar o Header unificado agora que sabemos todas as competências
+                const titulo = `RELATÓRIO DE PROCEDIMENTOS POR COMPETÊNCIA`;
+                const dClone = { ...d, competencia: formatadasComps.join('  ') };
+                await this.drawUnifiedHeader(doc, dClone, titulo, pageW, margin);
+
+                doc.autoTable({
+                    startY: 45,
+                    margin: { left: margin, right: margin },
+                    head: [headRow],
+                    body: rows,
+                    styles: { fontSize: 7.5, halign: 'center', lineWidth: 0.1, lineColor: [200, 200, 200], textColor: 0 },
+                    headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                    columnStyles: {
+                        0: { halign: 'center', fontStyle: 'bold', cellWidth: 25 },
+                        1: { halign: 'left', cellWidth: 'auto' }
+                    },
+                    alternateRowStyles: { fillColor: [245, 248, 250] },
+                    didParseCell: data => {
+                        if (data.row.index === rows.length - 1) { // Linha de TOTAL (última linha)
+                            data.cell.styles.fillColor = [220, 230, 245];
+                            data.cell.styles.textColor = [15, 30, 90];
+                            data.cell.styles.fontStyle = 'bold';
+                            data.cell.styles.fontSize = 8.5;
+                        }
+                    },
+                    didDrawPage: data => this.drawTableCard(doc, data, `RELATÓRIO MENSAL - SUBGRUPO ${subgrupoPrefix} - ${nomeSubgrupo.toUpperCase()}`)
+                });
+
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    this.addFooter(doc, pageW, pageH, i, totalPages, scaarImg);
+                }
+
+                doc.save(`ARGOS_Subgrupo_${subgrupoPrefix}_${d.municipio || 'Bacabal'}.pdf`);
+                showToast('✅ PDF Mensal do Subgrupo exportado com sucesso!', 'success');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ Erro ao gerar PDF do Subgrupo: ' + e.message, 'error');
             } finally {
                 hideLoading();
             }
@@ -1342,10 +1516,13 @@ const PDFExport = {
         doc.setFillColor(240, 245, 250);
         doc.rect(0, pageH - 12, pageW, 12, 'F');
         
+
+        let hasIcon = false;
         if (scaarImg) {
             try {
-                // Desenha a logo com 14mm de largura por 7mm de altura
-                doc.addImage(scaarImg, 'PNG', 14, pageH - 9.5, 14, 7);
+                // Desenha a logo do rodapé (proporção 3:2, tamanho ampliado)
+                doc.addImage(scaarImg, 'PNG', 14, pageH - 11, 15, 10);
+                hasIcon = true;
             } catch (e) {
                 console.error("Erro ao desenhar logo do rodapé:", e);
             }
@@ -1356,8 +1533,12 @@ const PDFExport = {
         doc.setTextColor(100, 116, 139);
         
         // Empurra o texto para a direita do logo
-        const textX = scaarImg ? 32 : 14;
-        doc.text(`Emitido em ${fmt.data()} | ARGOS FPA - Monitoramento Inteligente. Gestão Eficiente. | SCAAR — Controle, Avaliação, Auditoria e Regulação`, textX, pageH - 5);
+        const textX = hasIcon ? 33 : 14;
+        
+        const userSession = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || 'null');
+        const userName = userSession && userSession.name ? userSession.name.toUpperCase() : 'SISTEMA';
+        
+        doc.text(`ARGOS - Monitoramento Inteligente. Gestão Eficiente. | SCAAR — Superintendência de Controle, Avaliação, Auditoria e Regulação | Gerado em ${fmt.data()} por ${userName}`, textX, pageH - 5);
         doc.text(`Página ${pageNum} de ${totalPages}`, pageW - 14, pageH - 5, { align: 'right' });
     },
 
@@ -1444,7 +1625,7 @@ const ExcelExport = {
     addResumo(wb, d) {
         const r = d.resumo;
         const rows = [
-            ['ARGOS FPA — SIA/SUS'],
+            ['ARGOS — SIA/SUS'],
             [`Município: ${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'} — ${d.uf}`, '', `Competência: ${d.competencia}`],
             [],
             ['RESUMO GERAL DO PERÍODO'],

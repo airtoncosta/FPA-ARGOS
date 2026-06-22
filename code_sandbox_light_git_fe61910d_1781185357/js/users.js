@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — users.js
+ * ARGOS — users.js
  * Lógica do painel de Gerenciamento de Usuários (Apenas ADM)
  */
 

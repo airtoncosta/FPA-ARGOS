@@ -1,5 +1,5 @@
 /**
- * ARGOS FPA — db.js
+ * ARGOS — db.js
  * Persistência de dados locais utilizando IndexedDB
  */
 

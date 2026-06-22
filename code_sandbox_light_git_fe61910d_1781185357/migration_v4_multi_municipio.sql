@@ -1,5 +1,5 @@
 -- =========================================================
--- ARGOS FPA v4.0 — MULTI-MUNICÍPIO
+-- ARGOS v4.0 — MULTI-MUNICÍPIO
 -- Execute este script no SQL Editor do Supabase
 -- =========================================================
 
