@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<body>
+<div id="log">Running...</div>
+<script>
+const url = 'https://zrzaktbxzpyjpyhidrsu.supabase.co/rest/v1/usuarios';
+const headers = {
+    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyemFrdGJ4enB5anB5aGlkcnN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0OTg2NjIsImV4cCI6MjA5NzA3NDY2Mn0.db2d_4TFanE6KEJh7m8-nVBALvqv3erwwT8OJiMmU7k',
+    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpyemFrdGJ4enB5anB5aGlkcnN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0OTg2NjIsImV4cCI6MjA5NzA3NDY2Mn0.db2d_4TFanE6KEJh7m8-nVBALvqv3erwwT8OJiMmU7k',
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+};
+
+async function log(msg) {
+    document.getElementById('log').innerHTML += '<br>' + msg;
+}
+
+async function run() {
+    try {
+        // Fetch users
+        let res = await fetch(url + '?select=*', { headers });
+        let users = await res.json();
+        log('Users loaded: ' + users.length);
+        
+        let yvanna = users.find(u => u.name === 'Yvanna Carvalhal' || u.username === 'Yvanna@fpa.com.br' || u.username === 'yvanna');
+        if (!yvanna) {
+            log('User not found!');
+            return;
+        }
+        log('Found user: ' + yvanna.username);
+        
+        if (yvanna.username !== 'yvanna') {
+            res = await fetch(url + '?username=eq.' + yvanna.username, { method: 'DELETE', headers });
+            log('Deleted old user status: ' + res.status);
+        } else {
+            // Already yvanna, just update
+            res = await fetch(url + '?username=eq.yvanna', { method: 'DELETE', headers });
+            log('Deleted existing yvanna user status: ' + res.status);
+        }
+        
+        let newUser = {
+            ...yvanna,
+            username: 'yvanna',
+            email: 'yvanna@fpa.com.br',
+            password: 'yvanna@2026',
+            acesso_multi_municipio: false,
+            municipio_vinculado: 'Bacabal-MA',
+            role: 'GERENTE'
+        };
+        
+        res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(newUser) });
+        let result = await res.json();
+        log('Insert new user result: ' + JSON.stringify(result));
+        
+        log('DONE_SUCCESS');
+    } catch (e) {
+        log('Error: ' + e);
+    }
+}
+run();
+</script>
+</body>
+</html>

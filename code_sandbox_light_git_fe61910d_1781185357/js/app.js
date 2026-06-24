@@ -297,23 +297,12 @@ async function renderLogoHistory() {
             } catch(e){}
         }
 
-        let history = [];
-        
-        if (isGerenteRestrito && SupabaseConfig.isConnected()) {
-            const parts = vinculado.split('-');
-            const nomeMun = parts[0].trim();
-            const ufMun = parts.length > 1 ? parts[1].trim() : '';
-            const idMun = await SupabaseService.registrarMunicipio(nomeMun, ufMun);
-            
-            if (idMun) {
-                const munHistory = await SupabaseService.loadLogoHistoryPorMunicipio(idMun);
-                history = munHistory.map(m => m.logo_base64);
-                // Remove duplicatas
-                history = [...new Set(history)];
-            }
-        } else {
-            history = await AppDB.getItem('logos_history') || [];
+        if (isGerenteRestrito) {
+            container.style.display = 'none';
+            return;
         }
+
+        let history = await AppDB.getItem('logos_history') || [];
 
         if (!history || history.length === 0) {
             container.style.display = 'none';
@@ -432,12 +421,26 @@ function bindLogoUpload() {
     // v4.0: Abrir modal de seleção UF/Município antes do upload
     btnUpload?.addEventListener('click', () => {
         if (SupabaseConfig.isConnected() && window.MunicipioContext) {
-            showModal('modalSelecionarMunicipioLogo');
+            const userSession = MunicipioContext.getUserSession();
+            const isGerenteRestrito = userSession && userSession.role === 'GERENTE' && !userSession.acesso_multi_municipio && userSession.municipio_vinculado;
+            
+            if (isGerenteRestrito) {
+                // Usuário restrito: Pula o modal e vai direto para o upload usando o município vinculado
+                const parts = userSession.municipio_vinculado.split('-');
+                window._logoMunicipioSelecionado = { 
+                    municipio: parts[0].trim(),
+                    uf: parts.length > 1 ? parts[1].trim() : ''
+                };
+                input.click();
+            } else {
+                showModal('modalSelecionarMunicipioLogo');
+            }
         } else {
             // Sem Supabase: comportamento legado
             input.click();
         }
     });
+
 
     btnExcluir?.addEventListener('click', async () => {
         if (confirm('Tem certeza que deseja excluir a logomarca do PDF?')) {
