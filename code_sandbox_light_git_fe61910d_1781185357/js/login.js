@@ -392,9 +392,9 @@ const LoginModule = {
         }
 
         // v4.0: Auto-load do município vinculado SOMENTE para Yvanna
-        if (sessionUser.username === 'yvanna' && sessionUser.municipio_vinculado) {
+        if (user.username === 'yvanna' && user.municipio_vinculado) {
             if (window.MunicipioContext && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
-                const parts = sessionUser.municipio_vinculado.split('-');
+                const parts = user.municipio_vinculado.split('-');
                 const nomeMun = parts[0].trim();
                 const ufMun = parts.length > 1 ? parts[1].trim() : '';
                 const idMun = await window.MunicipioContext.registrarOuObterMunicipio(nomeMun, ufMun);
