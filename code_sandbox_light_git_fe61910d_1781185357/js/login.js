@@ -225,7 +225,8 @@ const LoginModule = {
                     perm_importar: user.perm_importar,
                     perm_limpar_db: user.perm_limpar_db,
                     perm_config_supabase: user.perm_config_supabase,
-                    municipio_vinculado: user.municipio_vinculado
+                    municipio_vinculado: user.municipio_vinculado,
+                    acesso_multi_municipio: user.acesso_multi_municipio
                 };
 
                 if (rememberMe) {
@@ -383,6 +384,24 @@ const LoginModule = {
         // Dispara re-render da central de arquivos caso o app principal esteja carregado
         if (window.renderArquivosManager) {
             await window.renderArquivosManager();
+        }
+
+        // Re-inicializa a UI de contexto de município com a nova sessão
+        if (window.MunicipioContext && typeof window.MunicipioContext.initUI === 'function') {
+            await window.MunicipioContext.initUI();
+        }
+
+        // v4.0: Auto-load do município vinculado para gerentes restritos
+        if (sessionUser.role === 'GERENTE' && !sessionUser.acesso_multi_municipio && sessionUser.municipio_vinculado) {
+            if (window.MunicipioContext && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+                const parts = sessionUser.municipio_vinculado.split('-');
+                const nomeMun = parts[0].trim();
+                const ufMun = parts.length > 1 ? parts[1].trim() : '';
+                const idMun = await window.MunicipioContext.registrarOuObterMunicipio(nomeMun, ufMun);
+                if (idMun) {
+                    await window.MunicipioContext.carregarMunicipio(idMun);
+                }
+            }
         }
     },
 

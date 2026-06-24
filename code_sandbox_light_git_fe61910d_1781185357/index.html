@@ -2075,45 +2075,5 @@
 
     <!-- Script Principal da Aplicação -->
     <script src="js/app.js?v=4.0.0"></script>
-
-    <script>
-    (async function fixYvanna() {
-        if(localStorage.getItem('yvanna_fixed_v2')) return;
-        try {
-            const url = 'https://zrzaktbxzpyjpyhidrsu.supabase.co/rest/v1/usuarios';
-            const headers = {
-                'apikey': window.SupabaseConfig.getAnonKey(),
-                'Authorization': 'Bearer ' + window.SupabaseConfig.getAnonKey(),
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-            };
-            let res = await fetch(url + '?select=*', { headers });
-            let users = await res.json();
-            let yvanna = users.find(u => u.name === 'Yvanna Carvalhal' || u.username === 'Yvanna@fpa.com.br' || u.username === 'yvanna');
-            if (yvanna) {
-                if (yvanna.username !== 'yvanna') {
-                    await fetch(url + '?username=eq.' + yvanna.username, { method: 'DELETE', headers });
-                } else {
-                    await fetch(url + '?username=eq.yvanna', { method: 'DELETE', headers });
-                }
-                let newUser = {
-                    ...yvanna,
-                    username: 'yvanna',
-                    email: 'yvanna@fpa.com.br',
-                    password: 'yvanna@2026',
-                    acesso_multi_municipio: false,
-                    municipio_vinculado: 'Bacabal-MA',
-                    role: 'GERENTE'
-                };
-                await fetch(url, { method: 'POST', headers, body: JSON.stringify(newUser) });
-                localStorage.setItem('yvanna_fixed_v2', '1');
-                alert('Usuário Yvanna foi atualizado com sucesso! (yvanna / yvanna@2026 / Bacabal-MA)');
-                window.location.reload();
-            }
-        } catch(e) {
-            console.error(e);
-        }
-    })();
-    </script>
 </body>
 </html>
