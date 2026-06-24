@@ -391,8 +391,8 @@ const LoginModule = {
             await window.MunicipioContext.initUI();
         }
 
-        // v4.0: Auto-load do município vinculado para gerentes restritos
-        if (sessionUser.role === 'GERENTE' && !sessionUser.acesso_multi_municipio && sessionUser.municipio_vinculado) {
+        // v4.0: Auto-load do município vinculado SOMENTE para Yvanna
+        if (sessionUser.username === 'yvanna' && sessionUser.municipio_vinculado) {
             if (window.MunicipioContext && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
                 const parts = sessionUser.municipio_vinculado.split('-');
                 const nomeMun = parts[0].trim();
@@ -402,6 +402,11 @@ const LoginModule = {
                     await window.MunicipioContext.carregarMunicipio(idMun);
                 }
             }
+        }
+        
+        // Garante que o modal de importar seja fechado caso tenha aberto no background
+        if (typeof hideModal === 'function') {
+            hideModal('modalImportar');
         }
     },
 
