@@ -137,7 +137,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 loadData(getEmptyData());
 
                 const isVisitor = userSession && userSession.role === 'VISITANTE';
-                if (!isVisitor) {
+                const hasVinculado = userSession && userSession.municipio_vinculado;
+                if (!isVisitor && !hasVinculado) {
                     showModal('modalImportar');
                     showToast('💡 Nenhum dado salvo. Importe um arquivo ou carregue os dados de demonstração.', 'info');
                 } else {

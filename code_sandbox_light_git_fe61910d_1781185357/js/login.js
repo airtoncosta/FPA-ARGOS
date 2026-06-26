@@ -528,14 +528,16 @@ const LoginModule = {
 
         // v4.0: Auto-load do município vinculado para usuários restritos
         if ((user.username === 'yvanna' || user.username === 'mateus') && user.municipio_vinculado) {
+            const parts = user.municipio_vinculado.split('-');
+            const nomeMun = parts[0].trim();
+            const ufMun = parts.length > 1 ? parts[1].trim() : '';
             if (window.MunicipioContext && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
-                const parts = user.municipio_vinculado.split('-');
-                const nomeMun = parts[0].trim();
-                const ufMun = parts.length > 1 ? parts[1].trim() : '';
                 const idMun = await window.MunicipioContext.registrarOuObterMunicipio(nomeMun, ufMun);
                 if (idMun) {
                     await window.MunicipioContext.carregarMunicipio(idMun);
                 }
+            } else if (window.MunicipioContext) {
+                window.MunicipioContext.setAtivo('local', nomeMun, ufMun);
             }
         }
         
