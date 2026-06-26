@@ -58,9 +58,12 @@ DROP POLICY IF EXISTS "Permitir escrita de municipios" ON public.municipios_sist
 DROP POLICY IF EXISTS "Permitir acesso total a logomarcas" ON public.logomarcas_municipio;
 DROP POLICY IF EXISTS "Permitir acesso total a producao" ON public.producao_sia;
 
--- Criar políticas
+-- Criar políticas (acesso restrito — consultar migration_v5_security.sql para funções SECURITY DEFINER)
 CREATE POLICY "Permitir leitura de municipios" ON public.municipios_sistema FOR SELECT TO anon USING (true);
-CREATE POLICY "Permitir escrita de municipios" ON public.municipios_sistema FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir escrita de municipios via function" ON public.municipios_sistema FOR ALL TO anon USING (false) WITH CHECK (false);
 
-CREATE POLICY "Permitir acesso total a logomarcas" ON public.logomarcas_municipio FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir acesso total a producao" ON public.producao_sia FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir leitura de logomarcas" ON public.logomarcas_municipio FOR SELECT TO anon USING (true);
+CREATE POLICY "Permitir acesso total a logomarcas via function" ON public.logomarcas_municipio FOR ALL TO anon USING (false) WITH CHECK (false);
+
+CREATE POLICY "Permitir leitura de producao" ON public.producao_sia FOR SELECT TO anon USING (true);
+CREATE POLICY "Permitir acesso total a producao via function" ON public.producao_sia FOR ALL TO anon USING (false) WITH CHECK (false);

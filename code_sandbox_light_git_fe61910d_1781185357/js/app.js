@@ -2653,6 +2653,7 @@ function buildAggregatedData(datasets) {
         });
         
         d.unidades.forEach(u => {
+            CryptoUtils.sanitizeData(u, ['nome']);
             const cleanName = u.nome.replace(/&l[0-9a-zA-Z.]+/gi, '')
                                     .replace(/\(s[0-9a-zA-Z.]+/gi, '')
                                     .replace(/\([0-9]+[a-zA-Z]/gi, '')
@@ -2680,6 +2681,7 @@ function buildAggregatedData(datasets) {
         });
         
         d.procedimentos.forEach(p => {
+            CryptoUtils.sanitizeData(p, ['descricao']);
             const cleanCode = p.codigo.replace(/\D/g, '');
             const correctDesc = (window.SIGTAP && window.SIGTAP[cleanCode]) || p.descricao;
             if (!pMap[p.codigo]) {
@@ -2713,6 +2715,7 @@ function buildAggregatedData(datasets) {
 
         const currentCbos = d.cbos || [];
         currentCbos.forEach(c => {
+            CryptoUtils.sanitizeData(c, ['descricao']);
             const correctDesc = (window.CBO_DICTIONARY && window.CBO_DICTIONARY[c.codigo]) || c.descricao;
             if (!cboMap[c.codigo]) {
                 cboMap[c.codigo] = { ...c, descricao: correctDesc, qtdAprovada: 0, valAprovado: 0, procedimentos: {}, valoresPorUnidade: {} };

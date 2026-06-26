@@ -121,9 +121,9 @@ const AccountModule = {
 
             tr.innerHTML = `
                 <td>${dateStr}</td>
-                <td><span class="badge-action ${badgeClass}">${reg.action}</span></td>
-                <td>${reg.module}</td>
-                <td>${reg.desc}</td>
+                <td><span class="badge-action ${badgeClass}">${CryptoUtils.escapeHtml(reg.action)}</span></td>
+                <td>${CryptoUtils.escapeHtml(reg.module)}</td>
+                <td>${CryptoUtils.escapeHtml(reg.desc)}</td>
             `;
             tbody.appendChild(tr);
         });

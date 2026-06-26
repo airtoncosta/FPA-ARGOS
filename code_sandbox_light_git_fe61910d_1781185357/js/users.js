@@ -133,14 +133,16 @@ const UsersModule = {
             const lastLogin = this.getLastLogin(u.username);
             
             const isMe = currentUser && currentUser.username === u.username;
-            const nameSpan = `<span class="clickable-user-name" onclick="UsersModule.viewUserHistory('${u.username}', '${u.name}')" style="color: var(--sus-blue); cursor: pointer; font-weight: 700; transition: color 0.2s;" onmouseover="this.style.color='var(--sus-blue-light)'; this.style.textDecoration='underline';" onmouseout="this.style.color='var(--sus-blue)'; this.style.textDecoration='none';">${u.name}</span>`;
+            const safeName = CryptoUtils.escapeHtml(u.name);
+            const safeEmail = CryptoUtils.escapeHtml(u.email);
+            const nameSpan = `<span class="clickable-user-name" onclick="UsersModule.viewUserHistory('${CryptoUtils.escapeHtml(u.username)}', '${safeName}')" style="color: var(--sus-blue); cursor: pointer; font-weight: 700; transition: color 0.2s;" onmouseover="this.style.color='var(--sus-blue-light)'; this.style.textDecoration='underline';" onmouseout="this.style.color='var(--sus-blue)'; this.style.textDecoration='none';">${safeName}</span>`;
             const nameHtml = isMe ? `${nameSpan} <span style="background:#e0f2f1;color:#00796b;font-size:0.6rem;padding:2px 6px;border-radius:10px;margin-left:5px;">Você</span>` : nameSpan;
 
             const registerDate = u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : (u.createdAt ? u.createdAt.split(',')[0] : '-');
 
             tr.innerHTML = `
                 <td style="font-weight:600;">${nameHtml}</td>
-                <td>${u.email}</td>
+                <td>${safeEmail}</td>
                 <td>${roleBadge}</td>
                 <td>${statusBadge}${failedHtml}</td>
                 <td>${registerDate}</td>
@@ -411,11 +413,13 @@ const UsersModule = {
             const d = new Date();
             const created = `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
+            const passwordHash = await CryptoUtils.sha256(password);
+
             const newUser = {
                 username: username,
                 email: email,
                 name: name,
-                password: password,
+                password: passwordHash,
                 role: role,
                 status: 'ATIVO',
                 createdAt: created,
@@ -531,6 +535,8 @@ const UsersModule = {
             return;
         }
 
+        const passwordHash = await CryptoUtils.sha256(newPass);
+
         const isOnline = window.SupabaseConfig && window.SupabaseConfig.isConnected();
         const loggedUser = this.getCurrentUser();
 
@@ -545,7 +551,7 @@ const UsersModule = {
                 return;
             }
         } else {
-            user.password = newPass;
+            user.password = passwordHash;
             this.saveUsersLocal();
         }
         if (window.LoginModule) LoginModule.showToast(`Senha redefinida para ${user.name}.`, 'success');
@@ -614,9 +620,9 @@ const UsersModule = {
 
             tr.innerHTML = `
                 <td>${dateStr}</td>
-                <td><span class="badge-action ${badgeClass}">${reg.action}</span></td>
-                <td>${reg.module}</td>
-                <td>${reg.desc}</td>
+                <td><span class="badge-action ${badgeClass}">${CryptoUtils.escapeHtml(reg.action)}</span></td>
+                <td>${CryptoUtils.escapeHtml(reg.module)}</td>
+                <td>${CryptoUtils.escapeHtml(reg.desc)}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -702,20 +708,18 @@ const UsersModule = {
         if (!user) return;
 
         if (isOnline) {
-            // Zerar localmente para o navegador do admin
             localStorage.removeItem('failed_attempts_' + username);
-            
-            // Se o usuário estiver BLOQUEADO, desbloqueia ele na nuvem (status -> ATIVO)
-            if (user.status === 'BLOQUEADO') {
-                try {
+            try {
+                await window.SupabaseService.resetFailedAttempts(username);
+                if (user.status === 'BLOQUEADO') {
                     await window.SupabaseService.updateUserStatus(username, 'ATIVO');
-                    if (loggedUser) {
-                        await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'STATUS_USUARIO', `Conta de ${user.name} desbloqueada e tentativas resetadas.`);
-                    }
-                } catch (err) {
-                    alert("Erro ao desbloquear usuário no Supabase: " + err.message);
-                    return;
                 }
+                if (loggedUser) {
+                    await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'STATUS_USUARIO', `Conta de ${user.name} desbloqueada e tentativas resetadas.`);
+                }
+            } catch (err) {
+                alert("Erro ao resetar tentativas no Supabase: " + err.message);
+                return;
             }
         } else {
             user.failedAttempts = 0;

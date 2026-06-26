@@ -1,0 +1,30 @@
+# FPA ARGOS — .gitignore
+
+# PDFs (Portarias, DOU, etc.)
+*.pdf
+
+# Dados de município extraídos
+*.txt
+
+# Artefatos temporários
+git_status.txt
+COMMIT_EDITMSG
+
+# Imagens grandes em Base64 (geradas)
+code_sandbox_light_git_fe61910d_1781185357/js/scaar_logo.js
+
+# Script de correção manual (contém credenciais)
+code_sandbox_light_git_fe61910d_1781185357/fix.html
+
+# Node modules
+node_modules/
+
+# Ambiente
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

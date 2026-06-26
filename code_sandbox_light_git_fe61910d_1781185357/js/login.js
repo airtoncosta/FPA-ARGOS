@@ -3,19 +3,29 @@
  * Gerenciamento de Autenticação, Perfis de Usuário e Segurança de Acesso
  */
 
+const ARGOS_USERS_HASHES = {
+    'airton': '3b711afd736b9a7a8008f776a7a37fd0a2aa0cb9ecab20d1e0ee9880ef94591d',
+    'francileide': '5ee51df5f54fe34491eca667d200890a7d6b9a7a3d86c54207bc945e9fd8db24',
+    'jessica': '22d4954d6dd4a39356d3329d1b48f54425d3bb3f33ca45adcc559f6e81c759f5',
+    'aline': 'c6e9ca89f3378cc107bfba66e613793f9696e1d0695f2e51f54a025cd827dce6',
+    'ewerton': 'f5b1f7e02f7c4262c58aa0ef7414e850a610d4b8c051e12c3c48acc2bbac3973',
+    'marilene': '2ee5551e6e31e7cd748d42f7a9beb2878aa3ece2e7124e8b72cdacbc94eea7d4',
+    'flavia': '17f40d3c094d044dc7f94bd3724e8e88d4225205345d1b54035b55cc249b2e2e'
+};
+
 const ARGOS_USERS = [
     {
         username: 'airton',
         email: 'airton.costa@yahoo.com.br',
         name: 'Airton Costa',
-        password: 'airton@2026',
+        password: ARGOS_USERS_HASHES['airton'],
         role: 'ADM'
     },
     {
         username: 'francileide',
         email: 'francileide@fpa.gov.br',
         name: 'Francileide',
-        password: 'francileide@2026',
+        password: ARGOS_USERS_HASHES['francileide'],
         role: 'SUPERINTENDENTE',
         perm_usuarios: true,
         perm_importar: true,
@@ -26,50 +36,159 @@ const ARGOS_USERS = [
         username: 'jessica',
         email: 'jessica@fpa.gov.br',
         name: 'Jessica',
-        password: 'jessica@2026',
+        password: ARGOS_USERS_HASHES['jessica'],
         role: 'GERENTE'
     },
     {
         username: 'aline',
         email: 'aline@fpa.gov.br',
         name: 'Aline',
-        password: 'aline@2026',
+        password: ARGOS_USERS_HASHES['aline'],
         role: 'GERENTE'
     },
     {
         username: 'ewerton',
         email: 'ewerton@fpa.gov.br',
         name: 'Ewerton',
-        password: 'ewerton@2026',
+        password: ARGOS_USERS_HASHES['ewerton'],
         role: 'GERENTE'
     },
     {
         username: 'marilene',
         email: 'marilene@fpa.gov.br',
         name: 'Marilene',
-        password: 'marilene@2026',
+        password: ARGOS_USERS_HASHES['marilene'],
         role: 'GERENTE'
     },
     {
         username: 'flavia',
         email: 'flavia@fpa.gov.br',
         name: 'Flavia',
-        password: 'flavia@2026',
+        password: ARGOS_USERS_HASHES['flavia'],
         role: 'GERENTE'
     }
 ];
 
-const LoginModule = {
-    init() {
-        // Forçar rebuild do banco local caso não tenha as novas atualizações
-        let dbStr = localStorage.getItem('argos_users_db');
-        if (dbStr && !dbStr.includes('francileide')) {
-            localStorage.removeItem('argos_users_db');
-            dbStr = null;
-        }
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutos
+const INACTIVITY_WARNING = 2 * 60 * 1000;  // 2 minutos antes
 
-        // Inicializar banco de usuários se não existir
-        if (!dbStr) {
+const LoginModule = {
+    _inactivityTimer: null,
+    _warningTimer: null,
+
+    startInactivityTimer() {
+        this.clearInactivityTimer();
+        if (!this._isLoggedIn()) return;
+
+        this._warningTimer = setTimeout(() => {
+            this.showInactivityWarning();
+        }, INACTIVITY_TIMEOUT - INACTIVITY_WARNING);
+
+        this._inactivityTimer = setTimeout(() => {
+            this.handleLogout(true);
+        }, INACTIVITY_TIMEOUT);
+    },
+
+    clearInactivityTimer() {
+        if (this._inactivityTimer) {
+            clearTimeout(this._inactivityTimer);
+            this._inactivityTimer = null;
+        }
+        if (this._warningTimer) {
+            clearTimeout(this._warningTimer);
+            this._warningTimer = null;
+        }
+        this.hideInactivityWarning();
+    },
+
+    resetInactivityTimer() {
+        this.startInactivityTimer();
+    },
+
+    _isLoggedIn() {
+        return !!(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user'));
+    },
+
+    showInactivityWarning() {
+        const existing = document.getElementById('inactivity-modal');
+        if (existing) return;
+
+        const modal = document.createElement('div');
+        modal.id = 'inactivity-modal';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center;
+            justify-content: center; z-index: 99999;
+        `;
+        modal.innerHTML = `
+            <div style="background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px;
+                padding: 32px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                text-align: center;">
+                <i class="fas fa-clock" style="font-size: 3rem; color: #ffa726; margin-bottom: 16px;"></i>
+                <h3 style="color: #fff; margin: 0 0 8px 0;">Sessão Expirando</h3>
+                <p style="color: #aaa; margin: 0 0 24px 0; font-size: 0.9rem;">
+                    Sua sessão será encerrada em <strong id="inactivity-countdown" style="color: #ffa726;">2:00</strong> por inatividade.
+                </p>
+                <button id="btn-continue-session" style="
+                    background: linear-gradient(135deg, #00c853, #00e676); color: #000;
+                    border: none; padding: 12px 32px; border-radius: 8px;
+                    font-weight: 700; font-size: 0.95rem; cursor: pointer;
+                    transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'"
+                    onmouseout="this.style.transform='scale(1)'">
+                    <i class="fas fa-play"></i> Continuar Sessão
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        let countdown = 120;
+        const countdownEl = document.getElementById('inactivity-countdown');
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            const min = Math.floor(countdown / 60);
+            const sec = countdown % 60;
+            if (countdownEl) countdownEl.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+            if (countdown <= 0) clearInterval(countdownInterval);
+        }, 1000);
+
+        document.getElementById('btn-continue-session').onclick = () => {
+            clearInterval(countdownInterval);
+            this.clearInactivityTimer();
+            this.resetInactivityTimer();
+        };
+    },
+
+    hideInactivityWarning() {
+        const modal = document.getElementById('inactivity-modal');
+        if (modal) modal.remove();
+    },
+
+    init() {
+        let dbStr = localStorage.getItem('argos_users_db');
+        let needsUpdate = false;
+
+        if (dbStr) {
+            let users = [];
+            try { users = JSON.parse(dbStr); } catch(e) {}
+
+            // Migrar senhas em texto puro para hash SHA-256
+            users = users.map(u => {
+                const hashLookup = ARGOS_USERS_HASHES[u.username];
+                if (hashLookup && u.password !== hashLookup && u.password.length !== 64) {
+                    if (hashLookup) {
+                        u.password = hashLookup;
+                        needsUpdate = true;
+                    }
+                }
+                return u;
+            });
+
+            // Migrar se não tiver o hash (senha ainda em texto puro)
+            if (!dbStr.includes('francileide') || needsUpdate) {
+                localStorage.setItem('argos_users_db', JSON.stringify(users));
+            }
+        } else {
+            // Inicializar banco de usuários com hashes
             const initialUsers = ARGOS_USERS.map(u => ({
                 ...u,
                 status: 'ATIVO',
@@ -126,6 +245,11 @@ const LoginModule = {
                 this.handleLogout();
             });
         }
+
+        // Monitoramento de inatividade
+        ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach(event => {
+            document.addEventListener(event, () => this.resetInactivityTimer(), { passive: true });
+        });
     },
 
     validatePasswordRules(password) {
@@ -193,18 +317,15 @@ const LoginModule = {
                 }
 
                 if (!res.success) {
-                    if (res.isPasswordWrong && res.user) {
-                        // Incrementar tentativas falhas no Supabase via Relação Local/Remota
-                        let failedAttempts = parseInt(localStorage.getItem('failed_attempts_' + res.user.username) || '0');
-                        failedAttempts++;
+                    if (res.isPasswordWrong) {
+                        const attempts = res.failedAttempts || 
+                            (parseInt(localStorage.getItem('failed_attempts_' + loginVal) || '0') + 1);
+                        localStorage.setItem('failed_attempts_' + loginVal, attempts);
 
-                        if (failedAttempts >= 5) {
-                            await window.SupabaseService.updateUserStatus(res.user.username, 'BLOQUEADO');
-                            localStorage.removeItem('failed_attempts_' + res.user.username);
+                        if (attempts >= 5) {
                             this.showToast('⛔ CONTA BLOQUEADA: Você excedeu o limite de 5 tentativas inválidas. Contate o Administrador.', 'error');
                         } else {
-                            localStorage.setItem('failed_attempts_' + res.user.username, failedAttempts);
-                            this.showToast(`❌ Senha incorreta. Tentativa ${failedAttempts} de 5.`, 'error');
+                            this.showToast(`❌ Senha incorreta. Tentativa ${attempts} de 5.`, 'error');
                         }
                     } else {
                         this.showToast(res.message, 'error');
@@ -273,8 +394,11 @@ const LoginModule = {
             return;
         }
 
-        // Validar a senha correspondente
-        if (user.password !== passwordVal) {
+        // Hashear a senha digitada para comparar com o hash armazenado
+        const inputHash = await CryptoUtils.sha256(passwordVal);
+
+        // Validar a senha correspondente (comparação de hashes)
+        if (user.password !== inputHash) {
             user.failedAttempts = (user.failedAttempts || 0) + 1;
             if (user.failedAttempts >= 5) {
                 user.status = 'BLOQUEADO';
@@ -318,6 +442,8 @@ const LoginModule = {
 
         const loginContainer = document.getElementById('login-container');
         if (loginContainer) loginContainer.classList.add('hidden');
+
+        this.resetInactivityTimer();
 
         // Atualizar informações do cabeçalho
         const userNameHeader = document.getElementById('userNameHeader');
@@ -487,6 +613,7 @@ const LoginModule = {
             try {
                 const user = JSON.parse(userStr);
                 this.loginUI(user);
+                this.resetInactivityTimer();
             } catch (e) {
                 console.error("Erro ao ler sessão do usuário:", e);
                 this.showLoginUI();
@@ -497,6 +624,7 @@ const LoginModule = {
     },
 
     showLoginUI() {
+        this.clearInactivityTimer();
         document.body.classList.remove('logged-in');
 
         const loginContainer = document.getElementById('login-container');
@@ -530,7 +658,9 @@ const LoginModule = {
         this.updateRequirementUI('req-special', false);
     },
 
-    async handleLogout() {
+    async handleLogout(inactivity = false) {
+        this.clearInactivityTimer();
+
         const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
         if (userStr) {
             try {
@@ -563,11 +693,16 @@ const LoginModule = {
             }
         }
 
-        this.showLoginUI();
-        this.showToast('ℹ️ Você saiu do sistema.', 'info');
+        // Limpar sessão do Supabase Auth se existir
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected() && window.supabase) {
+            try {
+                await window.supabase.auth.signOut();
+            } catch (e) { /* ignora */ }
+        }
 
-        // Aguarda meio segundo para o usuário ver o toast e a tela, e então recarrega a página 
-        // para garantir que toda a memória (gráficos, variáveis globais) seja limpa.
+        this.showLoginUI();
+        this.showToast(inactivity ? '⏰ Sessão encerrada por inatividade.' : 'ℹ️ Você saiu do sistema.', 'info');
+
         setTimeout(() => {
             window.location.reload();
         }, 500);
