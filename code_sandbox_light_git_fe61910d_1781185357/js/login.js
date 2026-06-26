@@ -10,7 +10,8 @@ const ARGOS_USERS_HASHES = {
     'aline': 'c6e9ca89f3378cc107bfba66e613793f9696e1d0695f2e51f54a025cd827dce6',
     'ewerton': 'f5b1f7e02f7c4262c58aa0ef7414e850a610d4b8c051e12c3c48acc2bbac3973',
     'marilene': '2ee5551e6e31e7cd748d42f7a9beb2878aa3ece2e7124e8b72cdacbc94eea7d4',
-    'flavia': '17f40d3c094d044dc7f94bd3724e8e88d4225205345d1b54035b55cc249b2e2e'
+    'flavia': '17f40d3c094d044dc7f94bd3724e8e88d4225205345d1b54035b55cc249b2e2e',
+    'mateus': 'd5ba7ab9de1cf0bca3bb33cad947cc61671ad4d469bc9c1627492c24810b322c'
 };
 
 const ARGOS_USERS = [
@@ -66,6 +67,14 @@ const ARGOS_USERS = [
         name: 'Flavia',
         password: ARGOS_USERS_HASHES['flavia'],
         role: 'GERENTE'
+    },
+    {
+        username: 'mateus',
+        email: 'mateus@fpa.gov.br',
+        name: 'Mateus',
+        password: ARGOS_USERS_HASHES['mateus'],
+        role: 'GERENTE',
+        municipio_vinculado: 'Bacabal-MA'
     }
 ];
 
@@ -517,8 +526,8 @@ const LoginModule = {
             await window.MunicipioContext.initUI();
         }
 
-        // v4.0: Auto-load do município vinculado SOMENTE para Yvanna
-        if (user.username === 'yvanna' && user.municipio_vinculado) {
+        // v4.0: Auto-load do município vinculado para usuários restritos
+        if ((user.username === 'yvanna' || user.username === 'mateus') && user.municipio_vinculado) {
             if (window.MunicipioContext && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
                 const parts = user.municipio_vinculado.split('-');
                 const nomeMun = parts[0].trim();
