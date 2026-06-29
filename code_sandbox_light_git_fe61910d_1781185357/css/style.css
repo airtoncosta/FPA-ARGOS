@@ -2441,6 +2441,19 @@ body {
     color: var(--gray-500);
 }
 
+.btn-red {
+    background: #dc2626 !important;
+    color: white !important;
+    border: none;
+    box-shadow: 0 4px 10px rgba(220, 38, 38, 0.3);
+}
+.btn-red i {
+    color: white !important;
+}
+.btn-red:hover {
+    background: #b91c1c !important;
+}
+
 /* Custom stylized checkbox list */
 .reports-info-text {
     font-size: .82rem;
@@ -5079,5 +5092,472 @@ html {
     html { font-size: 9px; }
 }
 @media screen and (max-width: 768px) {
-    html { font-size: 8px; }
+    html { font-size: 14px !important; } /* FIM DO AUTO-ZOOM */
+}
+
+/* =========================================================
+   MOBILE PREMIUM APP STYLES (Max-width: 768px) - PIXEL PERFECT
+   ========================================================= */
+@media screen and (max-width: 768px) {
+    /* 1. Layout Principal */
+    body {
+        grid-template-areas:
+            "header"
+            "main";
+        grid-template-columns: 100vw;
+        /* Removido overflow-x: hidden do body pois quebra position:fixed em celulares! */
+    }
+
+    #main-content {
+        min-width: 0; /* FIX CLÁSSICO: Evita que o CSS Grid expanda a tela por causa de tabelas largas */
+        padding: 4.5rem 1rem 6rem 1rem; /* Margens ajustadas para celular */
+        box-sizing: border-box;
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* 2. Menu Hamburguer (REMOVIDO DO TOPO) e Overlay */
+    .btn-mobile-menu {
+        display: none !important;
+    }
+    
+    #mobile-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.7); /* Tom escuro mais premium */
+        z-index: 9995 !important; /* Fica acima do resto, mas abaixo do sidebar */
+        backdrop-filter: blur(4px);
+        transition: all 0.3s ease;
+    }
+    #mobile-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* 3. Navegação Lateral (Off-canvas Drawer via Bottom Nav 'Mais') */
+    #sidebar {
+        position: fixed !important;
+        display: flex !important; /* Evita que o "display: none" de outras telas quebre a gaveta */
+        top: 0;
+        left: -100%;
+        width: 80%;
+        max-width: 320px;
+        height: 100vh;
+        z-index: 9999 !important; /* Acima do overlay e bottom nav */
+        box-shadow: 10px 0 30px rgba(0,0,0,0.6);
+        transition: left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+        padding-top: 1rem;
+        border-radius: 0 1.5rem 1.5rem 0; /* Cantos arredondados elegantes */
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%) !important;
+    }
+    #sidebar.open {
+        left: 0 !important;
+    }
+    
+    /* Restaurar visual e textos dos links na gaveta mobile */
+    .nav-item span {
+        display: inline !important; /* Mostra os nomes (estavam ocultos na view tablet) */
+        font-size: 1rem;
+        font-weight: 500;
+    }
+    .nav-item {
+        justify-content: flex-start !important;
+        padding: 0.8rem 1.5rem !important;
+        gap: 1.2rem !important;
+        margin: 0.3rem 1rem;
+        border-radius: 0.8rem !important;
+    }
+    .nav-item i {
+        font-size: 1.2rem;
+        min-width: 1.5rem; /* Alinhamento fixo dos ícones */
+        text-align: center;
+    }
+    .nav-item.active {
+        background: rgba(255, 255, 255, 0.15) !important;
+    }
+
+    /* 4. Cabeçalho Principal (ARGOS) */
+    #main-header {
+        padding: 0 1rem;
+        justify-content: center;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .header-brand {
+        flex: 1;
+        justify-content: center; /* Centraliza logo e título no mobile */
+        display: flex;
+    }
+    .brand-logo img {
+        height: 3rem; 
+    }
+    .argos-highlight {
+        font-size: 1.2rem;
+    }
+    .brand-sub {
+        display: none; 
+    }
+    
+    .header-meta {
+        position: absolute;
+        top: var(--header-h);
+        left: 0;
+        width: 100%;
+        background: var(--sus-blue-mid);
+        padding: 0.5rem 1rem;
+        justify-content: space-between;
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        z-index: 90;
+    }
+    .header-actions {
+        margin-left: auto;
+    }
+    .btn-header-premium span {
+        display: none; 
+    }
+    .btn-header-premium {
+        padding: 0.5rem;
+    }
+    
+    /* 5. Filtros Retráteis (Accordion) */
+    #filter-bar.is-sticky {
+        position: static !important; /* Desabilita sticky no celular para não sobrepor o dashboard ao rolar */
+    }
+    #filter-bar {
+        border-radius: 0; 
+    }
+    .filter-card-header {
+        border-radius: 0.5rem;
+    }
+    .filter-toggle-icon {
+        display: block !important;
+        font-size: 1.2rem;
+        color: white;
+    }
+    .filter-card-body {
+        display: none; /* Oculto por padrão no mobile */
+        padding: 1rem;
+        background: white;
+        border-radius: 0 0 0.5rem 0.5rem;
+        border: 1px solid var(--gray-200);
+        border-top: none;
+    }
+    .filter-card-body.expanded {
+        display: block;
+    }
+    .filter-inputs-grid {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 0.8rem;
+    }
+
+    /* 6. Dashboard MAC Header (Card Azul Arredondado do Mockup) */
+    .mac-dash-header {
+        border-radius: 1rem !important; 
+        margin: 1rem 0 1.5rem 0;
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center;
+        padding: 1.5rem !important;
+        box-shadow: 0 10px 20px -5px rgba(10, 75, 140, 0.4);
+    }
+    .mac-dash-title {
+        font-size: 1.1rem;
+        line-height: 1.4;
+        margin-bottom: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .mac-dash-title i {
+        margin: 0 !important;
+        font-size: 1.6rem;
+    }
+    .mac-dash-portaria {
+        display: inline-block;
+        margin-top: 0.5rem;
+    }
+    .mac-dash-municipio-wrapper {
+        flex-direction: column;
+        width: 100%;
+        gap: 1rem !important;
+    }
+    .mac-dash-municipio {
+        background: rgba(255,255,255,0.15);
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        width: 100%;
+        text-align: center;
+    }
+    .btn-table-export {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* 7. Grids e KPIs (Ficar em 1 coluna para legibilidade) */
+    .mac-exec-row, .kpi-grid, .mac-impact-cards {
+        grid-template-columns: 1fr !important;
+        gap: 1rem;
+    }
+    
+    /* Pixel Perfect KPI Cards */
+    .mac-kpi-executive, .mac-impact-card {
+        width: 100%;
+        border-radius: 1rem; /* Cantos bem arredondados como no print */
+        padding: 1.2rem;
+        display: flex;
+        align-items: center;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        background: white;
+    }
+    /* O ícone do KPI no mockup é grande e num quadrado com fundo claro */
+    .mac-kpi-icon-wrap {
+        width: 3.5rem;
+        height: 3.5rem;
+        border-radius: 0.8rem;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    .mac-kpi-content {
+        margin-left: 1.2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        flex: 1;
+    }
+    .mac-kpi-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--gray-500);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .mac-kpi-value {
+        font-size: 1.4rem;
+        font-weight: 900;
+        color: var(--gray-900);
+        margin: 0.2rem 0;
+    }
+    .mac-kpi-sub {
+        font-size: 0.75rem;
+        color: var(--gray-500);
+    }
+
+    /* =========================================
+       8. TABELAS COMO DATA CARDS (REVOLUÇÃO MOBILE)
+       ========================================= */
+    .table-header-bar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 1rem !important;
+        padding: 1rem !important;
+        background: transparent !important;
+    }
+    .table-header-title {
+        text-align: center;
+        margin-bottom: 0.5rem;
+        color: var(--sus-blue);
+        font-weight: bold;
+    }
+    .table-controls {
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 0.8rem !important;
+    }
+    .table-controls input, .table-controls select, .table-controls button {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+    /* Cores dos inputs para o mobile (fundo cinza, texto escuro) */
+    .table-controls input, .table-controls select {
+        background: #f1f5f9 !important;
+        color: #1e293b !important; /* Corrigido: Texto escuro forçado */
+        border: 1px solid #cbd5e1 !important;
+        padding: 0.8rem !important; /* Maior área de toque */
+        border-radius: 0.5rem !important;
+    }
+    .table-controls input::placeholder {
+        color: #64748b !important; /* Corrigido: Placeholder escuro forçado */
+    }
+    .table-actions {
+        width: 100%;
+    }
+    
+    /* Configuração padrão de rolagem para outras tabelas */
+    .table-responsive, .table-container {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 1rem;
+        border-radius: var(--radius-sm);
+        box-shadow: none; /* Removendo box-shadow do container no mobile */
+        background: transparent;
+    }
+    .data-table:not(#tableProcedimentos), .table-history {
+        min-width: 600px; /* Força rolagem apenas nas outras tabelas */
+    }
+
+    /* MAGIC: Transformando a tabela de Procedimentos em Cards */
+    #tableProcedimentos, #tableProcedimentos tbody {
+        display: block !important;
+        width: 100% !important;
+        background: transparent !important;
+    }
+    #tableProcedimentos thead {
+        display: none !important; /* Tchau cabeçalhos feios! */
+    }
+    #tableProcedimentos tr {
+        display: flex;
+        flex-direction: column;
+        background: #ffffff;
+        border-radius: 1.2rem;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+        padding: 1.2rem;
+        border: 1px solid var(--gray-200);
+        position: relative;
+        overflow: hidden;
+    }
+    #tableProcedimentos td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0 !important;
+        border: none !important;
+        text-align: right;
+        border-bottom: 1px dashed var(--gray-200) !important;
+        font-size: 0.95rem;
+    }
+    #tableProcedimentos td:last-child {
+        border-bottom: none !important;
+    }
+    
+    /* Pseudo-elementos (Labels do lado Esquerdo) */
+    #tableProcedimentos td::before {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--gray-500);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* 1. Ocultar o '#' (ID) */
+    #tableProcedimentos td:nth-child(1) { 
+        display: none !important; 
+    }
+    
+    /* 3. TÍTULO DO CARD (Descrição do Procedimento) */
+    #tableProcedimentos td:nth-child(3) {
+        display: block !important; 
+        text-align: left;
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--sus-blue);
+        border-bottom: none !important;
+        padding-bottom: 0.2rem !important;
+        line-height: 1.3;
+    }
+    #tableProcedimentos td:nth-child(3)::before { display: none; }
+    #tableProcedimentos td:nth-child(3) strong { font-weight: 800; }
+    
+    /* 2. SUBTÍTULO (Código SUS) */
+    #tableProcedimentos td:nth-child(2) {
+        justify-content: flex-start;
+        padding-top: 0 !important;
+        color: var(--gray-600);
+        font-size: 0.85rem;
+        border-bottom: 2px solid #f1f5f9 !important; /* Linha separadora principal */
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.8rem !important;
+    }
+    #tableProcedimentos td:nth-child(2)::before { content: "Cód: "; margin-right: 0.4rem; color: var(--gray-400);}
+    
+    /* Colocar os dados estáticos */
+    #tableProcedimentos td:nth-child(4)::before { content: "Qtd. Aprovada"; }
+    #tableProcedimentos td:nth-child(4) { font-weight: bold; color: var(--gray-800); }
+    
+    #tableProcedimentos td:nth-child(5)::before { content: "Valor Aprovado"; }
+    #tableProcedimentos td:nth-child(5) { font-weight: 900; color: var(--sus-green); font-size: 1.1rem; }
+    
+    #tableProcedimentos td:nth-child(6)::before { content: "Valor Unitário"; }
+    
+    #tableProcedimentos td:nth-child(7)::before { content: "% do Total"; }
+    
+    /* 8. Participação (Barra de Progresso) no Rodapé */
+    #tableProcedimentos td:nth-child(8) {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.8rem;
+        border-bottom: none !important;
+        background: #f8fafc;
+        margin: 0.5rem -1.2rem -1.2rem -1.2rem;
+        padding: 1rem 1.2rem !important;
+        border-top: 1px solid #e2e8f0 !important;
+    }
+    #tableProcedimentos td:nth-child(8)::before { content: "Participação"; }
+    #tableProcedimentos td:nth-child(8) .progress-bar-container {
+        width: 100% !important;
+        height: 8px !important;
+        margin: 0 !important;
+    }
+
+    /* 9. BOTTOM NAVIGATION BAR (FLUTUANTE) */
+    #mobile-bottom-nav {
+        display: flex !important;
+        justify-content: space-around;
+        align-items: center;
+        position: fixed !important;
+        bottom: 1rem !important; /* Descolado do fundo */
+        left: 1rem; /* Descolado das laterais */
+        width: calc(100% - 2rem);
+        background: #ffffff;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15); /* Sombra suave 3D */
+        padding: 0.6rem 0.5rem;
+        z-index: 9990 !important; 
+        border-radius: 2rem; /* Pílula 100% arredondada */
+    }
+    .bottom-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: #94A3B8;
+        font-size: 0.65rem;
+        font-weight: 700;
+        gap: 0.3rem;
+        cursor: pointer;
+        flex: 1;
+        transition: all 0.2s ease;
+    }
+    .bottom-nav-item i {
+        font-size: 1.2rem;
+        padding: 0.4rem 1.2rem;
+        border-radius: 1.5rem; /* Formato pílula pro ícone tbm */
+        transition: all 0.2s ease;
+    }
+    .bottom-nav-item.active {
+        color: var(--sus-blue);
+    }
+    .bottom-nav-item.active i {
+        background: var(--sus-blue); /* Fundo sólido igual o mockup */
+        color: white; 
+    }
+}
+
+/* Ocultar Bottom Nav no Desktop */
+@media screen and (min-width: 769px) {
+    #mobile-bottom-nav {
+        display: none !important;
+    }
 }
