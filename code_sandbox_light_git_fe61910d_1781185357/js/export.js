@@ -448,77 +448,70 @@ const PDFExport = {
                 const pageW = doc.internal.pageSize.getWidth();
                 const pageH = doc.internal.pageSize.getHeight();
                 const margin = 14;
-                let y = 36; // Header usa até y=30 mais ou menos
-
+                
                 await this.drawUnifiedHeader(doc, d, 'Dashboard Executivo — Monitoramento do Teto MAC', pageW, margin);
 
-                // Elemento a ser capturado
+                // === CAPTURA CLONADA (100% fiel à tela, proporção ideal, sem piscar) ===
                 const element = document.getElementById('tetoMacSection');
                 if (!element) throw new Error('Seção do Teto MAC não encontrada.');
 
-                // Esconder o botão de PDF temporariamente para não sair na impressão
-                const btnExport = document.getElementById('btnExportTetoMacPDF');
-                const btnDisplayOriginal = btnExport ? btnExport.style.display : '';
-                if (btnExport) btnExport.style.display = 'none';
+                // Criar clone off-screen para forçar proporção 1440px sem afetar a tela visível
+                const clone = element.cloneNode(true);
+                clone.id = 'tetoMacSection_clone_pdf';
+                clone.style.position = 'absolute';
+                clone.style.top = '-9999px';
+                clone.style.left = '-9999px';
+                clone.style.width = '1440px';
+                clone.style.maxWidth = '1440px';
+                clone.style.display = 'block';
+                clone.style.backgroundColor = '#ffffff';
 
-                // Esconder a tabela temporariamente para não sair na pág 1
-                const tableContainer = document.querySelector('#tetoMacSection .table-container');
-                const tcDisplayOriginal = tableContainer ? tableContainer.style.display : '';
-                if (tableContainer) tableContainer.style.display = 'none';
+                document.body.appendChild(clone);
 
-                // Aumentar a altura do gráfico temporariamente para preencher melhor o PDF
-                const chartCanvas = document.getElementById('chartTetoMacMensal');
-                const chartDiv = chartCanvas ? chartCanvas.parentElement : null;
-                const originalHeight = chartDiv ? chartDiv.style.height : '';
-                let chartInstance = null;
-                if (window.Chart) {
-                    chartInstance = Chart.getChart('chartTetoMacMensal');
-                }
-                
-                if (chartDiv) {
-                    chartDiv.style.height = '500px';
-                    if (chartInstance) {
-                        chartInstance.resize();
-                        chartInstance.update('none');
-                    }
+                // Copiar a imagem do gráfico (canvas não é copiado pelo cloneNode)
+                const origCanvas = element.querySelector('#chartTetoMacMensal');
+                const cloneCanvas = clone.querySelector('#chartTetoMacMensal');
+                if (origCanvas && cloneCanvas) {
+                    cloneCanvas.width = origCanvas.width;
+                    cloneCanvas.height = origCanvas.height;
+                    const ctx = cloneCanvas.getContext('2d');
+                    ctx.drawImage(origCanvas, 0, 0);
                 }
 
-                // Capturar com html2canvas
-                const canvas = await html2canvas(element, { 
+                // Ocultar elementos desnecessários no clone
+                const btnExportClone = clone.querySelector('#btnExportTetoMacPDF');
+                if (btnExportClone) btnExportClone.style.display = 'none';
+
+                const tableContainerClone = clone.querySelector('.table-container');
+                if (tableContainerClone) tableContainerClone.style.display = 'none';
+
+                // Capturar o clone silenciosamente
+                const canvas = await html2canvas(clone, { 
                     scale: 3, 
                     useCORS: true, 
-                    backgroundColor: '#ffffff' 
+                    backgroundColor: '#ffffff',
+                    windowWidth: 1440
                 });
 
-                // Restaurar estado original
-                if (btnExport) btnExport.style.display = btnDisplayOriginal;
-                if (tableContainer) tableContainer.style.display = tcDisplayOriginal;
-                if (chartDiv) {
-                    chartDiv.style.height = originalHeight || '280px';
-                    if (chartInstance) {
-                        chartInstance.resize();
-                        chartInstance.update('none');
-                    }
-                }
+                // Limpar o DOM
+                document.body.removeChild(clone);
 
                 const imgData = canvas.toDataURL('image/jpeg', 0.98);
 
-                // Calcular dimensões para caber na página (descontando header e footer)
+                // Calcular dimensões para caber perfeitamente na página 1
+                let y = 36;
                 const maxW = pageW - margin * 2;
-                const maxH = pageH - y - 15; // 15mm para o footer
+                const maxH = pageH - y - 15;
 
                 let imgW = maxW;
                 let imgH = (canvas.height / canvas.width) * imgW;
 
-                // Redimensionar caso passe da altura máxima (para caber em 1 página)
                 if (imgH > maxH) {
                     imgH = maxH;
                     imgW = (canvas.width / canvas.height) * imgH;
                 }
 
-                // Centralizar horizontalmente se ficou menor que a largura máxima
                 const xPos = margin + (maxW - imgW) / 2;
-
                 doc.addImage(imgData, 'JPEG', xPos, y, imgW, imgH);
 
                 // Adicionar o rodapé da página 1
@@ -593,7 +586,7 @@ const PDFExport = {
             } finally {
                 hideLoading();
             }
-        }, 800);
+        }, 150); // Reduzido o delay pois não mexe no DOM mais
     },
 
     async drawUnifiedHeader(doc, d, title, pageW, margin) {
