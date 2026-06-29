@@ -1414,16 +1414,16 @@ function renderDashboardEficiencia(d) {
         const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
 
         return `<tr>
-            <td class="text-center"><span class="${rankClass}">${i+1}º</span></td>
-            <td><strong>${u.nome}</strong><br><span class="text-muted" style="font-size:.7rem;">${u.tipo || ''} ${u.cnes ? '· CNES: ' + u.cnes : ''}</span></td>
-            <td class="text-right mono">${fmt.numero(u.qtdApresentada)}</td>
-            <td class="text-right mono">${fmt.numero(u.qtdAprovada)}</td>
-            <td class="text-right">${pctBarQtd}</td>
-            <td class="text-right mono">${fmt.moeda(u.valApresentado)}</td>
-            <td class="text-right mono fw-bold">${fmt.moeda(u.valAprovado)}</td>
-            <td class="text-right mono ${pctVal < 95 ? 'text-red fw-bold' : pctVal >= 99 ? 'text-green' : ''}">${fmt.pct(pctVal)}</td>
-            <td class="text-right mono text-red">${fmt.moeda(u.valGlosado)}</td>
-            <td class="text-center"><span class="status-badge-cell ${s.cls}">${s.label}</span></td>
+            <td class="text-center" data-label="Ranking"><span class="${rankClass}">${i+1}º</span></td>
+            <td data-label="Unidade"><strong>${u.nome}</strong><br><span class="text-muted" style="font-size:.7rem;">${u.tipo || ''} ${u.cnes ? '· CNES: ' + u.cnes : ''}</span></td>
+            <td class="text-right mono" data-label="Qtd. Apresentada">${fmt.numero(u.qtdApresentada)}</td>
+            <td class="text-right mono" data-label="Qtd. Aprovada">${fmt.numero(u.qtdAprovada)}</td>
+            <td class="text-right" data-label="% Aprovação (Qtd)">${pctBarQtd}</td>
+            <td class="text-right mono" data-label="Valor Apresentado">${fmt.moeda(u.valApresentado)}</td>
+            <td class="text-right mono fw-bold" data-label="Valor Aprovado">${fmt.moeda(u.valAprovado)}</td>
+            <td class="text-right mono ${pctVal < 95 ? 'text-red fw-bold' : pctVal >= 99 ? 'text-green' : ''}" data-label="% Financeiro">${fmt.pct(pctVal)}</td>
+            <td class="text-right mono text-red" data-label="Glosa (R$)">${fmt.moeda(u.valGlosado)}</td>
+            <td class="text-center" data-label="Status"><span class="status-badge-cell ${s.cls}">${s.label}</span></td>
         </tr>`;
     }).join('');
 
