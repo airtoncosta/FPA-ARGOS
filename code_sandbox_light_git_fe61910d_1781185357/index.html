@@ -159,8 +159,11 @@
     <!-- ===== SIDEBAR NAV ===== -->
     <nav id="sidebar">
         <ul class="nav-menu">
-            <li class="nav-item active" data-section="executivo">
-                <i class="fas fa-tachometer-alt"></i><span>Visão Geral</span>
+            <li class="nav-item active" data-section="teto-mac">
+                <i class="fas fa-shield-alt"></i><span>Teto da MAC</span>
+            </li>
+            <li class="nav-item" data-section="producao-ambulatorial">
+                <i class="fas fa-tachometer-alt"></i><span>Produção Ambulatorial</span>
             </li>
             <li class="nav-item" data-section="faturamento">
                 <i class="fas fa-dollar-sign"></i><span>Faturamento</span>
@@ -318,8 +321,9 @@
             </div>
         </div>
 
-        <!-- ====== DASHBOARD EXECUTIVO DO TETO MAC ====== -->
-        <div class="mac-dashboard" id="tetoMacSection" style="display: none;">
+        <!-- ======================== SEÇÃO TETO DA MAC ======================== -->
+        <section id="section-teto-mac" class="content-section active">
+        <div class="mac-dashboard" id="tetoMacSection">
             <!-- HEADER -->
             <div class="mac-dash-header">
                 <div class="mac-dash-title">
@@ -492,6 +496,7 @@
                 </table>
             </div>
         </div>
+        </section>
 
         <!-- ======================== SEÇÃO MINHA CONTA ======================== -->
         <section id="section-minha-conta" class="content-section">
@@ -835,15 +840,19 @@
             </div>
         </div>
 
-        <!-- ======================== SEÇÃO EXECUTIVO ======================== -->
-        <section id="section-executivo" class="content-section active">
-            <div class="section-header">
-                <h2><i class="fas fa-tachometer-alt"></i> Dashboard Executivo</h2>
-                <div class="section-badge" id="lblConsolidadoGeral">Consolidado Geral de Produção Ambulatorial — Sem
-                    Dados</div>
-            </div>
-
-            <!-- KPI CARDS ROW 1 -->
+        <!-- ======================== SEÇÃO PRODUÇÃO AMBULATORIAL ======================== -->
+        <section id="section-producao-ambulatorial" class="content-section">
+            <div class="mac-dashboard">
+                <div class="mac-dash-header">
+                    <div class="mac-dash-title">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Produção Ambulatorial</span>
+                    </div>
+                    <div class="mac-dash-municipio-wrapper" style="display: flex; align-items: center; gap: 0.7143rem;">
+                        <span class="mac-dash-portaria" id="lblConsolidadoGeral" style="background: rgba(255,255,255,0.15); font-size: 0.85rem;">Consolidado Geral de Produção Ambulatorial — Sem Dados</span>
+                    </div>
+                </div>
+                <div style="padding: 1.4286rem;">            <!-- KPI CARDS ROW 1 -->
             <div class="kpi-grid">
                 <div class="kpi-card kpi-blue">
                     <div class="kpi-icon"><i class="fas fa-list-ol"></i></div>
@@ -985,7 +994,9 @@
                     <div style="height:27.1429rem;"><canvas id="chartTopProcedimentosExec"></canvas></div>
                 </div>
             </div>
+            </div>
 
+                </div>
             </div>
         </section>
 
@@ -2052,9 +2063,13 @@
 
     <!-- ===== MOBILE BOTTOM NAVIGATION ===== -->
     <nav id="mobile-bottom-nav">
-        <div class="bottom-nav-item active" data-target="executivo">
+        <div class="bottom-nav-item active" data-target="teto-mac">
+            <i class="fas fa-shield-alt"></i>
+            <span>Teto MAC</span>
+        </div>
+        <div class="bottom-nav-item" data-target="producao-ambulatorial">
             <i class="fas fa-tachometer-alt"></i>
-            <span>Geral</span>
+            <span>Produção</span>
         </div>
         <div class="bottom-nav-item" data-target="faturamento">
             <i class="fas fa-dollar-sign"></i>
@@ -2063,10 +2078,6 @@
         <div class="bottom-nav-item" data-target="eficiencia">
             <i class="fas fa-chart-bar"></i>
             <span>Eficiência</span>
-        </div>
-        <div class="bottom-nav-item" data-target="unidades">
-            <i class="fas fa-hospital"></i>
-            <span>Unidades</span>
         </div>
         <div class="bottom-nav-item" id="btn-bottom-mais">
             <i class="fas fa-ellipsis-h"></i>

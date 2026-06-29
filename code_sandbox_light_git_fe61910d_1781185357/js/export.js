@@ -486,7 +486,8 @@ const PDFExport = {
                     const config = {
                         type: origChart.config.type,
                         data: JSON.parse(JSON.stringify(origChart.config.data)),
-                        options: Object.assign({}, origChart.config.options || {})
+                        options: Object.assign({}, origChart.config.options || {}),
+                        plugins: origChart.config.plugins || []
                     };
                     config.options.animation = false;
                     config.options.responsive = true;

@@ -469,7 +469,7 @@ const fmt = {
 let APP_STATE = {
     data: null,
     filteredData: null,
-    activeSection: 'executivo',
+    activeSection: 'teto-mac',
     filters: { ano: 'all', mes: 'all', unidade: 'all', procedimento: 'all', cbo: 'all', status: 'all' },
     chartsInstances: {}
 };

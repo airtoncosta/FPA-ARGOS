@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await renderArquivosManager();
         
         // Inicializar o estado visual correto da aba ativa
-        navigateTo('executivo');
+        navigateTo('teto-mac');
     } catch(e) {
         console.error("Exceção na inicialização:", e);
         // Apresenta uma mensagem de aviso mais amigável, conforme solicitado
@@ -565,24 +565,11 @@ function navigateTo(section) {
             filterBar.style.display = 'flex';
         }
         
-        // Ativar o modo sticky (deslizante) apenas no módulo Visão Geral (executivo)
-        if (section === 'executivo') {
+        // Ativar o modo sticky (deslizante) apenas no módulo Produção Ambulatorial
+        if (section === 'producao-ambulatorial') {
             filterBar.classList.add('is-sticky');
         } else {
             filterBar.classList.remove('is-sticky');
-        }
-    }
-
-    // Ocultar ou Mostrar o Painel Executivo do Teto MAC
-    const tetoSection = document.getElementById('tetoMacSection');
-    if (tetoSection) {
-        if (section !== 'executivo') {
-            tetoSection.style.display = 'none';
-        } else {
-            // Se houver portaria carregada e dados, exibe
-            if (APP_STATE.portariaData && APP_STATE.data && APP_STATE.data.competencia !== 'Sem dados') {
-                tetoSection.style.display = 'block';
-            }
         }
     }
 
@@ -990,7 +977,8 @@ function renderAll(data) {
 
     APP_STATE.filteredData = d;
 
-    renderDashboardExecutivo(d);
+    renderDashboardTetoMac(d);
+    renderDashboardProducaoAmbulatorial(d);
     renderDashboardFaturamento(d);
     renderDashboardEficiencia(d);
     renderDashboardUnidades(d);
@@ -1004,9 +992,9 @@ function renderAll(data) {
 }
 
 /* =========================================================
-   DASHBOARD EXECUTIVO
+   DASHBOARD PRODUÇÃO AMBULATORIAL
    ========================================================= */
-function renderDashboardExecutivo(d) {
+function renderDashboardProducaoAmbulatorial(d) {
     const r = d.resumo;
 
     setEl('kpiApresentados',  fmt.numero(r.qtdApresentada));
@@ -1066,12 +1054,17 @@ function renderDashboardExecutivo(d) {
     setEl('cntRegular',   counts.REGULAR);
     setEl('cntCritica',   counts.CRITICA);
 
-    // Renderizar Dashboard Executivo do Teto MAC
+}
+
+/* =========================================================
+   DASHBOARD TETO DA MAC
+   ========================================================= */
+function renderDashboardTetoMac(d) {
     const portaria = APP_STATE.portariaData;
     const tetoSection = document.getElementById('tetoMacSection');
     
     if (portaria && d.competencia !== 'Sem dados') {
-        if (tetoSection && APP_STATE.activeSection === 'executivo') tetoSection.style.display = 'block';
+        if (tetoSection) tetoSection.style.display = 'block';
         
         const tetoAnual = portaria.tetoMacSemSamu;
         const tetoMensal = tetoAnual / 12;
@@ -1104,9 +1097,9 @@ function renderDashboardExecutivo(d) {
             });
         }
 
-        // Produção do último mês
-        const ultimoMes = d.faturamentoMensal.length > 0 
-            ? d.faturamentoMensal[d.faturamentoMensal.length - 1] 
+        // Produção do último mês do ano corrente
+        const ultimoMes = fatAnoCorrente.length > 0 
+            ? fatAnoCorrente[fatAnoCorrente.length - 1] 
             : null;
         const prodMes = ultimoMes ? ultimoMes.valAprovado : 0;
         const folgaMes = prodMes - tetoMensal;
