@@ -5110,7 +5110,7 @@ html {
 
     #main-content {
         min-width: 0; /* FIX CLÁSSICO: Evita que o CSS Grid expanda a tela por causa de tabelas largas */
-        padding: 4.5rem 1rem 6rem 1rem; /* Margens ajustadas para celular */
+        padding: 1rem 1rem 6rem 1rem; /* Margens ajustadas (removido espaço em branco no topo) */
         box-sizing: border-box;
         width: 100%;
         overflow-x: hidden;
@@ -5181,48 +5181,67 @@ html {
 
     /* 4. Cabeçalho Principal (ARGOS) */
     #main-header {
-        padding: 0 1rem;
+        position: relative !important; /* Desabilita sticky no celular (rola junto com a página) */
+        height: auto;
+        padding: 0;
         justify-content: center;
+        flex-direction: column;
         width: 100%;
         box-sizing: border-box;
     }
     .header-brand {
-        flex: 1;
+        flex: none;
         justify-content: center; /* Centraliza logo e título no mobile */
         display: flex;
+        align-items: center;
+        height: 3rem; /* Faixa azul com altura reduzida (aprox metade do original) */
     }
     .brand-logo img {
-        height: 3rem; 
+        height: 3.5rem; /* Imagem do olho aumentada (antes 3rem) */
     }
     .argos-highlight {
-        font-size: 1.2rem;
+        font-size: 1.5rem; /* Nome ARGOS aumentado (antes 1.2rem) */
     }
     .brand-sub {
         display: none; 
     }
     
     .header-meta {
-        position: absolute;
-        top: var(--header-h);
-        left: 0;
+        position: relative; /* Fluxo normal após o brand, sem sobrepor outros elementos */
         width: 100%;
         background: var(--sus-blue-mid);
-        padding: 0.5rem 1rem;
+        padding: 1.5rem 1rem; /* Padding vertical massivamente aumentado para deixar a faixa muito mais alta */
         justify-content: space-between;
         display: flex;
         flex-wrap: nowrap;
+        align-items: center; /* Garante centralização vertical */
         overflow-x: auto;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         z-index: 90;
+        
+        /* Oculta scrollbar que estava "comendo" a borda de baixo no mobile/windows */
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .header-meta::-webkit-scrollbar {
+        display: none;
     }
     .header-actions {
         margin-left: auto;
+    }
+    .header-municipality,
+    .header-competencia {
+        white-space: normal; /* Permite quebra de linha natural (empilhamento) */
+        line-height: 1.35;
+        padding: 0.45rem 1rem; /* Respiro exato nas bordas do balão */
+        font-size: 0.75rem; 
+        height: auto;
     }
     .btn-header-premium span {
         display: none; 
     }
     .btn-header-premium {
-        padding: 0.5rem;
+        padding: 0.5rem; /* Botões proporcionais aos do print */
     }
     
     /* 5. Filtros Retráteis (Accordion) */
@@ -5552,6 +5571,22 @@ html {
     .bottom-nav-item.active i {
         background: var(--sus-blue); /* Fundo sólido igual o mockup */
         color: white; 
+    }
+    
+    /* 10. Ajustes Teto MAC Panel para Mobile (Evita texto espremido) */
+    .mac-progress-card {
+        margin: 0.8571rem 0.5rem !important; /* Ganha um pouco mais de espaço de tela nas laterais */
+        padding: 1rem 0.8rem !important;
+    }
+    .mac-progress-header {
+        flex-direction: column !important; /* Empilha o Título e os Indicadores */
+        align-items: flex-start !important;
+        gap: 0.8rem;
+    }
+    .mac-progress-header > div {
+        width: 100% !important; /* Ocupa a largura total do card */
+        justify-content: space-between !important; /* Status na esquerda, Porcentagem na direita */
+        gap: 0 !important; /* Anula o gap exagerado do inline style */
     }
 }
 

@@ -468,10 +468,36 @@ const PDFExport = {
 
                 document.body.appendChild(clone);
 
-                // Copiar a imagem do gráfico (canvas não é copiado pelo cloneNode)
+                // Recriar o gráfico no clone para garantir o layout Desktop perfeito (sem amassar no celular)
                 const origCanvas = element.querySelector('#chartTetoMacMensal');
                 const cloneCanvas = clone.querySelector('#chartTetoMacMensal');
-                if (origCanvas && cloneCanvas) {
+                const origChart = APP_STATE.chartsInstances ? APP_STATE.chartsInstances['chartTetoMacMensal'] : null;
+
+                if (origChart && cloneCanvas && window.Chart) {
+                    // Forçar tamanho de Desktop na div-mãe do canvas clonado
+                    const parentDiv = cloneCanvas.parentElement;
+                    if (parentDiv) {
+                        parentDiv.style.width = '1350px';
+                        parentDiv.style.height = '320px';
+                        parentDiv.style.display = 'block';
+                    }
+                    
+                    // Clonar a configuração com cópia profunda dos dados para desvincular do canvas original
+                    const config = {
+                        type: origChart.config.type,
+                        data: JSON.parse(JSON.stringify(origChart.config.data)),
+                        options: Object.assign({}, origChart.config.options || {})
+                    };
+                    config.options.animation = false;
+                    config.options.responsive = true;
+                    config.options.maintainAspectRatio = false;
+                    
+                    new window.Chart(cloneCanvas, config);
+                    
+                    // Dê tempo (500ms) para o Chart.js desenhar os pixels antes do html2canvas bater a foto
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } else if (origCanvas && cloneCanvas) {
+                    // Fallback de segurança caso a instância do Chart.js não seja encontrada
                     cloneCanvas.width = origCanvas.width;
                     cloneCanvas.height = origCanvas.height;
                     const ctx = cloneCanvas.getContext('2d');
