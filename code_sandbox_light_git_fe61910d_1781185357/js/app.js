@@ -3064,14 +3064,50 @@ function getReportFilteredData() {
     if (hasLinhas) {
         let linhas = [];
         let activeDatasets = [];
+        
         window.datasets.forEach(d => {
-            if (f.mes !== 'all' && d.competencia.split('/')[0] !== f.mes) return;
+            let dMes = d.competencia ? d.competencia.split('/')[0] : '';
+            const monthMap = {'JAN':'01','FEV':'02','MAR':'03','ABR':'04','MAI':'05','JUN':'06','JUL':'07','AGO':'08','SET':'09','OUT':'10','NOV':'11','DEZ':'12'};
+            if (monthMap[dMes.toUpperCase()]) dMes = monthMap[dMes.toUpperCase()];
+            
+            if (f.mes !== 'all' && dMes !== f.mes) return;
+            
             if (f.ano !== 'all' && String(d.ano) !== String(f.ano) && (!d.competencia || !d.competencia.endsWith('/' + f.ano))) return;
+            
             activeDatasets.push(d);
-            if (d.linhas) linhas = linhas.concat(d.linhas);
+            
+            if (d.linhas) {
+                let dtLinhas = d.linhas;
+                if (f.ano !== 'all') {
+                    dtLinhas = dtLinhas.filter(l => {
+                        const lAno = l.cmp ? l.cmp.split('/')[1] : String(d.ano);
+                        return String(lAno) === String(f.ano);
+                    });
+                }
+                if (f.mes !== 'all') {
+                    dtLinhas = dtLinhas.filter(l => {
+                        const lMes = l.mes || (l.cmp ? l.cmp.split('/')[0] : '');
+                        return String(lMes) === String(f.mes);
+                    });
+                }
+                linhas = linhas.concat(dtLinhas);
+            }
         });
 
-        if (f.unidade !== 'all') linhas = linhas.filter(l => l.uId === f.unidade);
+        if (f.unidade !== 'all') {
+            linhas = linhas.filter(l => String(l.uId) === String(f.unidade));
+        }
+
+        if (linhas.length === 0) {
+            return {
+                competencia: f.mes !== 'all' ? `${f.mes}/${f.ano !== 'all' ? f.ano : (window.datasets[0] ? window.datasets[0].ano : '')}` : '',
+                ano: f.ano,
+                municipio: window.datasets[0] ? window.datasets[0].municipio : '',
+                uf: window.datasets[0] ? window.datasets[0].uf : '',
+                unidades: [], faturamentoMensal: [], procedimentos: [], cbos: [],
+                resumo: { qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0, valApresentado: 0, valAprovado: 0, valGlosado: 0, pctAprovacaoQtd: 0, pctGlosaQtd: 0, totalUnidades: 0 }
+            };
+        }
 
         const cmpString = activeDatasets.length > 0 ? activeDatasets.map(d => d.competencia).join(', ') : window.datasets[0].competencia;
         const anoString = activeDatasets.length > 0 ? activeDatasets[0].ano : window.datasets[0].ano;
@@ -3082,14 +3118,8 @@ function getReportFilteredData() {
     
     // Fallback original (dados demo / legados sem linhas)
     let dts = window.datasets;
-    if (f.mes !== 'all') {
-        dts = dts.filter(d => {
-            const mesNum = (d.faturamentoMensal && d.faturamentoMensal.length > 0) ? d.faturamentoMensal[0].nomeMes.split('/')[0] : '';
-            return mesNum === f.mes;
-        });
-    }
     if (f.ano !== 'all') {
-        dts = dts.filter(d => d.ano === f.ano || (d.competencia && d.competencia.endsWith('/' + f.ano)));
+        dts = dts.filter(d => String(d.ano) === String(f.ano) || (d.competencia && d.competencia.endsWith('/' + f.ano)));
     }
     
     let agg = buildAggregatedData(dts);
@@ -3102,9 +3132,24 @@ function getReportFilteredData() {
     let procedimentos = [...agg.procedimentos];
     let cbos = [...(agg.cbos || [])];
 
+    // Filtrar faturamentoMensal no fallback (útil para dados com múltiplos meses na mesma competência)
+    if (f.mes !== 'all') {
+        faturamento = faturamento.filter(m => {
+            const mMes = m.mes || (m.competencia ? m.competencia.split('/')[0] : (m.nomeMes ? m.nomeMes.split('/')[0] : ''));
+            return String(mMes) === String(f.mes);
+        });
+    }
+
+    if (f.ano !== 'all') {
+        faturamento = faturamento.filter(m => {
+            const mAno = m.competencia ? m.competencia.split('/')[1] : (m.nomeMes && m.nomeMes.includes('/') ? m.nomeMes.split('/')[1] : '');
+            return !mAno || String(mAno) === String(f.ano);
+        });
+    }
+
     if (f.unidade !== 'all') {
-        const uId = f.unidade;
-        unidades = unidades.filter(u => u.id === uId);
+        const uId = String(f.unidade);
+        unidades = unidades.filter(u => String(u.id) === uId);
         
         faturamento = faturamento.map(m => {
             const val = m.valoresPorUnidade && m.valoresPorUnidade[uId] ? m.valoresPorUnidade[uId] : { valApresentado: 0, valAprovado: 0, valGlosado: 0, qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0 };

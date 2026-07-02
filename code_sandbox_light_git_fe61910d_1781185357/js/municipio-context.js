@@ -304,13 +304,6 @@ const MunicipioContext = {
                 municipios.map(m => `<option value="${m.id}">${m.nome}-${m.uf}</option>`).join('');
         }
 
-        // Select no QuickSelect do modal
-        const selectQuick = document.getElementById('selectMunicipioQuickLoad');
-        if (selectQuick) {
-            selectQuick.innerHTML = '<option value="">Selecione...</option>' +
-                municipios.map(m => `<option value="${m.id}">${m.nome}-${m.uf}</option>`).join('');
-        }
-
         return municipios;
     },
 
@@ -340,27 +333,46 @@ const MunicipioContext = {
 
         if (municipios.length > 0) {
             container.classList.remove('hidden');
-            const selectQuick = document.getElementById('selectMunicipioQuickLoad');
-            if (selectQuick) {
-                selectQuick.innerHTML = '<option value="">Selecione um município...</option>' +
-                    municipios.map(m => `<option value="${m.id}">${m.nome}-${m.uf}</option>`).join('');
+            const grid = document.getElementById('quickSelectGrid');
+            if (grid) {
+                grid.innerHTML = municipios.map(m => `
+                    <div class="mun-card glass-card" data-id="${m.id}" data-nome="${m.nome}">
+                        <div class="mun-card-icon">
+                            <i class="fas fa-map-marked-alt"></i>
+                        </div>
+                        <div class="mun-card-info">
+                            <h4>${m.nome}</h4>
+                            <span>${m.uf}</span>
+                        </div>
+                        <button class="btn-mun-load" title="Carregar Dados">
+                            <i class="fas fa-cloud-download-alt"></i>
+                        </button>
+                    </div>
+                `).join('');
+
+                // Bind click event para cada card (no botão ou no card inteiro)
+                const cards = grid.querySelectorAll('.mun-card');
+                cards.forEach(card => {
+                    card.addEventListener('click', async () => {
+                        const mId = card.getAttribute('data-id');
+                        const mNome = card.getAttribute('data-nome');
+                        
+                        // Efeito visual ao clicar
+                        card.classList.add('loading-state');
+                        
+                        const ok = await this.carregarMunicipio(mId);
+                        if (ok) {
+                            hideModal('modalImportar');
+                        }
+                        
+                        // Remove efeito se falhar ou após terminar
+                        card.classList.remove('loading-state');
+                    });
+                });
             }
         } else {
             container.classList.add('hidden');
         }
-
-        // Bind botão carregar rápido
-        document.getElementById('btnQuickLoadMunicipio')?.addEventListener('click', async () => {
-            const select = document.getElementById('selectMunicipioQuickLoad');
-            if (!select || !select.value) {
-                showToast('⚠️ Selecione um município.', 'warn');
-                return;
-            }
-            const ok = await this.carregarMunicipio(select.value);
-            if (ok) {
-                hideModal('modalImportar');
-            }
-        });
     },
 
     /**

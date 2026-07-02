@@ -1852,20 +1852,17 @@
 
                 <!-- TAB TXT -->
                 <div id="importTabTxt" class="import-tab-content active">
-                    <!-- SELETOR RÁPIDO DE MUNICÍPIO (v4.0) -->
+                    <!-- SELETOR RÁPIDO DE MUNICÍPIO (v4.0) - GLASSMORPHISM CARDS -->
                     <div id="municipioQuickSelect" class="municipio-quick-select hidden">
                         <div class="quick-select-header">
                             <i class="fas fa-bolt" style="color: #f59e0b;"></i>
                             <span class="quick-select-label">Já temos dados salvos na nuvem para:</span>
                         </div>
-                        <div class="quick-select-row">
-                            <select id="selectMunicipioQuickLoad" class="quick-select-dropdown">
-                                <option value="">Selecione um município...</option>
-                            </select>
-                            <button class="btn-primary btn-sm" id="btnQuickLoadMunicipio">
-                                <i class="fas fa-download"></i> Carregar
-                            </button>
+                        
+                        <div id="quickSelectGrid" class="quick-select-grid">
+                            <!-- Cards serão renderizados aqui pelo JS -->
                         </div>
+                        
                         <div class="quick-select-divider">
                             <span>ou importe um novo arquivo</span>
                         </div>

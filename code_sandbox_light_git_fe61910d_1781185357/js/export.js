@@ -5,6 +5,84 @@
  */
 
 /* =========================================================
+   FUNÇÕES AUXILIARES DE EXPORTAÇÃO
+   ========================================================= */
+function getActiveExportFilters() {
+    let filtersArr = [];
+    let filterTextArr = [];
+    
+    // Detectar se está no módulo de relatórios ou no dashboard
+    const reportSection = document.getElementById('section-relatorios');
+    const isReportModule = reportSection && (reportSection.classList.contains('active') || reportSection.style.display === 'block' || window.getComputedStyle(reportSection).display !== 'none');
+    
+    if (isReportModule) {
+        const u = document.getElementById('reportUnidade');
+        const m = document.getElementById('reportMes');
+        const a = document.getElementById('reportAno');
+        if (u && u.value && u.value !== 'all') {
+            const txt = u.options[u.selectedIndex]?.text;
+            filtersArr.push(txt);
+            filterTextArr.push(`Unidade: ${txt}`);
+        }
+        if (m && m.value && m.value !== 'all') {
+            const txt = m.options[m.selectedIndex]?.text;
+            filtersArr.push(txt);
+            filterTextArr.push(`Mês: ${txt}`);
+        }
+        if (a && a.value && a.value !== 'all') {
+            const txt = a.options[a.selectedIndex]?.text || a.value;
+            filtersArr.push(txt);
+            filterTextArr.push(`Ano: ${txt}`);
+        }
+    } else {
+        const f = APP_STATE.filters || {};
+        const getTxt = (id, val) => {
+            const el = document.getElementById(id);
+            return el ? el.options[el.selectedIndex]?.text : val;
+        };
+        if (f.unidade && f.unidade !== 'all') {
+            const txt = getTxt('filterUnidade', f.unidade);
+            filtersArr.push(txt); filterTextArr.push(`Unidade: ${txt}`);
+        }
+        if (f.mes && f.mes !== 'all') {
+            const txt = getTxt('filterMes', f.mes);
+            filtersArr.push(txt); filterTextArr.push(`Mês: ${txt}`);
+        }
+        if (f.ano && f.ano !== 'all') {
+            filtersArr.push(f.ano); filterTextArr.push(`Ano: ${f.ano}`);
+        }
+        if (f.procedimento && f.procedimento !== 'all') {
+            const txt = getTxt('filterProcedimento', f.procedimento);
+            filtersArr.push(txt); filterTextArr.push(`Procedimento: ${txt}`);
+        }
+        if (f.cbo && f.cbo !== 'all') {
+            const txt = getTxt('filterCbo', f.cbo);
+            filtersArr.push(txt); filterTextArr.push(`CBO: ${txt}`);
+        }
+        if (f.status && f.status !== 'all') {
+            const txt = getTxt('filterStatus', f.status);
+            filtersArr.push(txt); filterTextArr.push(`Status: ${txt}`);
+        }
+    }
+    return { filtersArr, filterTextArr };
+}
+
+function getSmartFileName(d, baseTitle) {
+    const mun = d.municipio || (window.datasets && window.datasets[0] && window.datasets[0].municipio) || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal';
+    const uf = d.uf || (window.datasets && window.datasets[0] && window.datasets[0].uf) || (APP_STATE.data && APP_STATE.data.uf) || 'MA';
+    
+    const { filtersArr } = getActiveExportFilters();
+    
+    let filterStr = filtersArr.length > 0 ? '_' + filtersArr.join('_') : '';
+    filterStr = filterStr.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+    
+    const safeMunUf = `${mun}_${uf}`.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/gi, '');
+    const safeBase = baseTitle.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+    
+    return `ARGOS_${safeBase}${filterStr}_${safeMunUf}`.toUpperCase() + '.pdf';
+}
+
+/* =========================================================
    EXPORTAÇÃO PDF
    ========================================================= */
 const PDFExport = {
@@ -421,7 +499,8 @@ const PDFExport = {
 
                 // A logomarca já é adicionada dinamicamente na página 1 no drawUnifiedHeader
 
-                doc.save(`ARGOS_Executivo_${d.municipio || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal'}_${d.ano || '2026'}.pdf`);
+                const filename = getSmartFileName(d, 'Executivo');
+                doc.save(filename);
                 showToast('✅ PDF exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
@@ -621,32 +700,9 @@ const PDFExport = {
         const mun = d.municipio || (window.datasets && window.datasets[0] && window.datasets[0].municipio) || (APP_STATE.data && APP_STATE.data.municipio) || 'Bacabal';
         const uf = d.uf || (window.datasets && window.datasets[0] && window.datasets[0].uf) || (APP_STATE.data && APP_STATE.data.uf) || 'MA';
 
-        // Obter Filtros Ativos
-        const f = APP_STATE.filters;
-        let activeFilters = [];
-        if (f.unidade && f.unidade !== 'all') {
-            const el = document.getElementById('filterUnidade');
-            const name = el ? el.options[el.selectedIndex]?.text : f.unidade;
-            activeFilters.push(`Unidade: ${name}`);
-        }
-        if (f.mes && f.mes !== 'all') {
-            const el = document.getElementById('filterMes');
-            const name = el ? el.options[el.selectedIndex]?.text : f.mes;
-            activeFilters.push(`Mês: ${name}`);
-        }
-        if (f.ano && f.ano !== 'all') {
-            activeFilters.push(`Ano: ${f.ano}`);
-        }
-        if (f.procedimento && f.procedimento !== 'all') {
-            activeFilters.push(`Procedimento: ${f.procedimento}`);
-        }
-        if (f.cbo && f.cbo !== 'all') {
-            activeFilters.push(`CBO: ${f.cbo}`);
-        }
-        if (f.status && f.status !== 'all') {
-            activeFilters.push(`Status: ${f.status}`);
-        }
-        const filterText = activeFilters.length > 0 ? ` | Filtro Ativo: ${activeFilters.join(', ')}` : '';
+        // Obter Filtros Ativos de Forma Inteligente
+        const { filterTextArr } = getActiveExportFilters();
+        const filterText = filterTextArr.length > 0 ? ` | Filtro Ativo: ${filterTextArr.join(', ')}` : '';
 
         // Bloco principal
         doc.setFillColor(37, 99, 235); // #2563EB Modern Blue
