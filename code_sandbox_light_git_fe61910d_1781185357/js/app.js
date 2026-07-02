@@ -1695,6 +1695,18 @@ function renderDashboardProcedimentos(d) {
     }).join('');
 
     bindSearch('searchProc', 'tableProcedimentos');
+    
+    // Reaplicar filtros se houver ao re-renderizar (ex: ordenação)
+    setTimeout(() => {
+        const searchProc = document.getElementById('searchProc');
+        if (searchProc && searchProc.value) {
+            searchProc.dispatchEvent(new Event('input'));
+        }
+        const filterSubgrupo = document.getElementById('filterSubgrupoPDF');
+        if (filterSubgrupo && filterSubgrupo.value) {
+            filterSubgrupo.dispatchEvent(new Event('change'));
+        }
+    }, 10);
 }
 
 /* =========================================================
@@ -3032,14 +3044,35 @@ function bindReports() {
             opt.textContent = `${key} — ${window.SIGTAP_SUBGRUPOS[key]}`;
             comboSubgrupo.appendChild(opt);
         });
+
+        comboSubgrupo.addEventListener('change', () => {
+            const subgrupo = comboSubgrupo.value;
+            const table = document.getElementById('tableProcedimentos');
+            if (!table) return;
+
+            table.querySelectorAll('tbody tr.proc-row').forEach(row => {
+                const codeCell = row.querySelector('.table-code');
+                if (!codeCell) return;
+                const procCode = codeCell.textContent.replace(/\D/g, '');
+                
+                if (!subgrupo || procCode.startsWith(subgrupo)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                    // Hide details if open
+                    const detailsRow = row.nextElementSibling;
+                    if (detailsRow && detailsRow.id && detailsRow.id.startsWith('details-proc-')) {
+                        detailsRow.classList.add('hidden');
+                        const icon = row.querySelector('i');
+                        if (icon) icon.style.transform = 'rotate(0deg)';
+                    }
+                }
+            });
+        });
     }
 
     document.getElementById('btnExportSubgrupoPDF')?.addEventListener('click', () => {
-        const sel = document.getElementById('filterSubgrupoPDF')?.value;
-        if (!sel) {
-            showToast('⚠️ Selecione um subgrupo antes de exportar.', 'warn');
-            return;
-        }
+        const sel = document.getElementById('filterSubgrupoPDF')?.value || 'all';
         if (PDFExport.exportRelatorioMensalSubgrupoPDF) {
             PDFExport.exportRelatorioMensalSubgrupoPDF(sel);
         } else {

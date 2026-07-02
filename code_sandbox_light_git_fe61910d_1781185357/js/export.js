@@ -867,8 +867,6 @@ const PDFExport = {
                 const pageH = doc.internal.pageSize.getHeight();
                 const margin = 14;
                 
-                const nomeSubgrupo = window.SIGTAP_SUBGRUPOS && window.SIGTAP_SUBGRUPOS[subgrupoPrefix] ? window.SIGTAP_SUBGRUPOS[subgrupoPrefix] : 'Subgrupo ' + subgrupoPrefix;
-
                 // Filtrar linhas
                 let linhas = [];
                 if (window.datasets && window.datasets.length > 0) {
@@ -906,107 +904,130 @@ const PDFExport = {
                     if (f.cbo && f.cbo !== 'all') {
                         linhas = linhas.filter(l => String(l.cbo) === String(f.cbo));
                     }
-                    // Ignoramos f.procedimento, pois o usuário está requerendo o Subgrupo (que engloba vários)
                 }
 
-                linhas = linhas.filter(l => String(l.proc).startsWith(subgrupoPrefix));
+                let subgruposToProcess = [];
+                if (subgrupoPrefix && subgrupoPrefix !== 'all') {
+                    subgruposToProcess = [subgrupoPrefix];
+                } else {
+                    const subSet = new Set();
+                    linhas.forEach(l => {
+                        const proc = String(l.proc).padStart(10, '0');
+                        subSet.add(proc.substring(0, 4));
+                    });
+                    subgruposToProcess = Array.from(subSet).sort();
+                }
 
-                if (linhas.length === 0) {
-                    showToast(`⚠️ Nenhuma produção encontrada para o subgrupo ${subgrupoPrefix} nestes dados.`, 'warn');
+                if (subgruposToProcess.length === 0) {
+                    showToast('⚠️ Nenhuma produção encontrada para exportar.', 'warn');
                     hideLoading();
                     return;
                 }
 
-                // Obter competências únicas
-                const compSet = new Set();
-                linhas.forEach(l => compSet.add(l.cmp));
-                // Ordenar competências por ano e mês
-                const comps = Array.from(compSet).sort((a,b) => {
-                    const partsA = a.split('/');
-                    const partsB = b.split('/');
-                    const valA = partsA.length === 2 ? partsA[1] + partsA[0] : a;
-                    const valB = partsB.length === 2 ? partsB[1] + partsB[0] : b;
-                    return valA.localeCompare(valB);
-                });
+                let isFirstTable = true;
 
-                // Agrupar por procedimento
-                const procAgrupados = {};
-                linhas.forEach(l => {
-                    const cleanCode = String(l.proc).replace(/\D/g, '');
-                    if (!procAgrupados[cleanCode]) {
-                        const desc = (window.SIGTAP && window.SIGTAP[cleanCode]) || 'Procedimento ' + cleanCode;
-                        procAgrupados[cleanCode] = { codigo: cleanCode, descricao: desc, totaisPorComp: {}, totalGeral: 0 };
-                        comps.forEach(c => procAgrupados[cleanCode].totaisPorComp[c] = 0);
+                for (let i = 0; i < subgruposToProcess.length; i++) {
+                    const sgPrefix = subgruposToProcess[i];
+                    const nomeSubgrupo = window.SIGTAP_SUBGRUPOS && window.SIGTAP_SUBGRUPOS[sgPrefix] ? window.SIGTAP_SUBGRUPOS[sgPrefix] : 'Subgrupo ' + sgPrefix;
+
+                    const linhasSg = linhas.filter(l => String(l.proc).padStart(10, '0').startsWith(sgPrefix));
+                    if (linhasSg.length === 0) continue;
+
+                    if (!isFirstTable) {
+                        doc.addPage();
                     }
-                    procAgrupados[cleanCode].totaisPorComp[l.cmp] += l.qtdAprovada;
-                    procAgrupados[cleanCode].totalGeral += l.qtdAprovada;
-                });
+                    isFirstTable = false;
 
-                // Converter para array de linhas para a tabela
-                const rows = [];
-                const totaisGerais = { total: 0 };
-                comps.forEach(c => totaisGerais[c] = 0);
-
-                Object.values(procAgrupados)
-                    .sort((a,b) => b.totalGeral - a.totalGeral)
-                    .forEach(p => {
-                        const row = [ p.codigo, p.descricao ];
-                        comps.forEach(c => {
-                            const val = p.totaisPorComp[c];
-                            row.push(val > 0 ? val.toLocaleString('pt-BR') : '-');
-                            totaisGerais[c] += val;
-                        });
-                        row.push(p.totalGeral.toLocaleString('pt-BR'));
-                        totaisGerais.total += p.totalGeral;
-                        rows.push(row);
+                    // Obter competências únicas
+                    const compSet = new Set();
+                    linhasSg.forEach(l => compSet.add(l.cmp));
+                    // Ordenar competências por ano e mês
+                    const comps = Array.from(compSet).sort((a,b) => {
+                        const partsA = a.split('/');
+                        const partsB = b.split('/');
+                        const valA = partsA.length === 2 ? partsA[1] + partsA[0] : a;
+                        const valB = partsB.length === 2 ? partsB[1] + partsB[0] : b;
+                        return valA.localeCompare(valB);
                     });
 
-                // Linha TOTAL do subgrupo (última linha, destacada)
-                const totalRow = [ `TOTAL ${subgrupoPrefix}`, 'Todos os procedimentos do subgrupo' ];
-                comps.forEach(c => totalRow.push(totaisGerais[c].toLocaleString('pt-BR')));
-                totalRow.push(totaisGerais.total.toLocaleString('pt-BR'));
-                rows.push(totalRow);
-
-                const mesesMap = {
-                    '01':'DEZ', '02':'FEV', '03':'MAR', '04':'ABR', '05':'MAI', '06':'JUN',
-                    '07':'JUL', '08':'AGO', '09':'SET', '10':'OUT', '11':'NOV', '12':'DEZ'
-                };
-                mesesMap['01'] = 'JAN'; // Corrigido bug no map
-                
-                const formatadasComps = comps.map(cmp => {
-                    const partes = cmp.split('/');
-                    return partes.length === 2 ? (mesesMap[partes[0]] || partes[0]) + '/' + partes[1] : cmp;
-                });
-
-                const headRow = ['Código', 'Descrição', ...formatadasComps, 'TOTAL GERAL'];
-
-                // Renderizar o Header unificado agora que sabemos todas as competências
-                const titulo = `RELATÓRIO DE PROCEDIMENTOS POR COMPETÊNCIA`;
-                const dClone = { ...d, competencia: formatadasComps.join('  ') };
-                await this.drawUnifiedHeader(doc, dClone, titulo, pageW, margin);
-
-                doc.autoTable({
-                    startY: 45,
-                    margin: { left: margin, right: margin },
-                    head: [headRow],
-                    body: rows,
-                    styles: { fontSize: 7.5, halign: 'center', lineWidth: 0.1, lineColor: [200, 200, 200], textColor: 0 },
-                    headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
-                    columnStyles: {
-                        0: { halign: 'center', fontStyle: 'bold', cellWidth: 25 },
-                        1: { halign: 'left', cellWidth: 'auto' }
-                    },
-                    alternateRowStyles: { fillColor: [245, 248, 250] },
-                    didParseCell: data => {
-                        if (data.row.index === rows.length - 1) { // Linha de TOTAL (última linha)
-                            data.cell.styles.fillColor = [220, 230, 245];
-                            data.cell.styles.textColor = [15, 30, 90];
-                            data.cell.styles.fontStyle = 'bold';
-                            data.cell.styles.fontSize = 8.5;
+                    // Agrupar por procedimento
+                    const procAgrupados = {};
+                    linhasSg.forEach(l => {
+                        const cleanCode = String(l.proc).replace(/\D/g, '');
+                        if (!procAgrupados[cleanCode]) {
+                            const desc = (window.SIGTAP && window.SIGTAP[cleanCode]) || 'Procedimento ' + cleanCode;
+                            procAgrupados[cleanCode] = { codigo: cleanCode, descricao: desc, totaisPorComp: {}, totalGeral: 0 };
+                            comps.forEach(c => procAgrupados[cleanCode].totaisPorComp[c] = 0);
                         }
-                    },
-                    didDrawPage: data => this.drawTableCard(doc, data, `RELATÓRIO MENSAL - SUBGRUPO ${subgrupoPrefix} - ${nomeSubgrupo.toUpperCase()}`)
-                });
+                        procAgrupados[cleanCode].totaisPorComp[l.cmp] += l.qtdAprovada;
+                        procAgrupados[cleanCode].totalGeral += l.qtdAprovada;
+                    });
+
+                    // Converter para array de linhas para a tabela
+                    const rows = [];
+                    const totaisGerais = { total: 0 };
+                    comps.forEach(c => totaisGerais[c] = 0);
+
+                    Object.values(procAgrupados)
+                        .sort((a,b) => b.totalGeral - a.totalGeral)
+                        .forEach(p => {
+                            const row = [ p.codigo, p.descricao ];
+                            comps.forEach(c => {
+                                const val = p.totaisPorComp[c];
+                                row.push(val > 0 ? val.toLocaleString('pt-BR') : '-');
+                                totaisGerais[c] += val;
+                            });
+                            row.push(p.totalGeral.toLocaleString('pt-BR'));
+                            totaisGerais.total += p.totalGeral;
+                            rows.push(row);
+                        });
+
+                    // Linha TOTAL do subgrupo
+                    const totalRow = [ `TOTAL ${sgPrefix}`, 'Todos os procedimentos do subgrupo' ];
+                    comps.forEach(c => totalRow.push(totaisGerais[c].toLocaleString('pt-BR')));
+                    totalRow.push(totaisGerais.total.toLocaleString('pt-BR'));
+                    rows.push(totalRow);
+
+                    const mesesMap = {
+                        '01':'JAN', '02':'FEV', '03':'MAR', '04':'ABR', '05':'MAI', '06':'JUN',
+                        '07':'JUL', '08':'AGO', '09':'SET', '10':'OUT', '11':'NOV', '12':'DEZ'
+                    };
+                    
+                    const formatadasComps = comps.map(cmp => {
+                        const partes = cmp.split('/');
+                        return partes.length === 2 ? (mesesMap[partes[0]] || partes[0]) + '/' + partes[1] : cmp;
+                    });
+
+                    const headRow = ['Código', 'Descrição', ...formatadasComps, 'TOTAL GERAL'];
+
+                    // Renderizar o Header unificado
+                    const titulo = `RELATÓRIO DE PROCEDIMENTOS POR COMPETÊNCIA`;
+                    const dClone = { ...d, competencia: formatadasComps.join('  ') };
+                    await this.drawUnifiedHeader(doc, dClone, titulo, pageW, margin);
+
+                    doc.autoTable({
+                        startY: 45,
+                        margin: { left: margin, right: margin },
+                        head: [headRow],
+                        body: rows,
+                        styles: { fontSize: 7.5, halign: 'center', lineWidth: 0.1, lineColor: [200, 200, 200], textColor: 0 },
+                        headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                        columnStyles: {
+                            0: { halign: 'center', fontStyle: 'bold', cellWidth: 25 },
+                            1: { halign: 'left', cellWidth: 'auto' }
+                        },
+                        alternateRowStyles: { fillColor: [245, 248, 250] },
+                        didParseCell: data => {
+                            if (data.row.index === rows.length - 1) { // Linha de TOTAL (última linha)
+                                data.cell.styles.fillColor = [220, 230, 245];
+                                data.cell.styles.textColor = [15, 30, 90];
+                                data.cell.styles.fontStyle = 'bold';
+                                data.cell.styles.fontSize = 8.5;
+                            }
+                        },
+                        didDrawPage: data => this.drawTableCard(doc, data, `RELATÓRIO MENSAL - SUBGRUPO ${sgPrefix} - ${nomeSubgrupo.toUpperCase()}`)
+                    });
+                }
 
                 const totalPages = doc.internal.getNumberOfPages();
                 for (let i = 1; i <= totalPages; i++) {
@@ -1014,7 +1035,8 @@ const PDFExport = {
                     this.addFooter(doc, pageW, pageH, i, totalPages, scaarImg);
                 }
 
-                doc.save(`ARGOS_Subgrupo_${subgrupoPrefix}_${d.municipio || 'Bacabal'}.pdf`);
+                const pdfName = (subgrupoPrefix && subgrupoPrefix !== 'all') ? `ARGOS_Subgrupo_${subgrupoPrefix}_${d.municipio || 'Bacabal'}.pdf` : `ARGOS_Todos_Subgrupos_${d.municipio || 'Bacabal'}.pdf`;
+                doc.save(pdfName);
                 showToast('✅ PDF Mensal do Subgrupo exportado com sucesso!', 'success');
             } catch(e) {
                 console.error(e);
