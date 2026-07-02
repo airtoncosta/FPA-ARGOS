@@ -1880,3 +1880,5 @@ const ExcelExport = {
         XLSX.utils.book_append_sheet(wb, ws, 'Regulação');
     }
 };
+
+window.PDFExport = PDFExport;

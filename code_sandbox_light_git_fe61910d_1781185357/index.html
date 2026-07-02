@@ -1403,24 +1403,74 @@
                 <h2><i class="fas fa-search"></i> Painel de Auditoria Inteligente</h2>
             </div>
 
-            <div id="alertasAuditoria" class="alertas-grid"></div>
+            <!-- Auditoria Tabs -->
+            <div class="auditoria-tabs" style="display: flex; gap: 1rem; border-bottom: 1px solid var(--gray-200); margin-bottom: 1.5rem;">
+                <button class="tab-btn active" id="tabAuditoriaGeral" onclick="switchAuditoriaTab('geral')" style="padding: 0.5rem 1rem; background: none; border: none; border-bottom: 3px solid var(--sus-blue); font-weight: 600; color: var(--sus-blue); cursor: pointer; transition: all 0.3s;">Visão Geral</button>
+                <button class="tab-btn" id="tabAuditoriaDivergencia" onclick="switchAuditoriaTab('divergencia')" style="padding: 0.5rem 1rem; background: none; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: var(--gray-500); cursor: pointer; transition: all 0.3s;">Divergência de Quantitativos</button>
+            </div>
 
-            <div class="table-container" style="margin-top:1.4286rem;">
-                <div class="table-header-bar"><span><i class="fas fa-clipboard-list"></i> Registro de Ocorrências
-                        Auditadas</span></div>
-                <table class="data-table" id="tableAuditoria">
-                    <thead>
-                        <tr>
-                            <th>Severidade</th>
-                            <th>Tipo</th>
-                            <th>Unidade</th>
-                            <th>Competência</th>
-                            <th>Descrição</th>
-                            <th>Valor Impactado</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbodyAuditoria"></tbody>
-                </table>
+            <div id="auditoriaViewGeral">
+                <div id="alertasAuditoria" class="alertas-grid"></div>
+
+                <div class="table-container" style="margin-top:1.4286rem;">
+                    <div class="table-header-bar"><span><i class="fas fa-clipboard-list"></i> Registro de Ocorrências
+                            Auditadas</span></div>
+                    <table class="data-table" id="tableAuditoria">
+                        <thead>
+                            <tr>
+                                <th>Severidade</th>
+                                <th>Tipo</th>
+                                <th>Unidade</th>
+                                <th>Competência</th>
+                                <th>Descrição</th>
+                                <th>Valor Impactado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyAuditoria"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="auditoriaViewDivergencia" style="display: none;">
+                <div class="history-filters-panel" style="padding: 1.0714rem 1.4286rem; background: #f8fafc; border-bottom: 1px solid var(--gray-200); display: flex; gap: 1.0714rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; border-radius: 0.5rem;">
+                    <div class="filter-field" style="display: flex; flex-direction: column; gap: 0.2857rem;">
+                        <label style="font-size: 0.72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase;">Subgrupo</label>
+                        <select id="filterDivergenciaSubgrupo" style="padding: 0.4286rem 0.7143rem; border: 1px solid var(--gray-300); border-radius: 0.2857rem; font-size: 0.85rem; background: white; max-width: 300px;">
+                            <option value="all">Todos os Subgrupos</option>
+                        </select>
+                    </div>
+                    <div class="filter-field" style="display: flex; flex-direction: column; gap: 0.2857rem;">
+                        <label style="font-size: 0.72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase;">Variação Mínima (%)</label>
+                        <input type="number" id="filterDivergenciaMinVar" value="30" min="0" max="1000" style="padding: 0.4286rem 0.7143rem; border: 1px solid var(--gray-300); border-radius: 0.2857rem; font-size: 0.85rem; background: white; width: 6rem;">
+                    </div>
+                    <div style="display: flex; gap: 0.5714rem;">
+                        <button onclick="calcularDivergencias()" class="btn-filter-apply" style="padding: 0.5rem 1.0714rem; font-size: 0.85rem; border-radius: 0.2857rem; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.4286rem; background: linear-gradient(135deg, var(--sus-blue) 0%, var(--sus-blue-light) 100%); color: white;">
+                            <i class="fas fa-search"></i> Analisar
+                        </button>
+                        <button onclick="exportDivergenciasPDF()" class="btn-filter-clear" style="padding: 0.5rem 1.0714rem; font-size: 0.85rem; border: 1px solid var(--gray-300); background: white; border-radius: 0.2857rem; cursor: pointer; font-weight: 600; color: var(--gray-600); display: flex; align-items: center; gap: 0.4286rem;">
+                            <i class="fas fa-file-pdf"></i> Exportar PDF
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header-bar"><span><i class="fas fa-exclamation-circle"></i> Procedimentos com Divergência Quantitativa</span></div>
+                    <table class="data-table" id="tableDivergencia">
+                        <thead>
+                            <tr id="theadDivergenciaRow">
+                                <th>Código</th>
+                                <th>Descrição</th>
+                                <th>Média Móvel</th>
+                                <th>Último Mês</th>
+                                <th>Variação</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyDivergencia">
+                            <tr><td colspan="6" class="text-center" style="padding: 2rem;">Clique em "Analisar" para carregar as divergências.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 

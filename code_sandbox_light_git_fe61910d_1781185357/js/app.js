@@ -1992,6 +1992,369 @@ function gerarAlertasAuditoria(d) {
 }
 
 /* =========================================================
+   AUDITORIA - DIVERGÊNCIA DE QUANTITATIVOS
+   ========================================================= */
+window.switchAuditoriaTab = function(tab) {
+    document.getElementById('tabAuditoriaGeral').classList.remove('active');
+    document.getElementById('tabAuditoriaDivergencia').classList.remove('active');
+    document.getElementById('tabAuditoriaGeral').style.borderBottomColor = 'transparent';
+    document.getElementById('tabAuditoriaDivergencia').style.borderBottomColor = 'transparent';
+    document.getElementById('tabAuditoriaGeral').style.color = 'var(--gray-500)';
+    document.getElementById('tabAuditoriaDivergencia').style.color = 'var(--gray-500)';
+
+    if (tab === 'geral') {
+        document.getElementById('tabAuditoriaGeral').classList.add('active');
+        document.getElementById('tabAuditoriaGeral').style.borderBottomColor = 'var(--sus-blue)';
+        document.getElementById('tabAuditoriaGeral').style.color = 'var(--sus-blue)';
+        document.getElementById('auditoriaViewGeral').style.display = 'block';
+        document.getElementById('auditoriaViewDivergencia').style.display = 'none';
+    } else {
+        document.getElementById('tabAuditoriaDivergencia').classList.add('active');
+        document.getElementById('tabAuditoriaDivergencia').style.borderBottomColor = 'var(--sus-blue)';
+        document.getElementById('tabAuditoriaDivergencia').style.color = 'var(--sus-blue)';
+        document.getElementById('auditoriaViewGeral').style.display = 'none';
+        document.getElementById('auditoriaViewDivergencia').style.display = 'block';
+        if (document.getElementById('filterDivergenciaSubgrupo').options.length <= 1) {
+            popularFiltroSubgrupoDivergencia();
+        }
+    }
+}
+
+function popularFiltroSubgrupoDivergencia() {
+    if (!window.datasets || window.datasets.length === 0) return;
+    
+    const subgrupos = new Set();
+    window.datasets.forEach(ds => {
+        if (ds.procedimentos) {
+            ds.procedimentos.forEach(p => {
+                if (p.codigo && p.codigo.length >= 4) {
+                    const sub = p.codigo.substring(0, 4);
+                    subgrupos.add(sub);
+                }
+            });
+        }
+    });
+
+    const select = document.getElementById('filterDivergenciaSubgrupo');
+    select.innerHTML = '<option value="all">Todos os Subgrupos</option>';
+    
+    Array.from(subgrupos).sort().forEach(sub => {
+        select.innerHTML += `<option value="${sub}">Subgrupo ${sub}</option>`;
+    });
+}
+
+window.calcularDivergencias = function() {
+    if (!window.datasets || window.datasets.length < 2) {
+        showToast('É necessário importar dados de pelo menos 2 competências diferentes para analisar divergências.', 'warn');
+        return;
+    }
+
+    const minVar = parseFloat(document.getElementById('filterDivergenciaMinVar').value) || 30;
+    const subgrupo = document.getElementById('filterDivergenciaSubgrupo').value;
+
+    const monthMap = { 'JAN':1, 'FEV':2, 'MAR':3, 'ABR':4, 'MAI':5, 'JUN':6, 'JUL':7, 'AGO':8, 'SET':9, 'OUT':10, 'NOV':11, 'DEZ':12 };
+    const sortedDatasets = [...window.datasets].sort((a, b) => {
+        if (!a.competencia || !b.competencia) return 0;
+        const [mA, aA] = a.competencia.split('/');
+        const [mB, aB] = b.competencia.split('/');
+        if (aA !== aB) return parseInt(aA) - parseInt(aB);
+        const numA = monthMap[mA.toUpperCase()] || parseInt(mA) || 0;
+        const numB = monthMap[mB.toUpperCase()] || parseInt(mB) || 0;
+        return numA - numB;
+    });
+
+    const meses = sortedDatasets.map(d => d.competencia);
+    const procMap = {};
+
+    sortedDatasets.forEach((ds, dsIndex) => {
+        if (!ds.procedimentos) return;
+        ds.procedimentos.forEach(p => {
+            if (subgrupo !== 'all' && (!p.codigo || !p.codigo.startsWith(subgrupo))) return;
+            
+            if (!procMap[p.codigo]) {
+                procMap[p.codigo] = {
+                    codigo: p.codigo,
+                    descricao: p.descricao,
+                    valores: new Array(meses.length).fill(0)
+                };
+            }
+            procMap[p.codigo].valores[dsIndex] = p.qtdAprovada || 0;
+        });
+    });
+
+    const divergencias = [];
+
+    Object.values(procMap).forEach(p => {
+        let soma = 0;
+        p.valores.forEach(v => { soma += v; });
+
+        const media = soma / (p.valores.length || 1);
+        
+        let temDivergencia = false;
+        let variacoes = p.valores.map(v => {
+            let varPct = 0;
+            if (media === 0) {
+                if (v > 0) varPct = 100;
+            } else {
+                varPct = ((v - media) / media) * 100;
+            }
+            if (Math.abs(varPct) >= minVar && (media >= 10 || v >= 10)) {
+                temDivergencia = true;
+            }
+            return varPct;
+        });
+
+        if (temDivergencia) {
+            let maxAbsVar = 0;
+            let variacaoPrincipal = 0;
+            variacoes.forEach(v => {
+                if (Math.abs(v) > maxAbsVar) {
+                    maxAbsVar = Math.abs(v);
+                    variacaoPrincipal = v;
+                }
+            });
+
+            divergencias.push({
+                codigo: p.codigo,
+                descricao: p.descricao,
+                historico: p.valores,
+                variacoes: variacoes,
+                media: media,
+                ultimoValor: p.valores[p.valores.length - 1],
+                variacao: variacaoPrincipal
+            });
+        }
+    });
+
+    divergencias.sort((a, b) => Math.abs(b.variacao) - Math.abs(a.variacao));
+    renderTableDivergencias(divergencias, meses, minVar);
+}
+
+function renderTableDivergencias(divergencias, meses, minVar) {
+    window.divergenciasExportData = { divergencias, meses, minVar };
+    window.divergenciasSort = window.divergenciasSort || { column: 'variacao', dir: 'desc' };
+    
+    _renderSortedDivergencias();
+}
+
+window.sortDivergencias = function(col) {
+    if (window.divergenciasSort.column === col) {
+        window.divergenciasSort.dir = window.divergenciasSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        window.divergenciasSort.column = col;
+        window.divergenciasSort.dir = 'desc';
+    }
+    _renderSortedDivergencias();
+}
+
+function _renderSortedDivergencias() {
+    const data = window.divergenciasExportData;
+    if (!data) return;
+    
+    let { divergencias, meses, minVar } = data;
+    const { column, dir } = window.divergenciasSort;
+    
+    divergencias.sort((a, b) => {
+        let valA, valB;
+        if (column === 'codigo') { valA = a.codigo; valB = b.codigo; }
+        else if (column === 'descricao') { valA = a.descricao; valB = b.descricao; }
+        else if (column === 'media') { valA = a.media; valB = b.media; }
+        else if (column === 'variacao' || column === 'status') { valA = a.variacao; valB = b.variacao; }
+        else if (typeof column === 'number') { valA = a.historico[column]; valB = b.historico[column]; }
+        
+        if (valA < valB) return dir === 'asc' ? -1 : 1;
+        if (valA > valB) return dir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const theadRow = document.getElementById('theadDivergenciaRow');
+    const tbody = document.getElementById('tbodyDivergencia');
+
+    const getIcon = (col) => {
+        if (column === col) return dir === 'asc' ? ' <i class="fas fa-sort-up"></i>' : ' <i class="fas fa-sort-down"></i>';
+        return ' <i class="fas fa-sort" style="color:var(--gray-300);"></i>';
+    };
+
+    let theadHtml = `<th style="cursor:pointer;" onclick="sortDivergencias('codigo')">Código${getIcon('codigo')}</th>
+                     <th style="cursor:pointer;" onclick="sortDivergencias('descricao')">Descrição${getIcon('descricao')}</th>`;
+    meses.forEach((m, idx) => {
+        theadHtml += `<th class="text-right" style="cursor:pointer;" onclick="sortDivergencias(${idx})">${m}${getIcon(idx)}</th>`;
+    });
+    theadHtml += `<th class="text-right" style="cursor:pointer;" onclick="sortDivergencias('media')">Média${getIcon('media')}</th>
+                  <th class="text-right" style="cursor:pointer;" onclick="sortDivergencias('variacao')">Variação${getIcon('variacao')}</th>
+                  <th class="text-center" style="cursor:pointer;" onclick="sortDivergencias('status')">Status${getIcon('status')}</th>`;
+    theadRow.innerHTML = theadHtml;
+
+    if (divergencias.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${5 + meses.length}" class="text-center" style="padding: 2rem;">Nenhuma divergência encontrada com a variação mínima especificada (${minVar}%).</td></tr>`;
+        return;
+    }
+
+    let tbodyHtml = '';
+    divergencias.forEach(d => {
+        let status = '';
+        if (d.variacao <= -50) {
+            status = `<span class="status-badge-cell badge-critica"><i class="fas fa-arrow-down"></i> Queda Abrupta</span>`;
+        } else if (d.variacao < 0) {
+            status = `<span class="status-badge-cell badge-regular"><i class="fas fa-arrow-down"></i> Queda</span>`;
+        } else if (d.variacao >= 50) {
+            status = `<span class="status-badge-cell badge-boa"><i class="fas fa-arrow-up"></i> Aumento Abrupto</span>`;
+        } else {
+            status = `<span class="status-badge-cell badge-excelente"><i class="fas fa-arrow-up"></i> Aumento</span>`;
+        }
+
+        let rowHtml = `<tr>
+            <td style="font-weight: 700;">${d.codigo}</td>
+            <td style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${d.descricao}">${d.descricao}</td>`;
+        
+        d.historico.forEach((val, idx) => {
+            const varCell = d.variacoes[idx];
+            let style = '';
+            if (Math.abs(varCell) >= minVar && (d.media >= 10 || val >= 10)) {
+                if (varCell < 0) {
+                    style = 'font-weight: bold; color: #ef4444; background: rgba(239, 68, 68, 0.1); border-radius: 4px;';
+                } else {
+                    style = 'font-weight: bold; color: #10b981; background: rgba(16, 185, 129, 0.1); border-radius: 4px;';
+                }
+            }
+            rowHtml += `<td class="text-right"><div style="padding: 2px 4px; display: inline-block; ${style}">${fmt.numero(val)}</div></td>`;
+        });
+
+        const colorVar = d.variacao < 0 ? '#ef4444' : '#10b981';
+        
+        rowHtml += `
+            <td class="text-right" style="color: var(--gray-600);">${fmt.numero(Math.round(d.media))}</td>
+            <td class="text-right" style="color: ${colorVar}; font-weight: bold;">${d.variacao > 0 ? '+' : ''}${d.variacao.toFixed(1)}%</td>
+            <td class="text-center">${status}</td>
+        </tr>`;
+
+        tbodyHtml += rowHtml;
+    });
+
+    tbody.innerHTML = tbodyHtml;
+}
+
+window.exportDivergenciasPDF = function() {
+    if (!window.divergenciasExportData || !window.divergenciasExportData.divergencias.length) {
+        showToast('Não há dados de divergência para exportar. Analise primeiro.', 'warn');
+        return;
+    }
+
+    showLoading('Gerando PDF de Divergências...');
+
+    setTimeout(async () => {
+        try {
+            const scaarImg = window.SCAAR_LOGO_BASE64 || null;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            
+            const pageW = doc.internal.pageSize.getWidth();
+            const pageH = doc.internal.pageSize.getHeight();
+            const margin = 14;
+
+            const d = APP_STATE.data || {};
+            const filterMinVar = document.getElementById('filterDivergenciaMinVar').value;
+            
+            // Re-use the existing header logic if possible
+            if (window.PDFExport && window.PDFExport.drawUnifiedHeader) {
+                await window.PDFExport.drawUnifiedHeader(doc, d, 'RELATÓRIO DE PROCEDIMENTOS COM DIVERGÊNCIA DE QUANTITATIVOS', pageW, margin);
+            }
+
+            const data = window.divergenciasExportData;
+            const rows = [];
+            
+            const thead = ['Código', 'Descrição', ...data.meses, 'Média', 'Variação', 'Status'];
+
+            data.divergencias.forEach(item => {
+                let statusTxt = '';
+                if (item.variacao <= -50) statusTxt = 'Queda Abrupta';
+                else if (item.variacao < 0) statusTxt = 'Queda';
+                else if (item.variacao >= 50) statusTxt = 'Aumento Abrupto';
+                else statusTxt = 'Aumento';
+
+                const historicoFormatado = item.historico.map(v => fmt.numero(v));
+                
+                rows.push([
+                    item.codigo,
+                    item.descricao.length > 50 ? item.descricao.substring(0, 47) + '...' : item.descricao,
+                    ...historicoFormatado,
+                    fmt.numero(Math.round(item.media)),
+                    (item.variacao > 0 ? '+' : '') + item.variacao.toFixed(1) + '%',
+                    statusTxt
+                ]);
+            });
+
+            doc.autoTable({
+                startY: 38,
+                margin: { left: margin, right: margin },
+                head: [thead],
+                body: rows,
+                styles: { fontSize: 7, cellPadding: 1.5, halign: 'center', lineWidth: 0, textColor: 0 },
+                headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                columnStyles: {
+                    0: { halign: 'center', fontStyle: 'bold' },
+                    1: { halign: 'left', cellWidth: 70 },
+                },
+                alternateRowStyles: { fillColor: [245, 248, 250] },
+                didParseCell: dataRow => {
+                    // Pintar a variação e o status
+                    if (dataRow.section === 'body') {
+                        const colIdx = dataRow.column.index;
+                        const rowData = data.divergencias[dataRow.row.index];
+                        
+                        const isVariacao = colIdx === thead.length - 2;
+                        const isStatus = colIdx === thead.length - 1;
+                        
+                        if (isVariacao || isStatus) {
+                            const valStr = String(dataRow.cell.raw);
+                            if (valStr.includes('-') || valStr.includes('Queda')) {
+                                dataRow.cell.styles.textColor = [220, 38, 38]; // red
+                                dataRow.cell.styles.fontStyle = 'bold';
+                            } else if (valStr.includes('+') || valStr.includes('Aumento')) {
+                                dataRow.cell.styles.textColor = [5, 150, 105]; // green
+                                dataRow.cell.styles.fontStyle = 'bold';
+                            }
+                        }
+                        
+                        // Pintar apenas as celulas dos meses que tiveram divergencia real
+                        const firstMonthIdx = 2;
+                        const lastMonthIdx = firstMonthIdx + data.meses.length - 1;
+                        if (colIdx >= firstMonthIdx && colIdx <= lastMonthIdx) {
+                            const monthIndex = colIdx - firstMonthIdx;
+                            const varCell = rowData.variacoes[monthIndex];
+                            if (Math.abs(varCell) >= filterMinVar && (rowData.media >= 10 || rowData.historico[monthIndex] >= 10)) {
+                                if (varCell < 0) {
+                                    dataRow.cell.styles.fillColor = [254, 226, 226]; // light red
+                                    dataRow.cell.styles.textColor = [220, 38, 38]; // red text
+                                } else {
+                                    dataRow.cell.styles.fillColor = [209, 250, 229]; // light green
+                                    dataRow.cell.styles.textColor = [5, 150, 105]; // green text
+                                }
+                                dataRow.cell.styles.fontStyle = 'bold';
+                            }
+                        }
+                    }
+                },
+                didDrawPage: dataInfo => {
+                    // Footer
+                    if (window.PDFExport && window.PDFExport.addFooter) {
+                        window.PDFExport.addFooter(doc, pageW, pageH, doc.internal.getNumberOfPages(), doc.internal.getNumberOfPages(), scaarImg);
+                    }
+                }
+            });
+
+            doc.save(`ARGOS_Divergencias_${d.municipio || 'Bacabal'}_Var${filterMinVar}pct.pdf`);
+            showToast('✅ PDF exportado com sucesso!', 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('❌ Erro ao exportar PDF: ' + e.message, 'error');
+        } finally {
+            hideLoading();
+        }
+    }, 500);
+};
+
+/* =========================================================
    DASHBOARD REGULAÇÃO
    ========================================================= */
 function renderDashboardRegulacao(d) {
