@@ -2289,8 +2289,8 @@ window.exportDivergenciasPDF = function() {
                 margin: { left: margin, right: margin },
                 head: [thead],
                 body: rows,
-                styles: { fontSize: 7, cellPadding: 1.5, halign: 'center', lineWidth: 0, textColor: 0 },
-                headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                styles: { fontSize: 7, cellPadding: 1.5, halign: 'center', lineWidth: 0.1, lineColor: [200, 200, 200], textColor: 0 },
+                headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', halign: 'center', lineWidth: 0.1, lineColor: [200, 200, 200] },
                 columnStyles: {
                     0: { halign: 'center', fontStyle: 'bold' },
                     1: { halign: 'left', cellWidth: 70 },
