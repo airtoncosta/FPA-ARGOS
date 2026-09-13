@@ -12,8 +12,12 @@
 const BpaModule = {
     storageKey: 'argos_producoes_bpa',
     responsaveisKey: 'argos_bpa_responsaveis',
+    modalidadesKey: 'argos_bpa_modalidades',
     producoes: [],
     currentCompetenciaFiltro: '',
+    currentStatusFilter: '', // '' (todos), 'delivered' (enviadas), 'pending' (faltam enviar)
+    currentResponsavelFiltro: '', // '' (todos) ou nome do profissional responsável
+    currentTipoFiltro: '', // '' (todos), 'BPA-C', 'BPA-I', 'AMBOS', 'PARCIAL'
     currentSearchTerm: '',
     filePendingUpload: null,
 
@@ -183,8 +187,9 @@ const BpaModule = {
             }
         });
 
-        // 6. Vincular o responsável definido pelo ADM / Francileide
+        // 6. Vincular o responsável e a modalidade definidos pelo ADM / Francileide
         const respMap = this.getResponsaveisMap();
+        const modalMap = this.getModalidadesMap();
         unidades.forEach(u => {
             const cleanCnes = (u.cnes || '').replace(/\D/g, '');
             u.responsavel = respMap[cleanCnes] || respMap[u.cnes] || respMap[u.nome] || respMap[u.id];
@@ -197,6 +202,18 @@ const BpaModule = {
                 }
             }
             if (!u.responsavel) u.responsavel = 'Não atribuído';
+
+            // Modalidade esperada: 'AMBOS' (BPA-C + BPA-I), 'BPA-C' ou 'BPA-I'
+            u.modalidade = modalMap[cleanCnes] || modalMap[u.cnes] || modalMap[u.nome] || modalMap[u.id];
+            if (!u.modalidade) {
+                for (const [k, mod] of Object.entries(modalMap)) {
+                    if (u.nome.includes(k) || k.includes(u.nome)) {
+                        u.modalidade = mod;
+                        break;
+                    }
+                }
+            }
+            if (!u.modalidade) u.modalidade = 'AMBOS';
         });
 
         return unidades;
@@ -288,6 +305,57 @@ const BpaModule = {
         };
     },
 
+    getModalidadesMap() {
+        try {
+            const str = localStorage.getItem(this.modalidadesKey);
+            if (str) return JSON.parse(str);
+        } catch(e){}
+        return {
+            'HOSPITAL MARIA SOCORRO BRANDÃO': 'AMBOS',
+            'HOSPITAL MATERNO INFANTIL': 'AMBOS',
+            'CENTRO DE ESPECIALIDADES DR. COELHO': 'AMBOS',
+            'CENTRO DE ESPECIALIDADES DR COELHO': 'AMBOS',
+            'POLICLÍNICA DE BACABAL': 'AMBOS',
+            'POLICLINICA DE BACABAL': 'AMBOS',
+            'CENTRO DE FISIOTERAPIA': 'AMBOS',
+            'CENTRO DE FISIOTERAPIA DE BACABAL': 'AMBOS',
+            '2389149': 'AMBOS',
+            'SAE': 'AMBOS',
+            'SAE SERVICO AMBULATORIAL ESPECIALIZ': 'AMBOS',
+            'CENTRO DE ATENCAO PSICOSSOCIAL CAPS': 'BPA-I',
+            'CAPS': 'BPA-I',
+            'CENTRO DE ATENCAO PSICOSSOCIAL INFA': 'BPA-I',
+            'CAPSI': 'BPA-I',
+            'COACTA CENTRO DE TESTAGEM ANONIMA P': 'AMBOS',
+            'CTA': 'AMBOS',
+            'CENTRO DE ESPECIALIDADE ODONTOLOGIC': 'AMBOS',
+            'CEO': 'AMBOS',
+            'TOMOGRAFIA': 'BPA-I',
+            'UNIDADE DE TRATAMENTO FORA DO DOMIC': 'BPA-I',
+            'TFD': 'BPA-I',
+            'LABORATÓRIO CENTRAL DR. COELHO DIAS': 'BPA-C',
+            'LABORATORIO CENTRAL DR COELHO DIAS': 'BPA-C',
+            'SERVICO DE VIGILANCIA SANITARIA BAC': 'BPA-C',
+            'VIGILÂNCIA SANITÁRIA': 'BPA-C',
+            'CENTRAL DE REGULACAO DAS URGENCIAS': 'BPA-C',
+            'CENTRAL DE REGULAÇÃO': 'BPA-C',
+            'SAMU 192 SAV BACABAL 01': 'BPA-C',
+            'SAMU SAV 01': 'BPA-C',
+            'SAMU 192 SBV BACABAL 01': 'BPA-C',
+            'SAMU SBV 01': 'BPA-C',
+            'SAMU 192 SBV BACABAL 02': 'BPA-C',
+            'SAMU SBV 02': 'BPA-C',
+            'SAMU 192 SBV BACABAL 03': 'BPA-C',
+            'SAMU SBV 03': 'BPA-C',
+            'MOTOLANCIA BACABAL 01': 'BPA-C',
+            'MOTOLÂNCIA 01': 'BPA-C',
+            'MOTOLANCIA BACABAL 02': 'BPA-C',
+            'MOTOLÂNCIA 02': 'BPA-C',
+            'MOTOLANCIA BACABAL 03': 'BPA-C',
+            'MOTOLÂNCIA 03': 'BPA-C'
+        };
+    },
+
     openAssignResponsaveisModal() {
         if (!this.isAdminOrFrancileide()) {
             alert('Apenas o Administrador e a Francileide podem definir ou alterar os responsáveis pelas unidades.');
@@ -301,10 +369,13 @@ const BpaModule = {
         const unidades = this.getUnidadesSistema();
         const users = this.getSystemUsers();
         const currentMap = this.getResponsaveisMap();
+        const modalMap = this.getModalidadesMap();
 
         let html = '';
         unidades.forEach(u => {
             const currentResp = currentMap[u.cnes] || currentMap[u.nome] || currentMap[u.id] || '';
+            const currentModal = modalMap[u.cnes] || modalMap[u.nome] || modalMap[u.id] || u.modalidade || 'AMBOS';
+
             let options = `<option value="">-- Não Atribuído --</option>`;
             users.forEach(usr => {
                 const isSelected = (usr.name.toLowerCase() === currentResp.toLowerCase() || usr.username.toLowerCase() === currentResp.toLowerCase());
@@ -323,6 +394,13 @@ const BpaModule = {
                             ${options}
                         </select>
                     </td>
+                    <td style="padding: 0.65rem 1rem;">
+                        <select class="bpa-select bpa-select-modal-row" data-key="${u.nome}" data-cnes="${u.cnes}" style="width: 100%; font-weight: 600;">
+                            <option value="AMBOS" ${currentModal === 'AMBOS' ? 'selected' : ''}>AMBOS (BPA-C + BPA-I)</option>
+                            <option value="BPA-C" ${currentModal === 'BPA-C' ? 'selected' : ''}>Apenas BPA-C (Consolidado)</option>
+                            <option value="BPA-I" ${currentModal === 'BPA-I' ? 'selected' : ''}>Apenas BPA-I (Individualizado)</option>
+                        </select>
+                    </td>
                 </tr>
             `;
         });
@@ -339,9 +417,9 @@ const BpaModule = {
     saveResponsaveis() {
         if (!this.isAdminOrFrancileide()) return;
 
+        // Salvar Responsáveis
         const selects = document.querySelectorAll('.bpa-select-resp-row');
         const newMap = this.getResponsaveisMap();
-
         selects.forEach(sel => {
             const key = sel.getAttribute('data-key');
             const cnes = sel.getAttribute('data-cnes');
@@ -349,8 +427,19 @@ const BpaModule = {
             if (key) newMap[key] = val;
             if (cnes) newMap[cnes] = val;
         });
-
         localStorage.setItem(this.responsaveisKey, JSON.stringify(newMap));
+
+        // Salvar Modalidades Esperadas
+        const modalSelects = document.querySelectorAll('.bpa-select-modal-row');
+        const newModalMap = this.getModalidadesMap();
+        modalSelects.forEach(sel => {
+            const key = sel.getAttribute('data-key');
+            const cnes = sel.getAttribute('data-cnes');
+            const val = sel.value;
+            if (key) newModalMap[key] = val;
+            if (cnes) newModalMap[cnes] = val;
+        });
+        localStorage.setItem(this.modalidadesKey, JSON.stringify(newModalMap));
 
         // Tentar salvar no Supabase se conectado
         try {
@@ -361,13 +450,18 @@ const BpaModule = {
                         chave: 'bpa_responsaveis',
                         valor: JSON.stringify(newMap)
                     });
+                    client.from('configuracoes').upsert({
+                        chave: 'bpa_modalidades',
+                        valor: JSON.stringify(newModalMap)
+                    });
                 }
             }
         } catch(e){}
 
         this.closeAssignResponsaveisModal();
+        this.populateResponsaveisFilter();
         this.renderAll();
-        this.showToast('Responsáveis pelas produções atualizados com sucesso!', 'success');
+        this.showToast('Responsáveis e modalidades esperadas atualizados com sucesso!', 'success');
     },
 
     /* =========================================================
@@ -598,23 +692,35 @@ const BpaModule = {
             }
         }
 
-        // 6. AMOSTRA DE PROCEDIMENTOS DO ARQUIVO COM DESCRIÇÃO SIGTAP
-        const procedimentosAmostra = Object.entries(procedimentosMap).slice(0, 5).map(([cod, qtd]) => {
+        // 6. VALORAÇÃO FINANCEIRA REAL COM BASE NO SIGTAP OFICIAL (SUS)
+        let valorTotalEstimado = 0;
+        const procedimentosDetalhados = Object.entries(procedimentosMap).map(([cod, qtd]) => {
             const clean = cod.replace(/\D/g, '');
-            let desc = (window.SIGTAP && window.SIGTAP[clean]);
-            if (!desc) {
-                const sub = clean.substring(0, 4);
-                const subMap = {
-                    '0302': 'Fisioterapia e Reabilitação',
-                    '0301': 'Consultas / Atendimento Especializado',
-                    '0204': 'Radiologia / Tomografia / Ultrassom',
-                    '0202': 'Diagnóstico Laboratorial Clínico',
-                    '0307': 'Tratamentos Odontológicos',
-                    '0201': 'Coletas e Procedimentos Clínicos'
-                };
-                desc = subMap[sub] ? `${subMap[sub]} (SIA/SUS)` : `Procedimento SIA/SUS ${cod}`;
-            }
-            return `• <code>${cod}</code>: ${desc} (Qtd: <strong>${qtd}</strong>)`;
+            const sigtapItem = (window.getSigtapProcedimento && window.getSigtapProcedimento(clean)) || (window.SIGTAP_TABELA && window.SIGTAP_TABELA[clean]);
+            const desc = (sigtapItem && sigtapItem.nome) || (window.SIGTAP && window.SIGTAP[clean]) || `Procedimento ${cod}`;
+            const vlSa = sigtapItem ? (sigtapItem.vl_sa || 0) : 0;
+            const subtotal = Math.round((qtd * vlSa + Number.EPSILON) * 100) / 100;
+            valorTotalEstimado += subtotal;
+            return {
+                codigo: cod,
+                descricao: desc,
+                quantidade: qtd,
+                valorUnitario: vlSa,
+                valorTotal: subtotal,
+                financiamento: sigtapItem ? sigtapItem.financiamento : ''
+            };
+        });
+        valorTotalEstimado = Math.round((valorTotalEstimado + Number.EPSILON) * 100) / 100;
+
+        const formatMoedaBpa = (v) => (window.fmt && typeof window.fmt.moeda === 'function') 
+            ? window.fmt.moeda(v) 
+            : 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const procedimentosAmostra = procedimentosDetalhados.slice(0, 5).map(p => {
+            const valorTxt = p.valorTotal > 0 
+                ? ` — Estimado: <strong>${formatMoedaBpa(p.valorTotal)}</strong>` 
+                : ' <em>(PAB/Financ. Global)</em>';
+            return `• <code>${p.codigo}</code>: ${p.descricao} (Qtd: <strong>${p.quantidade}</strong>${valorTxt})`;
         });
 
         return {
@@ -629,6 +735,9 @@ const BpaModule = {
             count03: countBpaI,
             totalLinhas: totalLinhas,
             totalAtendimentos: totalAtendimentos || totalLinhas,
+            valorTotalEstimado: valorTotalEstimado,
+            valorTotalFormatado: formatMoedaBpa(valorTotalEstimado),
+            procedimentosDetalhados: procedimentosDetalhados,
             procedimentosAmostra: procedimentosAmostra,
             tamanhoBytes: sizeBytes,
             tamanhoFormatado: sizeFormatted,
@@ -695,12 +804,35 @@ const BpaModule = {
         if (!loaded || loaded.length === 0) {
             loaded = this.getMockInitialData();
             localStorage.setItem(this.storageKey, JSON.stringify(loaded));
+        } else {
+            // Garantir que a produção BPA-I de exemplo conste se os mocks iniciais antigos estiverem salvos
+            const hasBpaI = loaded.some(p => p.tipo_bpa === 'BPA-I');
+            if (!hasBpaI && loaded.some(p => p.id === 'bpa-mock-2')) {
+                loaded.push({
+                    id: 'bpa-mock-4',
+                    nome_arquivo: 'IBHMSO07-.JUL',
+                    estabelecimento_nome: 'HOSPITAL MARIA SOCORRO BRANDÃO',
+                    cnes: '2387412',
+                    competencia: '07/2026',
+                    tipo_bpa: 'BPA-I',
+                    tamanho_bytes: 285400,
+                    tamanho_formatado: '285K',
+                    conteudo_arquivo: '01#BPA#2026070002800000082387412HOSPITAL MARIA DO SOCORRO BRANDAO 02.00\r\n03238741220260722512502040101780001',
+                    digitador_username: 'flavia',
+                    digitador_nome: 'Flávia',
+                    observacoes: 'Produção BPA-I Individualizada HMSO Julho/2026.',
+                    status: 'ENVIADO',
+                    criado_em: new Date('2026-08-06T14:30:00Z').toISOString()
+                });
+                localStorage.setItem(this.storageKey, JSON.stringify(loaded));
+            }
         }
 
         this.producoes = loaded;
         this.renderLoadingState(false);
         this.populateCompetenciaFilter();
         this.populateDatalistUnidades();
+        this.populateResponsaveisFilter();
         this.renderAll();
     },
 
@@ -734,9 +866,25 @@ const BpaModule = {
                 conteudo_arquivo: '01#BPA#2026070004800000122387412HOSPITAL MARIA DO SOCORRO BRANDAO 02.00\r\n03238741220260722512503010100720005',
                 digitador_username: 'flavia',
                 digitador_nome: 'Flávia',
-                observacoes: 'Arquivo de faturamento ambulatorial HMSO Julho/2026.',
+                observacoes: 'Arquivo de faturamento ambulatorial consolidado HMSO Julho/2026.',
                 status: 'ENVIADO',
                 criado_em: new Date('2026-08-06T10:15:00Z').toISOString()
+            },
+            {
+                id: 'bpa-mock-4',
+                nome_arquivo: 'IBHMSO07-.JUL',
+                estabelecimento_nome: 'HOSPITAL MARIA SOCORRO BRANDÃO',
+                cnes: '2387412',
+                competencia: '07/2026',
+                tipo_bpa: 'BPA-I',
+                tamanho_bytes: 285400,
+                tamanho_formatado: '285K',
+                conteudo_arquivo: '01#BPA#2026070002800000082387412HOSPITAL MARIA DO SOCORRO BRANDAO 02.00\r\n03238741220260722512502040101780001',
+                digitador_username: 'flavia',
+                digitador_nome: 'Flávia',
+                observacoes: 'Produção BPA-I Individualizada HMSO Julho/2026 com atendimentos especializados.',
+                status: 'ENVIADO',
+                criado_em: new Date('2026-08-06T14:30:00Z').toISOString()
             },
             {
                 id: 'bpa-mock-3',
@@ -898,6 +1046,226 @@ const BpaModule = {
     },
 
     /* =========================================================
+       DISPARO DE E-MAIL OFICIAL PARA AUDITORIA (auditoriabacabal@gmail.com)
+       ========================================================= */
+    canSendEmail(prod, currentUser) {
+        if (!currentUser) currentUser = this.getCurrentUser();
+        if (!prod) return false;
+        const isPrivileged = this.isAdminOrFrancileide(currentUser);
+        const isOwner = (currentUser.username === prod.digitador_username);
+        return isPrivileged || isOwner;
+    },
+
+    buildEmailPayload(prod) {
+        const compLabel = this.formatCompetenciaLabel(prod.competencia);
+        const tipoSigla = prod.tipo_bpa || 'BPA-C';
+        const tipoNome = (tipoSigla === 'BPA-I') ? 'BPA Individualizado (BPA-I)' : 'BPA Consolidado (BPA-C)';
+        const assunto = `[PRODUÇÃO BPA - ${prod.competencia}] ${prod.estabelecimento_nome} - ${tipoSigla}`;
+
+        const corpoTexto = `Prezada Equipe de Auditoria / Francileide,\n\n` +
+            `Informamos que a produção ambulatorial referente à competência ${prod.competencia} foi finalizada e validada no sistema ARGOS:\n\n` +
+            `• Unidade de Saúde: ${prod.estabelecimento_nome}\n` +
+            `• CNES: ${prod.cnes || 'N/D'}\n` +
+            `• Competência: ${compLabel} (${prod.competencia})\n` +
+            `• Tipo de Produção: ${tipoNome}\n` +
+            `• Arquivo Anexo: ${prod.nome_arquivo} (${prod.tamanho_formatado})\n` +
+            `• Responsável pelo Envio: ${prod.digitador_nome} (@${prod.digitador_username})\n` +
+            `• Data de Registro: ${this.formatTimestamp(prod.criado_em)}\n` +
+            (prod.observacoes ? `• Observações: ${prod.observacoes}\n` : '') +
+            `\nO arquivo correspondente segue em anexo para conferência, importação no BPA Magnético e arquivamento oficial.\n\n` +
+            `Atenciosamente,\n` +
+            `${prod.digitador_nome}\n` +
+            `Setor de Faturamento / ARGOS - Bacabal-MA`;
+
+        const corpoHtml = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; color: #1e293b; line-height: 1.6;">
+                <div style="background: #0284c7; padding: 1.2rem; border-radius: 8px 8px 0 0; color: #ffffff;">
+                    <h2 style="margin: 0; font-size: 1.25rem;">ARGOS — Notificação de Produção BPA</h2>
+                    <p style="margin: 0.25rem 0 0 0; opacity: 0.9; font-size: 0.85rem;">Secretaria Municipal de Saúde de Bacabal / Setor de Auditoria</p>
+                </div>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-top: none; padding: 1.5rem; border-radius: 0 0 8px 8px;">
+                    <p style="margin-top: 0;">Prezada Equipe de Auditoria / Francileide,</p>
+                    <p>Informamos que a produção ambulatorial abaixo foi homologada e anexada no sistema ARGOS:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem;">
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569; width: 40%;">Unidade de Saúde:</td>
+                            <td style="padding: 0.5rem 0; font-weight: 700; color: #0f172a;">${prod.estabelecimento_nome}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">CNES:</td>
+                            <td style="padding: 0.5rem 0; font-family: monospace;">${prod.cnes || 'N/D'}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Competência:</td>
+                            <td style="padding: 0.5rem 0;">${compLabel} (${prod.competencia})</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Modalidade:</td>
+                            <td style="padding: 0.5rem 0; font-weight: 600; color: #0284c7;">${tipoNome}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Arquivo Anexo:</td>
+                            <td style="padding: 0.5rem 0; font-family: monospace; font-weight: 700;">${prod.nome_arquivo} (${prod.tamanho_formatado})</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Digitador Responsável:</td>
+                            <td style="padding: 0.5rem 0;">${prod.digitador_nome} (@${prod.digitador_username})</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Data do Registro:</td>
+                            <td style="padding: 0.5rem 0;">${this.formatTimestamp(prod.criado_em)}</td>
+                        </tr>
+                    </table>
+                    ${prod.observacoes ? `<div style="background: #ffffff; border-left: 3px solid #0284c7; padding: 0.6rem 0.8rem; margin: 1rem 0; font-size: 0.85rem;"><strong>Observações:</strong> ${prod.observacoes}</div>` : ''}
+                    <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0;">
+                        📎 O arquivo original encontra-se anexado a este e-mail para processamento e arquivo oficial.
+                    </p>
+                </div>
+            </div>
+        `;
+
+        return {
+            producaoId: prod.id,
+            destinatario: 'auditoriabacabal@gmail.com',
+            assunto,
+            corpoTexto,
+            corpoHtml,
+            nomeArquivo: prod.nome_arquivo || 'PRODUCAO.BPA',
+            digitadorNome: prod.digitador_nome
+        };
+    },
+
+    openEmailModal(producaoId) {
+        const prod = this.producoes.find(p => p.id === producaoId);
+        if (!prod) {
+            alert('Arquivo de produção não localizado.');
+            return;
+        }
+
+        const currentUser = this.getCurrentUser();
+        if (!this.canSendEmail(prod, currentUser)) {
+            alert(`Acesso restrito: Apenas o autor deste envio (${prod.digitador_nome}) ou a gestão (Francileide / Administrador) podem disparar o e-mail oficial para a Auditoria.`);
+            return;
+        }
+
+        this.pendingEmailProducao = prod;
+        const emailData = this.buildEmailPayload(prod);
+
+        const modal = document.getElementById('modalPreviewEmailBpa');
+        if (!modal) return;
+
+        document.getElementById('emailBpaAssunto').value = emailData.assunto;
+        document.getElementById('emailBpaNomeArquivo').textContent = emailData.nomeArquivo;
+        document.getElementById('emailBpaTamanhoArquivo').textContent = prod.tamanho_formatado;
+        document.getElementById('emailBpaCorpoPreview').textContent = emailData.corpoTexto;
+        document.getElementById('emailBpaAutorNome').textContent = `${prod.digitador_nome} (@${prod.digitador_username})`;
+
+        modal.classList.remove('hidden');
+    },
+
+    closeEmailModal() {
+        const modal = document.getElementById('modalPreviewEmailBpa');
+        if (modal) modal.classList.add('hidden');
+        this.pendingEmailProducao = null;
+    },
+
+    async confirmEmailSend() {
+        if (!this.pendingEmailProducao) return;
+
+        const prod = this.pendingEmailProducao;
+        const btn = document.getElementById('btnConfirmarEnvioEmailBpa');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando E-mail...';
+        }
+
+        try {
+            const emailData = this.buildEmailPayload(prod);
+            
+            // Codificar conteúdo em Base64 para anexo real
+            let base64Content = '';
+            try {
+                base64Content = btoa(unescape(encodeURIComponent(prod.conteudo_arquivo || '')));
+            } catch(e) {
+                base64Content = btoa(prod.conteudo_arquivo || '');
+            }
+
+            const payload = {
+                ...emailData,
+                conteudoBase64: base64Content
+            };
+
+            // 1. Tentar disparo via Edge Function Supabase
+            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+                const client = window.SupabaseConfig.getClient();
+                if (client && client.functions) {
+                    try {
+                        await client.functions.invoke('enviar-bpa-email', {
+                            body: payload
+                        });
+                    } catch (funcErr) {
+                        console.warn('Edge Function indisponível, gravando status diretamente:', funcErr);
+                    }
+                }
+            }
+
+            // 2. Atualizar registro local e no banco
+            prod.email_enviado_em = new Date().toISOString();
+            prod.email_destinatario = 'auditoriabacabal@gmail.com';
+            prod.email_status = 'ENVIADO';
+
+            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+                try {
+                    const client = window.SupabaseConfig.getClient();
+                    if (client) {
+                        await client.from('producoes_bpa').update({
+                            email_enviado_em: prod.email_enviado_em,
+                            email_destinatario: prod.email_destinatario,
+                            email_status: 'ENVIADO'
+                        }).eq('id', prod.id);
+                    }
+                } catch(e){}
+            }
+
+            localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
+            this.closeEmailModal();
+            this.renderAll();
+            this.showToast(`Produção enviada com sucesso para auditoriabacabal@gmail.com!`, 'success');
+        } catch (err) {
+            console.error('Erro ao enviar e-mail:', err);
+            alert('Erro ao enviar e-mail: ' + (err.message || err));
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Agora para Auditoria';
+            }
+        }
+    },
+
+    openGmailWeb() {
+        if (!this.pendingEmailProducao) return;
+        const prod = this.pendingEmailProducao;
+        const emailData = this.buildEmailPayload(prod);
+
+        // Baixar arquivo para anexar facilmente
+        this.downloadFile(prod.id);
+
+        const subjectEnc = encodeURIComponent(emailData.assunto);
+        const bodyEnc = encodeURIComponent(emailData.corpoTexto);
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=auditoriabacabal@gmail.com&su=${subjectEnc}&body=${bodyEnc}`;
+        window.open(gmailUrl, '_blank');
+
+        prod.email_enviado_em = new Date().toISOString();
+        prod.email_destinatario = 'auditoriabacabal@gmail.com';
+        prod.email_status = 'ENVIADO';
+        localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
+
+        this.closeEmailModal();
+        this.renderAll();
+        this.showToast(`Gmail aberto e arquivo "${prod.nome_arquivo}" pronto para anexo!`, 'info');
+    },
+
+    /* =========================================================
        RENDERIZAÇÃO E INTERFACE
        ========================================================= */
     populateCompetenciaFilter() {
@@ -935,36 +1303,404 @@ const BpaModule = {
             btnResp.style.display = this.isAdminOrFrancileide() ? 'inline-flex' : 'none';
         }
 
+        this.populateResponsaveisFilter();
         this.renderKPIs();
+        this.renderActiveFiltersBar();
         this.renderChecklistFrancileide();
         this.renderTable();
     },
 
-    renderKPIs() {
+    /* =========================================================
+       FILTROS INTELIGENTES DE RESPONSÁVEIS E KPIS INTERATIVOS
+       ========================================================= */
+    populateResponsaveisFilter() {
+        const select = document.getElementById('selectBpaResponsavel');
+        const chipsContainer = document.getElementById('bpaSmartChipsContainer');
+
         const comp = this.currentCompetenciaFiltro || this.getLatestCompetencia();
         const unidades = this.getUnidadesSistema();
+        const enviadosComp = this.producoes.filter(p => !comp || p.competencia === comp);
+
+        // Mapear estatísticas de cada responsável
+        const statsByResp = {};
+
+        unidades.forEach(u => {
+            const resp = (u.responsavel && u.responsavel.trim() && u.responsavel !== 'Não atribuído') 
+                ? u.responsavel.trim() 
+                : 'Não atribuído';
+
+            if (!statsByResp[resp]) {
+                const initials = resp.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                statsByResp[resp] = { 
+                    nome: resp, 
+                    total: 0, 
+                    completas: 0, 
+                    parciais: 0, 
+                    pendentes: 0, 
+                    initials: initials || 'RP' 
+                };
+            }
+            statsByResp[resp].total++;
+
+            const evalRes = this.evaluateUnitDeliveries(u, enviadosComp);
+            if (evalRes.isComplete) {
+                statsByResp[resp].completas++;
+            } else if (evalRes.isPartial) {
+                statsByResp[resp].parciais++;
+            } else {
+                statsByResp[resp].pendentes++;
+            }
+        });
+
+        // 1. Preencher Dropdown de Responsáveis
+        if (select) {
+            const currentVal = this.currentResponsavelFiltro;
+            let optionsHtml = `<option value="">Todos os Responsáveis (${unidades.length} unidades)</option>`;
+            const sortedNames = Object.keys(statsByResp).sort((a, b) => a.localeCompare(b));
+            
+            sortedNames.forEach(name => {
+                const s = statsByResp[name];
+                const isSelected = (name.toLowerCase() === currentVal.toLowerCase());
+                let pendingTxt = '';
+                if (s.pendentes === 0 && s.parciais === 0) {
+                    pendingTxt = ' · 100% entregue';
+                } else if (s.parciais > 0 && s.pendentes === 0) {
+                    pendingTxt = ` · ${s.parciais} parcial`;
+                } else if (s.parciais > 0) {
+                    pendingTxt = ` · ${s.pendentes} pend. + ${s.parciais} parc.`;
+                } else {
+                    pendingTxt = ` · ${s.pendentes} pendente(s)`;
+                }
+                optionsHtml += `<option value="${name}" ${isSelected ? 'selected' : ''}>${name} (${s.completas}/${s.total}${pendingTxt})</option>`;
+            });
+            select.innerHTML = optionsHtml;
+        }
+
+        // 2. Preencher Chips Inteligentes
+        if (chipsContainer) {
+            const isAllActive = !this.currentResponsavelFiltro;
+            let chipsHtml = `
+                <div class="bpa-chip ${isAllActive ? 'active' : ''}" onclick="BpaModule.setResponsavelFilter('')" title="Visualizar unidades de todos os responsáveis">
+                    <span class="bpa-chip-avatar"><i class="fas fa-layer-group"></i></span>
+                    <span>Todos</span>
+                    <span class="bpa-chip-badge">${unidades.length}</span>
+                </div>
+            `;
+
+            const sortedNames = Object.keys(statsByResp).sort((a, b) => a.localeCompare(b));
+            sortedNames.forEach(name => {
+                const s = statsByResp[name];
+                const isActive = (name.toLowerCase() === this.currentResponsavelFiltro.toLowerCase());
+                const escapedName = name.replace(/'/g, "\\'");
+                const hasAlert = (s.pendentes > 0 || s.parciais > 0);
+                const pendingClass = hasAlert ? 'pending-count' : '';
+                const titleText = `${name}: ${s.completas} de ${s.total} completas` + 
+                    (s.parciais > 0 ? `, ${s.parciais} entrega(s) parcial(is)` : '') + 
+                    (s.pendentes > 0 ? `, ${s.pendentes} sem envio` : '');
+
+                chipsHtml += `
+                    <div class="bpa-chip ${isActive ? 'active' : ''}" onclick="BpaModule.setResponsavelFilter('${escapedName}')" title="${titleText}">
+                        <span class="bpa-chip-avatar">${s.initials}</span>
+                        <span>${name}</span>
+                        <span class="bpa-chip-badge ${pendingClass}">${s.completas}/${s.total}${s.parciais > 0 ? '*' : ''}</span>
+                    </div>
+                `;
+            });
+            chipsContainer.innerHTML = chipsHtml;
+        }
+    },
+
+    setStatusFilter(status) {
+        if (this.currentStatusFilter === status) {
+            this.currentStatusFilter = '';
+        } else {
+            this.currentStatusFilter = status;
+        }
+        this.renderAll();
+    },
+
+    setResponsavelFilter(responsavel) {
+        if (this.currentResponsavelFiltro === responsavel) {
+            this.currentResponsavelFiltro = '';
+        } else {
+            this.currentResponsavelFiltro = responsavel || '';
+        }
+        const select = document.getElementById('selectBpaResponsavel');
+        if (select) select.value = this.currentResponsavelFiltro;
+        this.renderAll();
+    },
+
+    setTipoFilter(tipo) {
+        this.currentTipoFiltro = tipo || '';
+        const select = document.getElementById('selectBpaTipoFiltro');
+        if (select) select.value = this.currentTipoFiltro;
+        this.renderAll();
+    },
+
+    setUnitModalidade(nome, cnes, novaModalidade) {
+        if (!nome && !cnes) return;
+
+        const map = this.getModalidadesMap();
+        if (nome) map[nome] = novaModalidade;
+        if (cnes) map[cnes] = novaModalidade;
+        localStorage.setItem(this.modalidadesKey, JSON.stringify(map));
+
+        // Sincronizar com Supabase se conectado
+        try {
+            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+                const client = window.SupabaseConfig.getClient();
+                if (client) {
+                    client.from('configuracoes').upsert({
+                        chave: 'bpa_modalidades',
+                        valor: map,
+                        atualizado_em: new Date().toISOString()
+                    }, { onConflict: 'chave' }).then();
+                }
+            }
+        } catch(e) {}
+
+        const labelMap = {
+            'AMBOS': 'Ambas (BPA-C + BPA-I)',
+            'BPA-C': 'Apenas Produção Consolidada (BPA-C)',
+            'BPA-I': 'Apenas Produção Individual (BPA-I)'
+        };
+        this.showToast(`"${nome}": exigência alterada para ${labelMap[novaModalidade] || novaModalidade}`, 'success');
+        this.renderAll();
+    },
+
+    clearAllFilters() {
+        this.currentStatusFilter = '';
+        this.currentResponsavelFiltro = '';
+        this.currentTipoFiltro = '';
+        this.currentSearchTerm = '';
+        const searchInput = document.getElementById('searchBpaInput');
+        if (searchInput) searchInput.value = '';
+        const selectResp = document.getElementById('selectBpaResponsavel');
+        if (selectResp) selectResp.value = '';
+        const selectTipo = document.getElementById('selectBpaTipoFiltro');
+        if (selectTipo) selectTipo.value = '';
+        this.renderAll();
+    },
+
+    clearSearchFilter() {
+        this.currentSearchTerm = '';
+        const searchInput = document.getElementById('searchBpaInput');
+        if (searchInput) searchInput.value = '';
+        this.renderAll();
+    },
+
+    renderActiveFiltersBar() {
+        const bar = document.getElementById('bpaActiveFilterBar');
+        const badges = document.getElementById('bpaActiveFilterBadges');
+        if (!bar || !badges) return;
+
+        let hasFilter = false;
+        let badgesHtml = '';
+
+        if (this.currentStatusFilter === 'delivered') {
+            hasFilter = true;
+            badgesHtml += `
+                <span class="bpa-active-pill" style="border-color: #86efac; color: #166534;">
+                    <i class="fas fa-check-circle"></i> Status: <strong>Enviadas</strong>
+                    <button onclick="BpaModule.setStatusFilter('')" title="Remover filtro"><i class="fas fa-times"></i></button>
+                </span>
+            `;
+        } else if (this.currentStatusFilter === 'pending') {
+            hasFilter = true;
+            badgesHtml += `
+                <span class="bpa-active-pill" style="border-color: #fde68a; color: #92400e;">
+                    <i class="fas fa-hourglass-half"></i> Status: <strong>Faltam Enviar</strong>
+                    <button onclick="BpaModule.setStatusFilter('')" title="Remover filtro"><i class="fas fa-times"></i></button>
+                </span>
+            `;
+        }
+
+        if (this.currentTipoFiltro) {
+            hasFilter = true;
+            let tipoLabel = this.currentTipoFiltro;
+            if (this.currentTipoFiltro === 'AMBOS') tipoLabel = 'Produção Dupla (BPA-C + BPA-I)';
+            else if (this.currentTipoFiltro === 'PARTIAL') tipoLabel = 'Entrega Parcial (Falta 1)';
+            else if (this.currentTipoFiltro === 'BPA-C') tipoLabel = 'Apenas BPA-C (Consolidado)';
+            else if (this.currentTipoFiltro === 'BPA-I') tipoLabel = 'Apenas BPA-I (Individualizado)';
+
+            badgesHtml += `
+                <span class="bpa-active-pill" style="border-color: #c084fc; color: #7e22ce;">
+                    <i class="fas fa-layer-group"></i> Modalidade: <strong>${tipoLabel}</strong>
+                    <button onclick="BpaModule.setTipoFilter('')" title="Remover filtro"><i class="fas fa-times"></i></button>
+                </span>
+            `;
+        }
+
+        if (this.currentResponsavelFiltro) {
+            hasFilter = true;
+            badgesHtml += `
+                <span class="bpa-active-pill" style="border-color: #7dd3fc; color: #0369a1;">
+                    <i class="fas fa-user-circle"></i> Responsável: <strong>${this.currentResponsavelFiltro}</strong>
+                    <button onclick="BpaModule.setResponsavelFilter('')" title="Remover filtro"><i class="fas fa-times"></i></button>
+                </span>
+            `;
+        }
+
+        if (this.currentSearchTerm) {
+            hasFilter = true;
+            badgesHtml += `
+                <span class="bpa-active-pill">
+                    <i class="fas fa-search"></i> Busca: "<strong>${this.currentSearchTerm}</strong>"
+                    <button onclick="BpaModule.clearSearchFilter()" title="Remover filtro"><i class="fas fa-times"></i></button>
+                </span>
+            `;
+        }
+
+        if (hasFilter) {
+            badges.innerHTML = badgesHtml;
+            bar.style.display = 'flex';
+        } else {
+            bar.style.display = 'none';
+        }
+    },
+
+    /* =========================================================
+       AVALIAÇÃO DE ENTREGAS: MODALIDADE DUPLA (BPA-C E BPA-I)
+       ========================================================= */
+    evaluateUnitDeliveries(estab, enviadosComp) {
+        const nomeE = (estab.nome || '').toUpperCase().trim();
+        const cnesE = (estab.cnes || '').trim().replace(/\D/g, '');
+        const modalidade = estab.modalidade || 'AMBOS';
+
+        // Encontrar todos os arquivos enviados que correspondem a este estabelecimento
+        const prods = enviadosComp.filter(p => {
+            const cnesP = (p.cnes || '').trim().replace(/\D/g, '');
+            const nomeP = (p.estabelecimento_nome || '').toUpperCase().trim();
+            if (cnesE && cnesP && cnesE === cnesP) return true;
+            if (nomeE && nomeP && (nomeP.includes(nomeE) || nomeE.includes(nomeP))) return true;
+            return false;
+        });
+
+        const isBpaC = (p) => {
+            if (p.tipo_bpa === 'BPA-C') return true;
+            if (p.tipo_bpa === 'BPA-I') return false;
+            if (p.count02 > 0 && (!p.count03 || p.count03 === 0)) return true;
+            const upName = (p.nome_arquivo || '').toUpperCase();
+            if (upName.startsWith('PA') || upName.startsWith('PC') || upName.startsWith('BC')) return true;
+            return false;
+        };
+
+        const isBpaI = (p) => {
+            if (p.tipo_bpa === 'BPA-I') return true;
+            if (p.tipo_bpa === 'BPA-C') return false;
+            if (p.count03 > 0) return true;
+            const upName = (p.nome_arquivo || '').toUpperCase();
+            if (upName.startsWith('PB') || upName.startsWith('PI') || upName.startsWith('BI')) return true;
+            return false;
+        };
+
+        const prodC = prods.find(isBpaC) || null;
+        const prodI = prods.find(isBpaI) || null;
+
+        const hasC = !!prodC;
+        const hasI = !!prodI;
+
+        let expectedCount = 1;
+        let deliveredCount = 0;
+        let status = 'pending'; // 'delivered' | 'partial' | 'pending'
+        let needsBpaC = false;
+        let needsBpaI = false;
+
+        if (modalidade === 'AMBOS') {
+            expectedCount = 2;
+            deliveredCount = (hasC ? 1 : 0) + (hasI ? 1 : 0);
+            needsBpaC = !hasC;
+            needsBpaI = !hasI;
+            if (deliveredCount === 2) {
+                status = 'delivered';
+            } else if (deliveredCount === 1) {
+                status = 'partial';
+            } else {
+                status = 'pending';
+            }
+        } else if (modalidade === 'BPA-C') {
+            expectedCount = 1;
+            deliveredCount = hasC ? 1 : 0;
+            needsBpaC = !hasC;
+            status = hasC ? 'delivered' : 'pending';
+        } else if (modalidade === 'BPA-I') {
+            expectedCount = 1;
+            deliveredCount = hasI ? 1 : 0;
+            needsBpaI = !hasI;
+            status = hasI ? 'delivered' : 'pending';
+        }
+
+        return {
+            estab,
+            modalidade,
+            prods,
+            prodC,
+            prodI,
+            hasC,
+            hasI,
+            expectedCount,
+            deliveredCount,
+            status,
+            isComplete: status === 'delivered',
+            isPartial: status === 'partial',
+            isPending: status === 'pending',
+            needsBpaC,
+            needsBpaI
+        };
+    },
+
+    renderKPIs() {
+        const comp = this.currentCompetenciaFiltro || this.getLatestCompetencia();
+        let unidades = this.getUnidadesSistema();
+
+        // Se houver filtro de responsável, os KPIs calculam a meta daquele profissional
+        if (this.currentResponsavelFiltro) {
+            const respTarget = this.currentResponsavelFiltro.toLowerCase().trim();
+            unidades = unidades.filter(u => (u.responsavel || '').toLowerCase().trim() === respTarget);
+        }
+
+        // Se houver filtro de modalidade
+        if (this.currentTipoFiltro) {
+            if (this.currentTipoFiltro === 'AMBOS') {
+                unidades = unidades.filter(u => (u.modalidade || 'AMBOS') === 'AMBOS');
+            } else if (this.currentTipoFiltro === 'BPA-C') {
+                unidades = unidades.filter(u => u.modalidade === 'BPA-C');
+            } else if (this.currentTipoFiltro === 'BPA-I') {
+                unidades = unidades.filter(u => u.modalidade === 'BPA-I');
+            }
+        }
+
         const totalEsperado = unidades.length;
 
         // Arquivos enviados na competência
         const enviadosComp = this.producoes.filter(p => !comp || p.competencia === comp);
         
-        let countEnviadas = 0;
+        let countCompletas = 0;
+        let countParciais = 0;
+        let countPendentes = 0;
+        let totalArquivosEsperados = 0;
+        let totalArquivosEntregues = 0;
+
         unidades.forEach(estab => {
-            const nomeE = (estab.nome || '').toUpperCase().trim();
-            const cnesE = (estab.cnes || '').trim();
-            const hasSent = enviadosComp.some(p => {
-                const cnesP = (p.cnes || '').trim();
-                const nomeP = (p.estabelecimento_nome || '').toUpperCase().trim();
-                if (cnesE && cnesP && cnesE.replace(/\D/g, '') === cnesP.replace(/\D/g, '')) return true;
-                if (nomeE && nomeP && (nomeP.includes(nomeE) || nomeE.includes(nomeP))) return true;
-                return false;
-            });
-            if (hasSent) countEnviadas++;
+            const evalRes = this.evaluateUnitDeliveries(estab, enviadosComp);
+            totalArquivosEsperados += evalRes.expectedCount;
+            totalArquivosEntregues += evalRes.deliveredCount;
+
+            if (evalRes.isComplete) {
+                countCompletas++;
+            } else if (evalRes.isPartial) {
+                countParciais++;
+            } else {
+                countPendentes++;
+            }
         });
 
-        countEnviadas = Math.max(countEnviadas, Math.min(totalEsperado, enviadosComp.length));
-        const countPendentes = Math.max(0, totalEsperado - countEnviadas);
-        const percentual = totalEsperado > 0 ? Math.round((countEnviadas / totalEsperado) * 100) : 0;
+        // Contagem de arquivos específicos
+        const countBpaC = enviadosComp.filter(p => p.tipo_bpa === 'BPA-C').length;
+        const countBpaI = enviadosComp.filter(p => p.tipo_bpa === 'BPA-I').length;
+
+        const totalComPendencia = countPendentes + countParciais;
+        const percentual = totalArquivosEsperados > 0 ? Math.round((totalArquivosEntregues / totalArquivosEsperados) * 100) : 0;
 
         const elTotal = document.getElementById('bpaKpiTotal');
         const elEnviadas = document.getElementById('bpaKpiEnviadas');
@@ -974,11 +1710,43 @@ const BpaModule = {
         const elCompLabel = document.getElementById('bpaKpiCompLabel');
 
         if (elTotal) elTotal.textContent = totalEsperado;
-        if (elEnviadas) elEnviadas.textContent = countEnviadas;
-        if (elPendentes) elPendentes.textContent = countPendentes;
+        if (elEnviadas) {
+            elEnviadas.innerHTML = countParciais > 0 
+                ? `${countCompletas} <span style="font-size: 0.72rem; font-weight: 500; color: #f59e0b;" title="${countParciais} unidade(s) com entrega parcial (+1 arquivo faltante)">(+${countParciais} parc.)</span>` 
+                : countCompletas;
+        }
+        if (elPendentes) {
+            elPendentes.innerHTML = countParciais > 0 
+                ? `${totalComPendencia} <span style="font-size: 0.72rem; font-weight: 500; color: #d97706;" title="${countPendentes} sem envio + ${countParciais} entrega parcial">(${countPendentes} zer. / ${countParciais} parc.)</span>` 
+                : totalComPendencia;
+        }
         if (elTaxa) elTaxa.textContent = `${percentual}%`;
         if (elProgress) elProgress.style.width = `${percentual}%`;
-        if (elCompLabel) elCompLabel.textContent = comp ? `Competência ${this.formatCompetenciaLabel(comp)}` : 'Geral';
+        
+        if (elCompLabel) {
+            const compName = this.formatCompetenciaLabel(comp);
+            if (this.currentResponsavelFiltro) {
+                elCompLabel.textContent = `Resp: ${this.currentResponsavelFiltro} · ${compName}`;
+            } else {
+                elCompLabel.textContent = comp ? `${compName} (BPA-C: ${countBpaC} | BPA-I: ${countBpaI})` : 'Geral';
+            }
+        }
+
+        // DESTAQUE VISUAL DO KPI ATIVO QUE ESTÁ FILTRANDO
+        const cardTotal = document.getElementById('bpaCardTotal');
+        const cardEnviadas = document.getElementById('bpaCardEnviadas');
+        const cardPendentes = document.getElementById('bpaCardPendentes');
+        const tagTotal = document.getElementById('tagFilterTotal');
+        const tagEnviadas = document.getElementById('tagFilterEnviadas');
+        const tagPendentes = document.getElementById('tagFilterPendentes');
+
+        if (cardTotal) cardTotal.classList.toggle('active', this.currentStatusFilter === '');
+        if (cardEnviadas) cardEnviadas.classList.toggle('active', this.currentStatusFilter === 'delivered');
+        if (cardPendentes) cardPendentes.classList.toggle('active', this.currentStatusFilter === 'pending');
+
+        if (tagTotal) tagTotal.style.display = (this.currentStatusFilter === '' && (this.currentResponsavelFiltro || this.currentTipoFiltro)) ? 'inline-block' : 'none';
+        if (tagEnviadas) tagEnviadas.style.display = (this.currentStatusFilter === 'delivered') ? 'inline-block' : 'none';
+        if (tagPendentes) tagPendentes.style.display = (this.currentStatusFilter === 'pending') ? 'inline-block' : 'none';
     },
 
     renderChecklistFrancileide() {
@@ -988,73 +1756,252 @@ const BpaModule = {
         const comp = this.currentCompetenciaFiltro || this.getLatestCompetencia();
         const unidades = this.getUnidadesSistema();
         const enviadosComp = this.producoes.filter(p => !comp || p.competencia === comp);
-        const isPrivileged = this.isAdminOrFrancileide();
+        const currentUser = this.getCurrentUser();
+        const isPrivileged = this.isAdminOrFrancileide(currentUser);
+        const search = (this.currentSearchTerm || '').toLowerCase().trim();
+        const respFilter = (this.currentResponsavelFiltro || '').toLowerCase().trim();
+        const tipoFilter = this.currentTipoFiltro;
+
+        // 1. Avaliar cada unidade quanto às entregas necessárias
+        const unitItems = unidades.map(estab => {
+            return this.evaluateUnitDeliveries(estab, enviadosComp);
+        });
+
+        // 2. Aplicar os filtros combinados (Status do KPI, Responsável, Modalidade, Busca)
+        const filtered = unitItems.filter(item => {
+            const { estab, modalidade, isComplete, isPartial, prods } = item;
+            const nomeE = estab.nome.toLowerCase();
+            const cnesE = estab.cnes || '';
+            const respE = (estab.responsavel || '').toLowerCase();
+
+            // Filtro de Status do KPI
+            if (this.currentStatusFilter === 'delivered' && !isComplete) return false;
+            if (this.currentStatusFilter === 'pending' && isComplete) return false;
+
+            // Filtro de Modalidade
+            if (tipoFilter === 'AMBOS' && modalidade !== 'AMBOS') return false;
+            if (tipoFilter === 'PARTIAL' && !isPartial) return false;
+            if (tipoFilter === 'BPA-C' && modalidade !== 'BPA-C') return false;
+            if (tipoFilter === 'BPA-I' && modalidade !== 'BPA-I') return false;
+
+            // Filtro de Responsável
+            if (respFilter) {
+                const matchResp = (respE === respFilter || prods.some(p => (p.digitador_nome || '').toLowerCase() === respFilter));
+                if (!matchResp) return false;
+            }
+
+            // Filtro de Busca
+            if (search) {
+                const matchSearch = nomeE.includes(search) ||
+                    cnesE.includes(search) ||
+                    respE.includes(search) ||
+                    prods.some(p => (p.nome_arquivo && p.nome_arquivo.toLowerCase().includes(search)) ||
+                                     (p.digitador_nome && p.digitador_nome.toLowerCase().includes(search)));
+                if (!matchSearch) return false;
+            }
+
+            return true;
+        });
+
+        // 3. Renderizar Empty State ou Cards
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1 / -1; padding: 2.5rem 1.5rem; text-align: center; background: #f8fafc; border-radius: 0.75rem; border: 1px dashed #cbd5e1;">
+                    <i class="fas fa-filter" style="font-size: 2.2rem; color: #94a3b8; margin-bottom: 0.75rem; display: block;"></i>
+                    <h4 style="margin: 0 0 0.35rem 0; color: #334155; font-weight: 700;">Nenhuma unidade encontrada para os filtros selecionados</h4>
+                    <p style="margin: 0 0 1rem 0; color: #64748b; font-size: 0.85rem;">
+                        ${this.currentStatusFilter ? `Status: <strong>${this.currentStatusFilter === 'delivered' ? 'Produções Enviadas' : 'Faltam Enviar'}</strong> · ` : ''}
+                        ${this.currentTipoFiltro ? `Modalidade: <strong>${this.currentTipoFiltro}</strong> · ` : ''}
+                        ${this.currentResponsavelFiltro ? `Responsável: <strong>${this.currentResponsavelFiltro}</strong> · ` : ''}
+                        ${search ? `Busca: <strong>"${search}"</strong>` : ''}
+                    </p>
+                    <button class="btn-secondary" onclick="BpaModule.clearAllFilters()" style="padding: 0.45rem 1rem;">
+                        <i class="fas fa-times-circle"></i> Limpar Filtros
+                    </button>
+                </div>
+            `;
+            return;
+        }
 
         let html = '';
+        filtered.forEach(item => {
+            const { estab, modalidade, prodC, prodI, hasC, hasI, status, isComplete, isPartial } = item;
+            const escapedNome = (estab.nome || '').replace(/'/g, "\\'");
 
-        unidades.forEach(estab => {
-            const nomeE = (estab.nome || '').toUpperCase().trim();
-            const cnesE = (estab.cnes || '').trim();
+            const modalidadeSelectHtml = `
+                <div class="bpa-unit-modalidade-badge-group" title="Alterar o que deve ser lançado para esta unidade">
+                    <span class="bpa-modalidade-label"><i class="fas fa-sliders-h"></i> Exigir:</span>
+                    <select class="bpa-select-modalidade-card ${modalidade === 'AMBOS' ? 'mode-ambos' : (modalidade === 'BPA-C' ? 'mode-c' : 'mode-i')}" 
+                            onchange="BpaModule.setUnitModalidade('${escapedNome}', '${estab.cnes || ''}', this.value)">
+                        <option value="AMBOS" ${modalidade === 'AMBOS' ? 'selected' : ''}>Ambas (BPA-C + BPA-I)</option>
+                        <option value="BPA-C" ${modalidade === 'BPA-C' ? 'selected' : ''}>Apenas BPA-C (Consolidado)</option>
+                        <option value="BPA-I" ${modalidade === 'BPA-I' ? 'selected' : ''}>Apenas BPA-I (Individualizado)</option>
+                    </select>
+                </div>
+            `;
 
-            const prod = enviadosComp.find(p => {
-                const cnesP = (p.cnes || '').trim();
-                const nomeP = (p.estabelecimento_nome || '').toUpperCase().trim();
-                if (cnesE && cnesP && cnesE.replace(/\D/g, '') === cnesP.replace(/\D/g, '')) return true;
-                if (nomeE && nomeP && (nomeP.includes(nomeE) || nomeE.includes(nomeP))) return true;
-                return false;
-            });
+            if (modalidade === 'AMBOS') {
+                // CASO MODALIDADE DUPLA: UNIDADE QUE DEVE ENVIAR BPA-C E BPA-I
+                let statusBadgeHtml = '';
+                let statusIcon = '';
 
-            if (prod) {
-                // Unidade Entregue (Verde)
+                if (isComplete) {
+                    statusBadgeHtml = '<span class="bpa-badge-delivered"><i class="fas fa-check-double"></i> Completo (2/2)</span>';
+                    statusIcon = '<i class="fas fa-check-circle bpa-status-icon delivered"></i>';
+                } else if (isPartial) {
+                    statusBadgeHtml = '<span class="bpa-badge-partial"><i class="fas fa-adjust"></i> Parcial (1/2)</span>';
+                    statusIcon = '<i class="fas fa-exclamation-triangle bpa-status-icon partial"></i>';
+                } else {
+                    statusBadgeHtml = '<span class="bpa-badge-pending"><i class="fas fa-hourglass-half"></i> Falta Enviar (0/2)</span>';
+                    statusIcon = '<i class="fas fa-exclamation-circle bpa-status-icon pending"></i>';
+                }
+
                 html += `
-                    <div class="bpa-status-card delivered">
+                    <div class="bpa-status-card ${status}">
                         <div class="bpa-card-header">
                             <div class="bpa-card-title">
-                                <i class="fas fa-check-circle bpa-status-icon delivered"></i>
+                                ${statusIcon}
                                 <strong>${estab.nome}</strong>
+                                ${estab.isIsolado ? '<span style="font-size: 0.65rem; background: #e0f2fe; color: #0284c7; padding: 1px 5px; border-radius: 4px;">Isolado</span>' : ''}
                             </div>
-                            <span class="bpa-badge-delivered">Enviado</span>
+                            ${statusBadgeHtml}
                         </div>
+
                         <div class="bpa-card-meta">
-                            <span class="bpa-file-pill"><i class="fas fa-file-code"></i> ${prod.nome_arquivo}</span>
-                            <span class="bpa-meta-item"><i class="fas fa-user"></i> Enviado por: <strong>${prod.digitador_nome}</strong></span>
-                            <span class="bpa-meta-item"><i class="fas fa-clock"></i> ${this.formatTimestamp(prod.criado_em)}</span>
-                            <span class="bpa-meta-item"><i class="fas fa-database"></i> ${prod.tamanho_formatado}</span>
+                            <span class="bpa-meta-item text-muted">
+                                <i class="fas fa-user-edit"></i> Resp: <strong>${estab.responsavel}</strong>
+                                ${isPrivileged ? `<button onclick="BpaModule.openAssignResponsaveisModal()" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 0.75rem; padding: 0 4px;" title="Alterar responsável"><i class="fas fa-pen"></i></button>` : ''}
+                            </span>
+                            <span class="bpa-meta-item text-muted"><i class="fas fa-hospital"></i> CNES: ${estab.cnes || 'N/D'}</span>
+                            ${modalidadeSelectHtml}
                         </div>
-                        <div class="bpa-card-actions">
-                            <button class="bpa-btn-download-sm" onclick="BpaModule.downloadFile('${prod.id}')" title="Baixar ${prod.nome_arquivo}">
-                                <i class="fas fa-download"></i> Baixar Arquivo
-                            </button>
+
+                        <!-- SLOTS INTERATIVOS BPA-C E BPA-I -->
+                        <div class="bpa-modalidades-slots">
+                            <!-- SLOT 1: BPA-C (CONSOLIDADO) -->
+                            <div class="bpa-slot-item ${hasC ? 'delivered' : 'pending'}">
+                                <div class="bpa-slot-left">
+                                    <span class="bpa-type-tag bpa-c"><i class="fas ${hasC ? 'fa-check' : 'fa-clock'}"></i> BPA-C</span>
+                                    <span class="bpa-slot-file-info" title="${hasC ? prodC.nome_arquivo : 'Pendente de envio'}">
+                                        ${hasC ? `${prodC.nome_arquivo} <small>(${prodC.tamanho_formatado})</small>` : '<em style="color: #b45309;">Consolidado Pendente</em>'}
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                    ${hasC ? `
+                                        <button class="bpa-slot-btn-dl" onclick="BpaModule.downloadFile('${prodC.id}')" title="Baixar ${prodC.nome_arquivo}">
+                                            <i class="fas fa-download"></i> Baixar
+                                        </button>
+                                        ${this.canSendEmail(prodC, currentUser) ? `
+                                            <button class="bpa-slot-btn-email" onclick="BpaModule.openEmailModal('${prodC.id}')" title="${prodC.email_enviado_em ? `Enviado em ${this.formatTimestamp(prodC.email_enviado_em)}. Clique para reenviar.` : 'Enviar para auditoriabacabal@gmail.com'}">
+                                                <i class="fas ${prodC.email_enviado_em ? 'fa-check' : 'fa-paper-plane'}"></i> ${prodC.email_enviado_em ? 'Email OK' : 'Email'}
+                                            </button>
+                                        ` : `
+                                            <span style="font-size: 0.72rem; color: #94a3b8; padding: 0 4px;" title="Apenas o autor (${prodC.digitador_nome}) pode enviar ao e-mail"><i class="fas fa-lock"></i></span>
+                                        `}
+                                    ` : `
+                                        <button class="bpa-slot-btn-up" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${estab.cnes}', 'BPA-C')" title="Anexar produção BPA-C">
+                                            <i class="fas fa-upload"></i> Anexar BPA-C
+                                        </button>
+                                    `}
+                                </div>
+                            </div>
+
+                            <!-- SLOT 2: BPA-I (INDIVIDUALIZADO) -->
+                            <div class="bpa-slot-item ${hasI ? 'delivered' : 'pending'}">
+                                <div class="bpa-slot-left">
+                                    <span class="bpa-type-tag bpa-i"><i class="fas ${hasI ? 'fa-check' : 'fa-clock'}"></i> BPA-I</span>
+                                    <span class="bpa-slot-file-info" title="${hasI ? prodI.nome_arquivo : 'Pendente de envio'}">
+                                        ${hasI ? `${prodI.nome_arquivo} <small>(${prodI.tamanho_formatado})</small>` : '<em style="color: #0369a1;">Individualizado Pendente</em>'}
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                    ${hasI ? `
+                                        <button class="bpa-slot-btn-dl" onclick="BpaModule.downloadFile('${prodI.id}')" title="Baixar ${prodI.nome_arquivo}">
+                                            <i class="fas fa-download"></i> Baixar
+                                        </button>
+                                        ${this.canSendEmail(prodI, currentUser) ? `
+                                            <button class="bpa-slot-btn-email" onclick="BpaModule.openEmailModal('${prodI.id}')" title="${prodI.email_enviado_em ? `Enviado em ${this.formatTimestamp(prodI.email_enviado_em)}. Clique para reenviar.` : 'Enviar para auditoriabacabal@gmail.com'}">
+                                                <i class="fas ${prodI.email_enviado_em ? 'fa-check' : 'fa-paper-plane'}"></i> ${prodI.email_enviado_em ? 'Email OK' : 'Email'}
+                                            </button>
+                                        ` : `
+                                            <span style="font-size: 0.72rem; color: #94a3b8; padding: 0 4px;" title="Apenas o autor (${prodI.digitador_nome}) pode enviar ao e-mail"><i class="fas fa-lock"></i></span>
+                                        `}
+                                    ` : `
+                                        <button class="bpa-slot-btn-up" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${estab.cnes}', 'BPA-I')" title="Anexar produção BPA-I">
+                                            <i class="fas fa-upload"></i> Anexar BPA-I
+                                        </button>
+                                    `}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
             } else {
-                // Unidade Pendente (Laranja / Alerta)
-                html += `
-                    <div class="bpa-status-card pending">
-                        <div class="bpa-card-header">
-                            <div class="bpa-card-title">
-                                <i class="fas fa-exclamation-circle bpa-status-icon pending"></i>
-                                <strong>${estab.nome}</strong>
-                                ${estab.isIsolado ? '<span style="font-size: 0.65rem; background: #e0f2fe; color: #0284c7; padding: 1px 5px; border-radius: 4px;">Isolado</span>' : ''}
+                // CASO MODALIDADE ÚNICA (APENAS BPA-C OU APENAS BPA-I)
+                const singleProd = modalidade === 'BPA-I' ? prodI : prodC;
+
+                if (isComplete && singleProd) {
+                    const canSendSingle = this.canSendEmail(singleProd, currentUser);
+                    html += `
+                        <div class="bpa-status-card delivered">
+                            <div class="bpa-card-header">
+                                <div class="bpa-card-title">
+                                    <i class="fas fa-check-circle bpa-status-icon delivered"></i>
+                                    <strong>${estab.nome}</strong>
+                                </div>
+                                <span class="bpa-badge-delivered">Enviado (${modalidade})</span>
                             </div>
-                            <span class="bpa-badge-pending">Falta Enviar</span>
+                            <div class="bpa-card-meta">
+                                <span class="bpa-file-pill"><i class="fas fa-file-code"></i> ${singleProd.nome_arquivo}</span>
+                                <span class="bpa-meta-item"><i class="fas fa-user"></i> Enviado por: <strong>${singleProd.digitador_nome}</strong></span>
+                                <span class="bpa-meta-item"><i class="fas fa-clock"></i> ${this.formatTimestamp(singleProd.criado_em)}</span>
+                                <span class="bpa-meta-item"><i class="fas fa-database"></i> ${singleProd.tamanho_formatado}</span>
+                                ${modalidadeSelectHtml}
+                            </div>
+                            <div class="bpa-card-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button class="bpa-btn-download-sm" style="flex: 1;" onclick="BpaModule.downloadFile('${singleProd.id}')" title="Baixar ${singleProd.nome_arquivo}">
+                                    <i class="fas fa-download"></i> Baixar
+                                </button>
+                                ${canSendSingle ? `
+                                    <button class="btn-bpa-email ${singleProd.email_enviado_em ? 'is-sent' : ''}" style="flex: 1;" onclick="BpaModule.openEmailModal('${singleProd.id}')" title="${singleProd.email_enviado_em ? `Enviado em ${this.formatTimestamp(singleProd.email_enviado_em)}. Clique para reenviar.` : 'Enviar para auditoriabacabal@gmail.com'}">
+                                        <i class="fas ${singleProd.email_enviado_em ? 'fa-check' : 'fa-paper-plane'}"></i>
+                                        <span>${singleProd.email_enviado_em ? 'Email Enviado' : 'Enviar Email'}</span>
+                                    </button>
+                                ` : `
+                                    <span style="font-size: 0.72rem; color: #64748b; padding: 0.35rem 0.5rem;" title="Apenas o autor (${singleProd.digitador_nome}) pode enviar ao e-mail">
+                                        <i class="fas fa-lock"></i> Apenas Autor
+                                    </span>
+                                `}
+                            </div>
                         </div>
-                        <div class="bpa-card-meta">
-                            <span class="bpa-meta-item text-muted">
-                                <i class="fas fa-user-edit"></i> Responsável: <strong>${estab.responsavel}</strong>
-                                ${isPrivileged ? `<button onclick="BpaModule.openAssignResponsaveisModal()" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 0.75rem; padding: 0 4px;" title="Alterar responsável"><i class="fas fa-pen"></i></button>` : ''}
-                            </span>
-                            <span class="bpa-meta-item text-muted"><i class="fas fa-hospital"></i> CNES: ${estab.cnes || 'N/D'}</span>
-                            <span class="bpa-meta-item text-muted"><i class="fas fa-calendar-alt"></i> Comp: ${comp || '07/2026'}</span>
+                    `;
+                } else {
+                    html += `
+                        <div class="bpa-status-card pending">
+                            <div class="bpa-card-header">
+                                <div class="bpa-card-title">
+                                    <i class="fas fa-exclamation-circle bpa-status-icon pending"></i>
+                                    <strong>${estab.nome}</strong>
+                                    ${estab.isIsolado ? '<span style="font-size: 0.65rem; background: #e0f2fe; color: #0284c7; padding: 1px 5px; border-radius: 4px;">Isolado</span>' : ''}
+                                </div>
+                                <span class="bpa-badge-pending">Falta ${modalidade}</span>
+                            </div>
+                            <div class="bpa-card-meta">
+                                <span class="bpa-meta-item text-muted">
+                                    <i class="fas fa-user-edit"></i> Resp: <strong>${estab.responsavel}</strong>
+                                    ${isPrivileged ? `<button onclick="BpaModule.openAssignResponsaveisModal()" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 0.75rem; padding: 0 4px;" title="Alterar responsável"><i class="fas fa-pen"></i></button>` : ''}
+                                </span>
+                                <span class="bpa-meta-item text-muted"><i class="fas fa-hospital"></i> CNES: ${estab.cnes || 'N/D'}</span>
+                                ${modalidadeSelectHtml}
+                            </div>
+                            <div class="bpa-card-actions">
+                                <button class="bpa-btn-upload-direct" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${estab.cnes}', '${modalidade}')" title="Anexar ${modalidade}">
+                                    <i class="fas fa-upload"></i> Anexar ${modalidade}
+                                </button>
+                            </div>
                         </div>
-                        <div class="bpa-card-actions">
-                            <button class="bpa-btn-upload-direct" onclick="BpaModule.openUploadModalFor('${estab.nome}', '${estab.cnes}')" title="Anexar arquivo desta unidade">
-                                <i class="fas fa-upload"></i> Anexar Produção
-                            </button>
-                        </div>
-                    </div>
-                `;
+                    `;
+                }
             }
         });
 
@@ -1067,9 +2014,155 @@ const BpaModule = {
 
         const comp = this.currentCompetenciaFiltro;
         const search = (this.currentSearchTerm || '').toLowerCase().trim();
+        const respFilter = (this.currentResponsavelFiltro || '').toLowerCase().trim();
+        const tipoFilter = this.currentTipoFiltro;
         const currentUser = this.getCurrentUser();
         const isPrivileged = this.isAdminOrFrancileide(currentUser);
+        const unidades = this.getUnidadesSistema();
 
+        // CASO 1: SE O FILTRO DE STATUS FOR 'pending' (FALTAM ENVIAR / PENDÊNCIAS)
+        if (this.currentStatusFilter === 'pending') {
+            const enviadosComp = this.producoes.filter(p => !comp || p.competencia === comp);
+            
+            // Avaliar unidades com pendências (totais ou parciais)
+            const pendingList = [];
+
+            unidades.forEach(estab => {
+                const evalRes = this.evaluateUnitDeliveries(estab, enviadosComp);
+                if (evalRes.isComplete) return; // Unidade 100% entregue não entra aqui
+
+                const nomeE = estab.nome.toLowerCase();
+                const cnesE = estab.cnes || '';
+                const respE = (estab.responsavel || '').toLowerCase();
+
+                // Filtro de Responsável
+                if (respFilter && respE !== respFilter) return;
+
+                // Filtro de Modalidade
+                if (tipoFilter === 'AMBOS' && evalRes.modalidade !== 'AMBOS') return;
+                if (tipoFilter === 'PARTIAL' && !evalRes.isPartial) return;
+                if (tipoFilter === 'BPA-C' && !evalRes.needsBpaC) return;
+                if (tipoFilter === 'BPA-I' && !evalRes.needsBpaI) return;
+
+                // Filtro de Busca
+                if (search && !nomeE.includes(search) && !cnesE.includes(search) && !respE.includes(search)) {
+                    return;
+                }
+
+                // Gerar linhas de pendência específicas:
+                if (evalRes.modalidade === 'AMBOS') {
+                    if (evalRes.needsBpaC) {
+                        pendingList.push({
+                            estab,
+                            tipoPendente: 'BPA-C',
+                            isPartial: evalRes.isPartial,
+                            descricaoTipo: 'BPA Consolidado (BPA-C)'
+                        });
+                    }
+                    if (evalRes.needsBpaI) {
+                        pendingList.push({
+                            estab,
+                            tipoPendente: 'BPA-I',
+                            isPartial: evalRes.isPartial,
+                            descricaoTipo: 'BPA Individualizado (BPA-I)'
+                        });
+                    }
+                } else if (evalRes.modalidade === 'BPA-C' && evalRes.needsBpaC) {
+                    pendingList.push({
+                        estab,
+                        tipoPendente: 'BPA-C',
+                        isPartial: false,
+                        descricaoTipo: 'BPA Consolidado (BPA-C)'
+                    });
+                } else if (evalRes.modalidade === 'BPA-I' && evalRes.needsBpaI) {
+                    pendingList.push({
+                        estab,
+                        tipoPendente: 'BPA-I',
+                        isPartial: false,
+                        descricaoTipo: 'BPA Individualizado (BPA-I)'
+                    });
+                }
+            });
+
+            if (pendingList.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 2.5rem 1rem; color: #10b981;">
+                            <i class="fas fa-check-circle" style="font-size: 2.2rem; margin-bottom: 0.8rem; color: #10b981; display: block;"></i>
+                            <span style="font-size: 0.95rem; font-weight: 700;">Nenhuma produção pendente encontrada!</span><br>
+                            <span style="font-size: 0.8rem; color: #64748b;">Todas as unidades correspondentes aos filtros selecionados já enviaram suas produções.</span>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            const compLabel = this.formatCompetenciaLabel(comp || '07/2026');
+
+            pendingList.forEach(item => {
+                const u = item.estab;
+                const escapedNome = (u.nome || '').replace(/'/g, "\\'");
+                const tagColor = item.tipoPendente === 'BPA-I' ? '#0284c7' : '#16a34a';
+                const tagBg = item.tipoPendente === 'BPA-I' ? '#e0f2fe' : '#dcfce7';
+
+                html += `
+                    <tr class="bpa-table-row pending-unit-row">
+                        <!-- ARQUIVO (PENDENTE) -->
+                        <td class="bpa-cell-file">
+                            <span class="bpa-file-pending-pill" style="border-color: ${item.isPartial ? '#fde68a' : '#fed7aa'}; color: ${item.isPartial ? '#b45309' : '#c2410c'};">
+                                <i class="fas fa-hourglass-half"></i> Falta ${item.tipoPendente} ${item.isPartial ? '<small style="font-weight: 700;">(Parcial)</small>' : ''}
+                            </span>
+                        </td>
+
+                        <!-- ESTABELECIMENTO -->
+                        <td class="bpa-cell-estab">
+                            <div class="estab-name" title="${u.nome}">${u.nome}</div>
+                            <div class="estab-sub">
+                                <span class="bpa-badge-tipo" style="background: ${tagBg}; color: ${tagColor}; border: 1px solid ${tagColor}40;">
+                                    ${item.tipoPendente}
+                                </span>
+                                ${u.cnes ? `<span class="cnes-code">CNES: ${u.cnes}</span>` : ''}
+                                ${u.isIsolado ? '<span style="font-size: 0.65rem; background: #e0f2fe; color: #0284c7; padding: 1px 5px; border-radius: 4px;">Isolado</span>' : ''}
+                            </div>
+                        </td>
+
+                        <!-- COMPETÊNCIA -->
+                        <td class="bpa-cell-comp">
+                            <span class="comp-text">${compLabel}</span>
+                        </td>
+
+                        <!-- DIGITADOR RESPONSÁVEL -->
+                        <td class="bpa-cell-author">
+                            <div class="author-name" style="color: #b45309;">
+                                <i class="fas fa-user-clock"></i> Resp: <strong>${u.responsavel}</strong>
+                            </div>
+                            <div class="author-date" style="color: #94a3b8;">Aguardando envio de ${item.tipoPendente}</div>
+                        </td>
+
+                        <!-- TAMANHO -->
+                        <td class="bpa-cell-size">
+                            <span class="size-text">-</span>
+                        </td>
+
+                        <!-- AÇÃO: ANEXAR PRODUÇÃO -->
+                        <td class="bpa-cell-actions">
+                            <div class="bpa-action-group">
+                                <button class="bpa-btn-upload-direct-table" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${u.cnes}', '${item.tipoPendente}')" title="Anexar ${item.tipoPendente} desta unidade">
+                                    <i class="fas fa-upload"></i>
+                                    <span>Anexar ${item.tipoPendente}</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+            return;
+        }
+
+        // CASO 2: SE O FILTRO DE STATUS FOR 'delivered' OU '' (ARQUIVOS ENVIADOS)
         const filtered = this.producoes.filter(p => {
             const matchComp = !comp || p.competencia === comp;
             const matchSearch = !search || 
@@ -1077,7 +2170,40 @@ const BpaModule = {
                 (p.estabelecimento_nome && p.estabelecimento_nome.toLowerCase().includes(search)) ||
                 (p.digitador_nome && p.digitador_nome.toLowerCase().includes(search)) ||
                 (p.competencia && p.competencia.toLowerCase().includes(search));
-            return matchComp && matchSearch;
+
+            // Encontrar unidade correspondente ao arquivo
+            const u = unidades.find(unit => {
+                const cnesP = (p.cnes || '').trim();
+                const nomeP = (p.estabelecimento_nome || '').toUpperCase().trim();
+                const cnesU = (unit.cnes || '').trim();
+                const nomeU = (unit.nome || '').toUpperCase().trim();
+                if (cnesU && cnesP && cnesU.replace(/\D/g, '') === cnesP.replace(/\D/g, '')) return true;
+                if (nomeU && nomeP && (nomeP.includes(nomeU) || nomeU.includes(nomeP))) return true;
+                return false;
+            });
+
+            let matchResp = true;
+            if (respFilter) {
+                const unitResp = (u && u.responsavel) ? u.responsavel.toLowerCase() : '';
+                const pDigitador = (p.digitador_nome || '').toLowerCase();
+                matchResp = (pDigitador === respFilter || unitResp === respFilter);
+            }
+
+            let matchTipo = true;
+            if (tipoFilter) {
+                if (tipoFilter === 'BPA-C') matchTipo = (p.tipo_bpa === 'BPA-C');
+                else if (tipoFilter === 'BPA-I') matchTipo = (p.tipo_bpa === 'BPA-I');
+                else if (tipoFilter === 'AMBOS') matchTipo = (u && u.modalidade === 'AMBOS');
+                else if (tipoFilter === 'PARTIAL') {
+                    if (!u) matchTipo = false;
+                    else {
+                        const evalU = this.evaluateUnitDeliveries(u, this.producoes.filter(pr => !comp || pr.competencia === comp));
+                        matchTipo = evalU.isPartial;
+                    }
+                }
+            }
+
+            return matchComp && matchSearch && matchResp && matchTipo;
         });
 
         if (filtered.length === 0) {
@@ -1086,7 +2212,11 @@ const BpaModule = {
                     <td colspan="6" class="text-center" style="padding: 2.5rem 1rem; color: #94a3b8;">
                         <i class="fas fa-folder-open" style="font-size: 2.2rem; margin-bottom: 0.8rem; color: #475569; display: block;"></i>
                         <span style="font-size: 0.95rem; font-weight: 600;">Nenhum arquivo de produção BPA encontrado</span><br>
-                        <span style="font-size: 0.8rem; color: #64748b;">Utilize o botão "+ Enviar Produção BPA" para anexar um novo arquivo.</span>
+                        <span style="font-size: 0.8rem; color: #64748b;">
+                            ${(this.currentResponsavelFiltro || this.currentSearchTerm || this.currentStatusFilter || this.currentTipoFiltro) ? 
+                                '<button class="btn-secondary" onclick="BpaModule.clearAllFilters()" style="margin-top: 0.6rem; padding: 0.35rem 0.75rem;"><i class="fas fa-times-circle"></i> Limpar Filtros</button>' : 
+                                'Utilize o botão "+ Enviar Produção BPA" para anexar um novo arquivo.'}
+                        </span>
                     </td>
                 </tr>
             `;
@@ -1096,12 +2226,14 @@ const BpaModule = {
         let html = '';
         filtered.forEach(p => {
             const compLabel = this.formatCompetenciaLabel(p.competencia);
-            // Permissão de exclusão: Apenas ADM, Francileide ou quem enviou o arquivo
             const canDelete = isPrivileged || (currentUser.username === p.digitador_username);
+            const isBpaI = p.tipo_bpa === 'BPA-I';
+            const badgeClass = isBpaI ? 'bpa-badge-tipo bpa-i' : 'bpa-badge-tipo bpa-c';
+            const badgeIcon = isBpaI ? '<i class="fas fa-user-tag"></i>' : '<i class="fas fa-layer-group"></i>';
 
             html += `
                 <tr class="bpa-table-row">
-                    <!-- ARQUIVO (Badge escuro idêntico ao print) -->
+                    <!-- ARQUIVO -->
                     <td class="bpa-cell-file">
                         <div class="bpa-file-tag" title="${p.nome_arquivo}">
                             <i class="fas fa-file-code file-icon"></i>
@@ -1113,7 +2245,7 @@ const BpaModule = {
                     <td class="bpa-cell-estab">
                         <div class="estab-name" title="${p.estabelecimento_nome}">${p.estabelecimento_nome}</div>
                         <div class="estab-sub">
-                            <span class="bpa-badge-tipo">${p.tipo_bpa || 'BPA-C'}</span>
+                            <span class="${badgeClass}">${badgeIcon} ${p.tipo_bpa || 'BPA-C'}</span>
                             ${p.cnes ? `<span class="cnes-code">CNES: ${p.cnes}</span>` : ''}
                         </div>
                     </td>
@@ -1127,6 +2259,11 @@ const BpaModule = {
                     <td class="bpa-cell-author">
                         <div class="author-name"><i class="fas fa-user-circle"></i> ${p.digitador_nome}</div>
                         <div class="author-date">${this.formatTimestamp(p.criado_em)}</div>
+                        ${p.email_enviado_em ? `
+                            <div class="bpa-badge-email-sent" style="margin-top: 0.35rem;" title="Enviado para auditoriabacabal@gmail.com em ${this.formatTimestamp(p.email_enviado_em)}">
+                                <i class="fas fa-check-circle"></i> E-mail Enviado
+                            </div>
+                        ` : ''}
                     </td>
 
                     <!-- TAMANHO -->
@@ -1141,6 +2278,24 @@ const BpaModule = {
                                 <i class="fas fa-download"></i>
                                 <span>Download</span>
                             </button>
+                            ${(() => {
+                                const canSend = this.canSendEmail(p, currentUser);
+                                const isSent = !!p.email_enviado_em;
+                                if (canSend) {
+                                    return `
+                                        <button class="btn-bpa-email ${isSent ? 'is-sent' : ''}" onclick="BpaModule.openEmailModal('${p.id}')" title="${isSent ? `Enviado em ${this.formatTimestamp(p.email_enviado_em)}. Clique para reenviar.` : 'Enviar esta produção por e-mail para auditoriabacabal@gmail.com'}">
+                                            <i class="fas ${isSent ? 'fa-check' : 'fa-paper-plane'}"></i>
+                                            <span>${isSent ? 'E-mail Enviado' : 'Enviar E-mail'}</span>
+                                        </button>
+                                    `;
+                                } else {
+                                    return `
+                                        <span class="bpa-pill-locked" style="font-size: 0.75rem;" title="Enviado por ${p.digitador_nome}. Apenas o autor ou gestão podem enviar ao e-mail.">
+                                            <i class="fas fa-lock"></i>
+                                        </span>
+                                    `;
+                                }
+                            })()}
                             ${canDelete ? `
                                 <button class="btn-bpa-delete" onclick="BpaModule.deleteProducao('${p.id}')" title="Excluir arquivo">
                                     <i class="fas fa-trash-alt"></i>
@@ -1177,7 +2332,7 @@ const BpaModule = {
     /* =========================================================
        MODAL DE UPLOAD COM AUTO-IDENTIFICAÇÃO E RAIO-X
        ========================================================= */
-    openUploadModal(prefillEstab = '', prefillCnes = '') {
+    openUploadModal(prefillEstab = '', prefillCnes = '', prefillTipo = '') {
         const modal = document.getElementById('modalUploadBpa');
         if (!modal) return;
 
@@ -1194,6 +2349,11 @@ const BpaModule = {
             document.getElementById('inputBpaEstabelecimento').value = '';
         }
 
+        if (prefillTipo) {
+            const selectTipo = document.getElementById('selectBpaTipo');
+            if (selectTipo) selectTipo.value = prefillTipo;
+        }
+
         const defaultComp = this.currentCompetenciaFiltro || '07/2026';
         document.getElementById('inputBpaCompetencia').value = defaultComp;
         document.getElementById('inputBpaObservacoes').value = '';
@@ -1202,8 +2362,8 @@ const BpaModule = {
         modal.classList.remove('hidden');
     },
 
-    openUploadModalFor(estabNome, cnes) {
-        this.openUploadModal(estabNome, cnes);
+    openUploadModalFor(estabNome, cnes, tipo = '') {
+        this.openUploadModal(estabNome, cnes, tipo);
     },
 
     closeUploadModal() {
@@ -1226,7 +2386,9 @@ const BpaModule = {
             document.getElementById('inputBpaFileName').textContent = parsed.nomeArquivo;
             document.getElementById('inputBpaFileSize').textContent = parsed.tamanhoFormatado;
             document.getElementById('inputBpaLinesCount').textContent = `${parsed.totalLinhas} linhas`;
-            document.getElementById('inputBpaProcedimentosCount').textContent = `${parsed.totalAtendimentos} itens/atendimentos`;
+            document.getElementById('inputBpaProcedimentosCount').textContent = `${parsed.totalAtendimentos} atendimentos`;
+            const elValBpa = document.getElementById('inputBpaValorTotal');
+            if (elValBpa) elValBpa.textContent = `${parsed.valorTotalFormatado} (SIGTAP)`;
 
             // Badge do tipo (BPA-C ou BPA-I)
             const badgeTipo = document.getElementById('badgeDetectedTipo');
@@ -1323,6 +2485,16 @@ const BpaModule = {
         const btnConfirm = document.getElementById('btnConfirmarUploadBpa');
         if (btnConfirm) btnConfirm.addEventListener('click', () => this.handleFormSubmit());
 
+        // Modal de E-mail BPA (Auditoria Bacabal)
+        const btnCloseEmail = document.getElementById('btnCloseModalEmailBpa');
+        if (btnCloseEmail) btnCloseEmail.addEventListener('click', () => this.closeEmailModal());
+        const btnCancelEmail = document.getElementById('btnCancelEmailBpa');
+        if (btnCancelEmail) btnCancelEmail.addEventListener('click', () => this.closeEmailModal());
+        const btnConfirmEmail = document.getElementById('btnConfirmarEnvioEmailBpa');
+        if (btnConfirmEmail) btnConfirmEmail.addEventListener('click', () => this.confirmEmailSend());
+        const btnOpenGmailWeb = document.getElementById('btnOpenGmailWebBpa');
+        if (btnOpenGmailWeb) btnOpenGmailWeb.addEventListener('click', () => this.openGmailWeb());
+
         // Filtros
         const selectComp = document.getElementById('selectBpaCompetencia');
         if (selectComp) {
@@ -1332,13 +2504,46 @@ const BpaModule = {
             });
         }
 
+        const selectResp = document.getElementById('selectBpaResponsavel');
+        if (selectResp) {
+            selectResp.addEventListener('change', (e) => {
+                this.setResponsavelFilter(e.target.value);
+            });
+        }
+
+        const selectTipoFiltro = document.getElementById('selectBpaTipoFiltro');
+        if (selectTipoFiltro) {
+            selectTipoFiltro.addEventListener('change', (e) => {
+                this.currentTipoFiltro = e.target.value;
+                this.renderAll();
+            });
+        }
+
         const searchInput = document.getElementById('searchBpaInput');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 this.currentSearchTerm = e.target.value;
-                this.renderTable();
+                this.renderAll();
             });
         }
+
+        const btnClearFilters = document.getElementById('btnClearBpaFilters');
+        if (btnClearFilters) {
+            btnClearFilters.addEventListener('click', () => this.clearAllFilters());
+        }
+
+        // Interação dos Cards de KPI (Filtragem da Lista)
+        const cardTotal = document.getElementById('bpaCardTotal');
+        if (cardTotal) cardTotal.addEventListener('click', () => this.setStatusFilter(''));
+
+        const cardEnviadas = document.getElementById('bpaCardEnviadas');
+        if (cardEnviadas) cardEnviadas.addEventListener('click', () => this.setStatusFilter('delivered'));
+
+        const cardPendentes = document.getElementById('bpaCardPendentes');
+        if (cardPendentes) cardPendentes.addEventListener('click', () => this.setStatusFilter('pending'));
+
+        const cardProgresso = document.getElementById('bpaCardProgresso');
+        if (cardProgresso) cardProgresso.addEventListener('click', () => this.setStatusFilter(''));
 
         // Drag & Drop
         const dropzone = document.getElementById('bpaDropzone');

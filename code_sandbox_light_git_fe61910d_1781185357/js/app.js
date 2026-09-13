@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindNavigation();
     bindFilters();
     bindImport();
-    bindImportSigtap();
     bindImportPortaria();
     bindArgosIA();
     bindModals();
@@ -177,9 +176,7 @@ function bindLimparDados() {
             APP_STATE.filteredData = null;
             
             try {
-                const imports = await AppDB.getItem('imported_files') || [];
-                const sigtapOnly = imports.filter(i => i.type === 'SIGTAP');
-                await AppDB.setItem('imported_files', sigtapOnly);
+                await AppDB.setItem('imported_files', []);
                 await renderArquivosManager();
             } catch (err) {
                 console.error("Erro ao limpar histórico:", err);
@@ -702,17 +699,23 @@ function aggregateLinhas(linhas, cmpFallback, anoFallback, municipioFallback, uf
         
         if (!pMap[l.proc]) {
             const cleanCode = l.proc.replace(/\D/g, '');
+            const sigtapInfo = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : null;
             pMap[l.proc] = { 
                 codigo: l.proc, 
-                descricao: window.SIGTAP?.[cleanCode] || 'Proc '+l.proc, 
+                descricao: sigtapInfo?.nome || window.SIGTAP?.[cleanCode] || 'Proc '+l.proc, 
                 qtdAprovada: 0, 
                 valAprovado: 0, 
                 valUnitario: 0,
+                valTabela: (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? sigtapInfo.vl_sa : 0,
+                financiamento: sigtapInfo?.financiamento || '',
+                complexidade: sigtapInfo?.complexidade || '',
+                subgrupo: sigtapInfo?.subgrupo || '',
+                valEsperadoTabela: 0,
                 cbos: {} 
             };
         }
         pMap[l.proc].qtdAprovada += l.qtdAprovada;
-        pMap[l.proc].valAprovado += l.valAprovado;
+        pMap[l.proc].valAprovado = Math.round((pMap[l.proc].valAprovado + l.valAprovado + Number.EPSILON) * 100) / 100;
 
         if (l.cbo && l.cbo.match(/^[a-zA-Z0-9]{6}$/)) {
             const cboCode = l.cbo;
@@ -721,39 +724,51 @@ function aggregateLinhas(linhas, cmpFallback, anoFallback, municipioFallback, uf
                 pMap[l.proc].cbos[cboCode] = { codigo: cboCode, descricao: descCbo, qtdAprovada: 0, valAprovado: 0 };
             }
             pMap[l.proc].cbos[cboCode].qtdAprovada += l.qtdAprovada;
-            pMap[l.proc].cbos[cboCode].valAprovado += l.valAprovado;
+            pMap[l.proc].cbos[cboCode].valAprovado = Math.round((pMap[l.proc].cbos[cboCode].valAprovado + l.valAprovado + Number.EPSILON) * 100) / 100;
 
             if (!cboMap[cboCode]) {
                 cboMap[cboCode] = { 
                     codigo: cboCode, 
                     descricao: window.CBO_DICTIONARY?.[cboCode] || 'CBO '+cboCode, 
                     qtdAprovada: 0, 
-                    valAprovado: 0,
+                    valAprovado: 0, 
                     procedimentos: {} 
                 };
             }
             cboMap[cboCode].qtdAprovada += l.qtdAprovada;
-            cboMap[cboCode].valAprovado += l.valAprovado;
+            cboMap[cboCode].valAprovado = Math.round((cboMap[cboCode].valAprovado + l.valAprovado + Number.EPSILON) * 100) / 100;
             
             if (!cboMap[cboCode].procedimentos[l.proc]) {
                 const cleanCode = l.proc.replace(/\D/g, '');
-                const descProc = window.SIGTAP?.[cleanCode] || 'Proc ' + l.proc;
-                cboMap[cboCode].procedimentos[l.proc] = { codigo: l.proc, descricao: descProc, qtdAprovada: 0, valAprovado: 0 };
+                const sigtapInfo = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : null;
+                const descProc = sigtapInfo?.nome || window.SIGTAP?.[cleanCode] || 'Proc ' + l.proc;
+                cboMap[cboCode].procedimentos[l.proc] = { 
+                    codigo: l.proc, 
+                    descricao: descProc, 
+                    qtdAprovada: 0, 
+                    valAprovado: 0,
+                    valTabela: (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? sigtapInfo.vl_sa : 0,
+                    financiamento: sigtapInfo?.financiamento || '',
+                    complexidade: sigtapInfo?.complexidade || ''
+                };
             }
             cboMap[cboCode].procedimentos[l.proc].qtdAprovada += l.qtdAprovada;
-            cboMap[cboCode].procedimentos[l.proc].valAprovado += l.valAprovado;
+            cboMap[cboCode].procedimentos[l.proc].valAprovado = Math.round((cboMap[cboCode].procedimentos[l.proc].valAprovado + l.valAprovado + Number.EPSILON) * 100) / 100;
         }
 
         totalQtdApresentada += l.qtdApresentada;
         totalQtdAprovada += l.qtdAprovada;
         totalQtdGlosada += l.qtdGlosada;
-        totalValApresentado += l.valApresentado;
-        totalValAprovado += l.valAprovado;
-        totalValGlosado += l.valGlosado;
+        totalValApresentado = Math.round((totalValApresentado + l.valApresentado + Number.EPSILON) * 100) / 100;
+        totalValAprovado = Math.round((totalValAprovado + l.valAprovado + Number.EPSILON) * 100) / 100;
+        totalValGlosado = Math.round((totalValGlosado + l.valGlosado + Number.EPSILON) * 100) / 100;
     });
 
     let unidades = Object.values(uMap);
     unidades.forEach(u => {
+        u.valApresentado = Math.round((u.valApresentado + Number.EPSILON) * 100) / 100;
+        u.valAprovado = Math.round((u.valAprovado + Number.EPSILON) * 100) / 100;
+        u.valGlosado = Math.round((u.valGlosado + Number.EPSILON) * 100) / 100;
         u.pctAprovacaoQtd = u.qtdApresentada > 0 ? (u.qtdAprovada / u.qtdApresentada * 100) : 0;
         u.pctAprovacaoVal = u.valApresentado > 0 ? (u.valAprovado / u.valApresentado * 100) : (u.qtdAprovada > 0 ? 100 : 0);
     });
@@ -761,16 +776,24 @@ function aggregateLinhas(linhas, cmpFallback, anoFallback, municipioFallback, uf
     unidades.forEach((u,i) => { u.rank = i+1; u.pctDoTotal = totalValAprovado > 0 ? (u.valAprovado/totalValAprovado*100) : 0; });
 
     let faturamentoMensal = Object.values(mesMap).sort((a,b) => a.competencia.localeCompare(b.competencia));
-    faturamentoMensal.forEach(m => m.pctAprovado = m.valApresentado > 0 ? (m.valAprovado / m.valApresentado * 100) : 0);
+    faturamentoMensal.forEach(m => {
+        m.valApresentado = Math.round((m.valApresentado + Number.EPSILON) * 100) / 100;
+        m.valAprovado = Math.round((m.valAprovado + Number.EPSILON) * 100) / 100;
+        m.valGlosado = Math.round((m.valGlosado + Number.EPSILON) * 100) / 100;
+        m.pctAprovado = m.valApresentado > 0 ? (m.valAprovado / m.valApresentado * 100) : 0;
+    });
 
     let procedimentos = Object.values(pMap).map(p => {
         p.cbos = Object.values(p.cbos).sort((a,b) => b.valAprovado - a.valAprovado);
-        if (p.qtdAprovada > 0) p.valUnitario = p.valAprovado / p.qtdAprovada;
+        p.valAprovado = Math.round((p.valAprovado + Number.EPSILON) * 100) / 100;
+        if (p.qtdAprovada > 0) p.valUnitario = Math.round((p.valAprovado / p.qtdAprovada + Number.EPSILON) * 100) / 100;
+        p.valEsperadoTabela = Math.round((p.qtdAprovada * (p.valTabela || 0) + Number.EPSILON) * 100) / 100;
         return p;
     }).sort((a,b) => b.valAprovado - a.valAprovado);
 
     let cbos = Object.values(cboMap).map(c => {
         c.procedimentos = Object.values(c.procedimentos).sort((a,b) => b.valAprovado - a.valAprovado);
+        c.valAprovado = Math.round((c.valAprovado + Number.EPSILON) * 100) / 100;
         return c;
     }).sort((a,b) => b.valAprovado - a.valAprovado);
 
@@ -1665,7 +1688,15 @@ function renderDashboardProcedimentos(d) {
         return `<tr class="proc-row" onclick="toggleProcDetails('${p.codigo}')" style="cursor: pointer;">
             <td class="text-center fw-bold"><i id="icon-proc-${p.codigo}" class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 6px;"></i>${i+1}</td>
             <td class="table-code" style="font-size:.75rem; white-space: nowrap;">${p.codigo.replace(/-/g, '\u2011')}</td>
-            <td><strong>${p.descricao}</strong></td>
+            <td>
+                <div><strong>${p.descricao}</strong></div>
+                ${(p.financiamento || p.complexidade || (p.valTabela && p.valTabela > 0)) ? `
+                <div style="margin-top: 4px; display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                    ${(p.valTabela && p.valTabela > 0) ? `<span class="badge" style="font-size: 0.68rem; padding: 2px 7px; background: #e6f4ea; color: #137333; border: 1px solid #ceead6; border-radius: 4px; font-weight: 700;" title="Valor Unitário Ambulatorial Oficial da Tabela SIGTAP (VL_SA)"><i class="fas fa-check-circle" style="margin-right: 3px; font-size: 0.65rem;"></i>SIGTAP: ${fmt.moeda(p.valTabela)}</span>` : ''}
+                    ${p.financiamento ? `<span class="badge" style="font-size: 0.68rem; padding: 2px 6px; background: ${p.financiamento.includes('MAC') ? '#e8f0fe; color: #1a73e8; border: 1px solid #d2e3fc;' : '#fef7e0; color: #b06000; border: 1px solid #feefc3;'} border-radius: 4px; font-weight: 600;"><i class="fas fa-coins" style="margin-right: 3px; font-size: 0.65rem;"></i>${p.financiamento}</span>` : ''}
+                    ${p.complexidade ? `<span class="badge" style="font-size: 0.68rem; padding: 2px 6px; background: #f1f3f4; color: #5f6368; border-radius: 4px; font-weight: 500;">${p.complexidade}</span>` : ''}
+                </div>` : ''}
+            </td>
             <td class="text-right mono">${fmt.numero(p.qtdAprovada)}</td>
             <td class="text-right mono fw-bold">${fmt.moeda(p.valAprovado)}</td>
             <td class="text-right mono">${fmt.moeda(p.valUnitario || 0)}</td>
@@ -2679,70 +2710,6 @@ function bindImport() {
     });
 }
 
-function bindImportSigtap() {
-    const btn = document.getElementById('btnUploadSigtap');
-    const input = document.getElementById('fileSigtapInput');
-    if (!input) return;
-
-    btn?.addEventListener('click', () => input.click());
-
-    input.addEventListener('change', e => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        showLoading('Importando SIGTAP...');
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            const text = ev.target.result;
-            const lines = text.split(/\r?\n/);
-            const sigtapMap = {};
-            
-            lines.forEach(line => {
-                if (line.length >= 260) {
-                    const code = line.substring(0, 10).trim();
-                    const name = line.substring(10, 260).trim();
-                    if (code && name) sigtapMap[code] = name;
-                }
-            });
-            
-            window.SIGTAP = { ...(window.SIGTAP || {}), ...sigtapMap };
-            await AppDB.setItem('SIGTAP_DB', window.SIGTAP);
-            
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            await AppDB.setItem('sigtap_meta', { fileName: file.name, importDate: dateStr });
-            await registerImport(file.name, 'SIGTAP', 'Tabela Oficial');
-
-            if (SupabaseConfig.isConnected()) {
-                showLoading('Sincronizando SIGTAP na nuvem...');
-                try {
-                    await SupabaseService.uploadSigtap(window.SIGTAP, (msg) => showLoading(msg));
-                    const user = JSON.parse(sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user') || '{}');
-                    if (user.username) {
-                        await SupabaseService.logAction(user.username, 'ARQUIVOS', 'IMPORTACAO_SIGTAP', `Tabela SIGTAP (${file.name}) sincronizada na nuvem.`);
-                    }
-                    hideLoading();
-                    showToast(`✅ Tabela SIGTAP carregada com ${Object.keys(sigtapMap).length} itens na Nuvem!`, 'success');
-                } catch (err) {
-                    console.error("Erro ao sincronizar SIGTAP no Supabase:", err);
-                    hideLoading();
-                    showToast(`⚠️ SIGTAP com ${Object.keys(sigtapMap).length} itens salvo LOCALMENTE, erro ao sincronizar nuvem. Verifique sua conexão ou chaves do Supabase.`, 'warn');
-                }
-            } else {
-                hideLoading();
-                showToast(`✅ Tabela SIGTAP carregada com ${Object.keys(sigtapMap).length} itens localmente!`, 'success');
-            }
-            
-            if (APP_STATE.data) {
-                const agg = buildAggregatedData(window.datasets);
-                await PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
-                loadData(agg);
-            }
-        };
-        reader.readAsText(file, 'iso-8859-1');
-    });
-}
-
 function bindImportPortaria() {
     const input = document.getElementById('filePortariaInput');
     const msgEl = document.getElementById('portariaProgressMsg');
@@ -3068,16 +3035,31 @@ function buildAggregatedData(datasets) {
         d.procedimentos.forEach(p => {
             CryptoUtils.sanitizeData(p, ['descricao']);
             const cleanCode = p.codigo.replace(/\D/g, '');
-            const correctDesc = (window.SIGTAP && window.SIGTAP[cleanCode]) || p.descricao;
+            const sigtapInfo = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : null;
+            const correctDesc = sigtapInfo?.nome || (window.SIGTAP && window.SIGTAP[cleanCode]) || p.descricao;
             if (!pMap[p.codigo]) {
-                pMap[p.codigo] = { ...p, descricao: correctDesc, qtdAprovada: 0, valAprovado: 0, cbos: {}, valoresPorUnidade: {} };
+                pMap[p.codigo] = { 
+                    ...p, 
+                    descricao: correctDesc, 
+                    valTabela: (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? sigtapInfo.vl_sa : (p.valTabela || 0),
+                    financiamento: sigtapInfo?.financiamento || p.financiamento || '',
+                    complexidade: sigtapInfo?.complexidade || p.complexidade || '',
+                    qtdAprovada: 0, 
+                    valAprovado: 0, 
+                    cbos: {}, 
+                    valoresPorUnidade: {} 
+                };
             }
             pMap[p.codigo].descricao = correctDesc; // Garantir atualização
+            if (sigtapInfo?.vl_sa !== undefined) pMap[p.codigo].valTabela = sigtapInfo.vl_sa;
+            if (sigtapInfo?.financiamento) pMap[p.codigo].financiamento = sigtapInfo.financiamento;
+            if (sigtapInfo?.complexidade) pMap[p.codigo].complexidade = sigtapInfo.complexidade;
             pMap[p.codigo].qtdAprovada += p.qtdAprovada;
-            pMap[p.codigo].valAprovado += p.valAprovado;
+            pMap[p.codigo].valAprovado = Math.round((pMap[p.codigo].valAprovado + p.valAprovado + Number.EPSILON) * 100) / 100;
             if (pMap[p.codigo].valAprovado > 0 && pMap[p.codigo].qtdAprovada > 0) {
-                pMap[p.codigo].valUnitario = pMap[p.codigo].valAprovado / pMap[p.codigo].qtdAprovada;
+                pMap[p.codigo].valUnitario = Math.round((pMap[p.codigo].valAprovado / pMap[p.codigo].qtdAprovada + Number.EPSILON) * 100) / 100;
             }
+            pMap[p.codigo].valEsperadoTabela = Math.round((pMap[p.codigo].qtdAprovada * (pMap[p.codigo].valTabela || 0) + Number.EPSILON) * 100) / 100;
             if (p.valoresPorUnidade) {
                 Object.keys(p.valoresPorUnidade).forEach(uid => {
                     if (!pMap[p.codigo].valoresPorUnidade[uid]) pMap[p.codigo].valoresPorUnidade[uid] = { valAprovado: 0, qtdAprovada: 0 };
@@ -3138,14 +3120,14 @@ function buildAggregatedData(datasets) {
         u.pctAprovacaoVal = u.valApresentado > 0 ? (u.valAprovado / u.valApresentado * 100) : (u.qtdAprovada > 0 ? 100 : 0);
         if (u.valAprovado > 0 && u.valApresentado === 0) u.pctAprovacaoVal = 100;
         
-        totalValAprov += u.valAprovado;
+        totalValAprov = Math.round((totalValAprov + u.valAprovado + Number.EPSILON) * 100) / 100;
         
         agg.resumo.qtdApresentada += u.qtdApresentada;
         agg.resumo.qtdAprovada += u.qtdAprovada;
         agg.resumo.qtdGlosada += u.qtdGlosada;
-        agg.resumo.valApresentado += u.valApresentado;
-        agg.resumo.valAprovado += u.valAprovado;
-        agg.resumo.valGlosado += u.valGlosado;
+        agg.resumo.valApresentado = Math.round((agg.resumo.valApresentado + u.valApresentado + Number.EPSILON) * 100) / 100;
+        agg.resumo.valAprovado = Math.round((agg.resumo.valAprovado + u.valAprovado + Number.EPSILON) * 100) / 100;
+        agg.resumo.valGlosado = Math.round((agg.resumo.valGlosado + u.valGlosado + Number.EPSILON) * 100) / 100;
     });
     
     agg.unidades.sort((a,b) => b.valAprovado - a.valAprovado);
@@ -3168,6 +3150,9 @@ function buildAggregatedData(datasets) {
     });
     
     agg.faturamentoMensal.forEach(m => {
+        m.valApresentado = Math.round((m.valApresentado + Number.EPSILON) * 100) / 100;
+        m.valAprovado = Math.round((m.valAprovado + Number.EPSILON) * 100) / 100;
+        m.valGlosado = Math.round((m.valGlosado + Number.EPSILON) * 100) / 100;
         m.pctAprovado = m.valApresentado > 0 ? (m.valAprovado / m.valApresentado * 100) : (m.valAprovado > 0 ? 100 : 0);
     });
 
@@ -3176,10 +3161,14 @@ function buildAggregatedData(datasets) {
     agg.unidades = Object.values(uMap).sort((a,b) => b.valAprovado - a.valAprovado);
     agg.procedimentos = Object.values(pMap).map(p => {
         p.cbos = Object.values(p.cbos || {}).sort((a,b) => b.valAprovado - a.valAprovado);
+        p.valAprovado = Math.round((p.valAprovado + Number.EPSILON) * 100) / 100;
+        if (p.qtdAprovada > 0) p.valUnitario = Math.round((p.valAprovado / p.qtdAprovada + Number.EPSILON) * 100) / 100;
+        p.valEsperadoTabela = Math.round((p.qtdAprovada * (p.valTabela || 0) + Number.EPSILON) * 100) / 100;
         return p;
     }).sort((a,b) => b.valAprovado - a.valAprovado);
     agg.cbos = Object.values(cboMap).map(c => {
         c.procedimentos = Object.values(c.procedimentos || {}).sort((a,b) => b.valAprovado - a.valAprovado);
+        c.valAprovado = Math.round((c.valAprovado + Number.EPSILON) * 100) / 100;
         return c;
     }).sort((a,b) => b.valAprovado - a.valAprovado);
     
@@ -3689,26 +3678,6 @@ async function registerImport(fileName, type, competencia) {
 async function renderArquivosManager() {
     updateLogoPreview();
     
-    // Status do SIGTAP
-    const lblBadge = document.getElementById('lblSigtapStatusBadge');
-    const lblDate = document.getElementById('lblSigtapStatusDate');
-    if (lblBadge && lblDate) {
-        const savedSigtap = await AppDB.getItem('SIGTAP_DB');
-        const sigtapMeta = await AppDB.getItem('sigtap_meta');
-        
-        if (savedSigtap && Object.keys(savedSigtap).length > 0) {
-            lblBadge.className = 'sigtap-status-badge loaded';
-            lblBadge.innerHTML = `<i class="fas fa-check-circle"></i> Carregada (${Object.keys(savedSigtap).length} itens)`;
-            lblDate.textContent = sigtapMeta && sigtapMeta.importDate 
-                ? `Importada em ${sigtapMeta.importDate} (${sigtapMeta.fileName})`
-                : 'Tabela importada e ativa';
-        } else {
-            lblBadge.className = 'sigtap-status-badge missing';
-            lblBadge.innerHTML = `<i class="fas fa-times-circle"></i> Não Carregada`;
-            lblDate.textContent = 'Importe o arquivo TXT da tabela SIGTAP';
-        }
-    }
-
     // Tabela de Histórico de Arquivos de Faturamento SIA/SUS
     const tbody = document.getElementById('tbodyHistoricoArquivos');
     if (tbody) {

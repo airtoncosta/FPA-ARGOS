@@ -1798,31 +1798,6 @@
                         </button>
                     </div>
                 </div>
-
-                <!-- Card 2: Tabela SIGTAP -->
-                <div class="arquivos-card sigtap">
-                    <div class="arquivos-card-header">
-                        <div class="arquivos-card-icon"><i class="fas fa-table"></i></div>
-                        <div class="arquivos-card-title">
-                            <h3>Tabela Unificada SIGTAP</h3>
-                            <span>Catálogo oficial de procedimentos e descrições do SUS</span>
-                        </div>
-                    </div>
-                    <div class="arquivos-card-body">
-                        <div class="sigtap-status-box">
-                            <span class="sigtap-status-badge missing" id="lblSigtapStatusBadge"><i
-                                    class="fas fa-times-circle"></i> Não Carregada</span>
-                            <span class="sigtap-status-date" id="lblSigtapStatusDate">Importe o arquivo TXT da tabela
-                                SIGTAP</span>
-                        </div>
-                    </div>
-                    <div class="arquivos-card-actions">
-                        <input type="file" id="fileSigtapInput" accept=".txt" style="display:none;">
-                        <button class="btn-primary" id="btnUploadSigtap"
-                            style="font-size: 0.8rem; padding: 0.4286rem 0.8571rem;"><i class="fas fa-upload"></i>
-                            Importar/Atualizar</button>
-                    </div>
-                </div>
             </div>
 
             <!-- Tabela: Histórico de Arquivos de Faturamento SIA/SUS -->
@@ -1894,42 +1869,78 @@
                         <option value="">Todas as Competências</option>
                     </select>
                 </div>
+                <div class="bpa-filter-group">
+                    <label for="selectBpaResponsavel"><i class="fas fa-user-check"></i> Responsável:</label>
+                    <select id="selectBpaResponsavel" class="bpa-select">
+                        <option value="">Todos os Responsáveis</option>
+                    </select>
+                </div>
+                <div class="bpa-filter-group">
+                    <label for="selectBpaTipoFiltro"><i class="fas fa-layer-group"></i> Modalidade:</label>
+                    <select id="selectBpaTipoFiltro" class="bpa-select">
+                        <option value="">Todas as Modalidades</option>
+                        <option value="AMBOS">Produção Dupla (BPA-C + BPA-I)</option>
+                        <option value="PARCIAL">Entrega Parcial (Falta 1)</option>
+                        <option value="BPA-C">Apenas BPA-C (Consolidado)</option>
+                        <option value="BPA-I">Apenas BPA-I (Individualizado)</option>
+                    </select>
+                </div>
                 <div class="bpa-search-group">
                     <i class="fas fa-search bpa-search-icon"></i>
                     <input type="text" id="searchBpaInput" placeholder="Pesquisar por arquivo, unidade ou digitador...">
                 </div>
             </div>
 
-            <!-- PAINEL DE CONTROLE GERENCIAL (VISÃO DA FRANCILEIDE) -->
+            <!-- CHIPS INTELIGENTES DE PROFISSIONAIS RESPONSÁVEIS -->
+            <div class="bpa-smart-chips-wrapper">
+                <div class="bpa-smart-chips-label">
+                    <i class="fas fa-user-friends"></i>
+                    <span>Responsáveis:</span>
+                </div>
+                <div class="bpa-smart-chips-list" id="bpaSmartChipsContainer">
+                    <!-- Preenchido dinamicamente pelo bpa-module.js -->
+                </div>
+            </div>
+
+            <!-- PAINEL DE CONTROLE GERENCIAL (VISÃO DA FRANCILEIDE / DIGITADORES) -->
             <div class="bpa-kpi-container">
-                <div class="bpa-kpi-card">
+                <div class="bpa-kpi-card interactive" id="bpaCardTotal" data-status-filter="" title="Clique para exibir todas as unidades">
                     <div class="bpa-kpi-info">
-                        <span class="bpa-kpi-label">Unidades Esperadas</span>
+                        <div class="bpa-kpi-header-row">
+                            <span class="bpa-kpi-label">Unidades Esperadas</span>
+                            <span class="bpa-kpi-filter-tag" id="tagFilterTotal" style="display: none;"><i class="fas fa-filter"></i> Todos</span>
+                        </div>
                         <h3 class="bpa-kpi-value" id="bpaKpiTotal">9</h3>
                         <span class="bpa-kpi-sub" id="bpaKpiCompLabel">Competência Julho/2026</span>
                     </div>
                     <div class="bpa-kpi-icon total"><i class="fas fa-hospital-alt"></i></div>
                 </div>
 
-                <div class="bpa-kpi-card">
+                <div class="bpa-kpi-card interactive" id="bpaCardEnviadas" data-status-filter="delivered" title="Clique para filtrar apenas produções enviadas">
                     <div class="bpa-kpi-info">
-                        <span class="bpa-kpi-label">Produções Enviadas</span>
+                        <div class="bpa-kpi-header-row">
+                            <span class="bpa-kpi-label">Produções Enviadas</span>
+                            <span class="bpa-kpi-filter-tag delivered" id="tagFilterEnviadas" style="display: none;"><i class="fas fa-check"></i> Filtrando</span>
+                        </div>
                         <h3 class="bpa-kpi-value delivered" id="bpaKpiEnviadas">0</h3>
                         <span class="bpa-kpi-sub">Arquivos já recebidos</span>
                     </div>
                     <div class="bpa-kpi-icon delivered"><i class="fas fa-check-circle"></i></div>
                 </div>
 
-                <div class="bpa-kpi-card">
+                <div class="bpa-kpi-card interactive" id="bpaCardPendentes" data-status-filter="pending" title="Clique para filtrar apenas unidades que faltam enviar">
                     <div class="bpa-kpi-info">
-                        <span class="bpa-kpi-label">Faltam Enviar</span>
+                        <div class="bpa-kpi-header-row">
+                            <span class="bpa-kpi-label">Faltam Enviar</span>
+                            <span class="bpa-kpi-filter-tag pending" id="tagFilterPendentes" style="display: none;"><i class="fas fa-hourglass-half"></i> Filtrando</span>
+                        </div>
                         <h3 class="bpa-kpi-value pending" id="bpaKpiPendentes">0</h3>
                         <span class="bpa-kpi-sub">Unidades pendentes</span>
                     </div>
                     <div class="bpa-kpi-icon pending"><i class="fas fa-hourglass-half"></i></div>
                 </div>
 
-                <div class="bpa-kpi-card progress-card">
+                <div class="bpa-kpi-card progress-card interactive" id="bpaCardProgresso" data-status-filter="" title="Clique para resetar os filtros de status">
                     <div class="bpa-kpi-info">
                         <span class="bpa-kpi-label">Taxa de Conclusão</span>
                         <h3 class="bpa-kpi-value progress" id="bpaKpiTaxa">0%</h3>
@@ -1939,6 +1950,18 @@
                     </div>
                     <div class="bpa-kpi-icon progress"><i class="fas fa-chart-pie"></i></div>
                 </div>
+            </div>
+
+            <!-- BARRA DE STATUS DE FILTRO ATIVO -->
+            <div class="bpa-active-filter-bar" id="bpaActiveFilterBar" style="display: none;">
+                <div class="bpa-active-filter-info">
+                    <i class="fas fa-filter"></i>
+                    <span>Filtros ativos:</span>
+                    <div class="bpa-active-filter-badges" id="bpaActiveFilterBadges"></div>
+                </div>
+                <button type="button" class="btn-clear-bpa-filters" id="btnClearBpaFilters" title="Remover todos os filtros">
+                    <i class="fas fa-times-circle"></i> Limpar Filtros
+                </button>
             </div>
 
             <!-- QUADRO DE STATUS DAS UNIDADES (CHECKLIST DA FRANCILEIDE) -->
@@ -2014,7 +2037,8 @@
                                 <div>
                                     <span id="inputBpaFileSize">124K</span> · 
                                     <span id="inputBpaLinesCount">0 linhas</span> ·
-                                    <span id="inputBpaProcedimentosCount" style="color: #0284c7; font-weight: 700;">0 atendimentos</span>
+                                    <span id="inputBpaProcedimentosCount" style="color: #0284c7; font-weight: 700;">0 atendimentos</span> ·
+                                    <span id="inputBpaValorTotal" style="color: #16a34a; font-weight: 700;">R$ 0,00 (SIGTAP)</span>
                                 </div>
                             </div>
                             <div style="margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
@@ -2077,12 +2101,12 @@
         </div>
     </div>
 
-    <!-- ===== MODAL DE ATRIBUIÇÃO DE RESPONSÁVEIS BPA (EXCLUSIVO ADM / FRANCILEIDE) ===== -->
+    <!-- ===== MODAL DE ATRIBUIÇÃO DE RESPONSÁVEIS E MODALIDADES BPA (EXCLUSIVO ADM / FRANCILEIDE) ===== -->
     <div id="modalGerenciarResponsaveisBpa" class="modal-overlay hidden">
-        <div class="modal-box modal-medium" style="max-width: 44rem;">
+        <div class="modal-box modal-medium" style="max-width: 52rem;">
             <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem; border-radius: 1.1rem 1.1rem 0 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
                 <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.15rem;">
-                    <i class="fas fa-users-cog" style="color: #38bdf8;"></i> Atribuição de Responsáveis por Produção
+                    <i class="fas fa-users-cog" style="color: #38bdf8;"></i> Atribuição de Responsáveis e Modalidades BPA
                 </h3>
                 <button class="modal-close" id="btnCloseModalResponsaveisBpa" style="background: none; border: none; color: rgba(255,255,255,0.85); cursor: pointer; font-size: 1.2rem;">
                     <i class="fas fa-times"></i>
@@ -2090,15 +2114,16 @@
             </div>
             <div class="modal-body" style="padding: 1.4rem; max-height: 70vh; overflow-y: auto;">
                 <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; padding: 0.75rem 1rem; border-radius: 0.35rem; margin-bottom: 1.2rem; font-size: 0.85rem; color: #334155;">
-                    <i class="fas fa-shield-alt" style="color: #0284c7; margin-right: 0.4rem;"></i> Painel de Controle de Gestão exclusivo para <strong>Administradores</strong> e <strong>Francileide</strong>. Defina quem é o digitador responsável pelo faturamento de cada unidade de saúde.
+                    <i class="fas fa-shield-alt" style="color: #0284c7; margin-right: 0.4rem;"></i> Painel de Gestão exclusivo para <strong>Administradores</strong> e <strong>Francileide</strong>. Defina quem é o digitador responsável e quais modalidades de BPA (Consolidado, Individualizado ou Ambos) cada unidade deve entregar.
                 </div>
                 <div class="bpa-responsaveis-table-wrapper" style="border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden;">
                     <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
                         <thead style="background: #f1f5f9;">
                             <tr>
                                 <th style="padding: 0.7rem 1rem; text-align: left;">Unidade de Saúde</th>
-                                <th style="padding: 0.7rem 1rem; text-align: left; width: 110px;">CNES</th>
-                                <th style="padding: 0.7rem 1rem; text-align: left; width: 220px;">Digitador Responsável</th>
+                                <th style="padding: 0.7rem 1rem; text-align: left; width: 100px;">CNES</th>
+                                <th style="padding: 0.7rem 1rem; text-align: left; width: 175px;">Digitador Responsável</th>
+                                <th style="padding: 0.7rem 1rem; text-align: left; width: 185px;">Modalidade Esperada</th>
                             </tr>
                         </thead>
                         <tbody id="tbodyGerenciarResponsaveisBpa">
@@ -2112,6 +2137,80 @@
                 <button type="button" class="btn-primary" id="btnSalvarResponsaveisBpa">
                     <i class="fas fa-save"></i> Salvar Atribuições
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL DE PREVIEW E ENVIO DE E-MAIL BPA (AUDITORIA) ===== -->
+    <div id="modalPreviewEmailBpa" class="modal-overlay hidden">
+        <div class="modal-box modal-medium" style="max-width: 48rem;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem; border-radius: 1.1rem 1.1rem 0 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.15rem;">
+                    <i class="fas fa-envelope-open-text" style="color: #38bdf8;"></i> Enviar Produção para Auditoria por E-mail
+                </h3>
+                <button class="modal-close" id="btnCloseModalEmailBpa" style="background: none; border: none; color: rgba(255,255,255,0.85); cursor: pointer; font-size: 1.2rem;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 1.4rem; max-height: 72vh; overflow-y: auto;">
+                <!-- Card de Destinatário Fixo -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.65rem; padding: 0.85rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <span style="width: 38px; height: 38px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                            <i class="fas fa-at"></i>
+                        </span>
+                        <div>
+                            <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 700;">Destinatário Oficial</div>
+                            <div style="font-size: 0.95rem; font-weight: 700; color: #0f172a; font-family: monospace;" id="emailBpaDestinatario">auditoriabacabal@gmail.com</div>
+                        </div>
+                    </div>
+                    <span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 9999px;">
+                        <i class="fas fa-check-circle"></i> Setor de Auditoria SMS
+                    </span>
+                </div>
+
+                <!-- Assunto Padronizado -->
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 600; font-size: 0.84rem; margin-bottom: 0.35rem; color: #334155;">
+                        <i class="fas fa-heading"></i> Assunto Padronizado do E-mail:
+                    </label>
+                    <input type="text" id="emailBpaAssunto" class="bpa-input" style="font-weight: 600; color: #0f172a;" readonly>
+                </div>
+
+                <!-- Card do Arquivo em Anexo -->
+                <div style="background: #eff6ff; border: 1px dashed #93c5fd; border-radius: 0.65rem; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <i class="fas fa-paperclip" style="font-size: 1.2rem; color: #0284c7;"></i>
+                        <div>
+                            <div style="font-size: 0.75rem; color: #0369a1; font-weight: 700; text-transform: uppercase;">Arquivo Anexo na Mensagem</div>
+                            <div style="font-family: monospace; font-size: 0.9rem; font-weight: 700; color: #0f172a;" id="emailBpaNomeArquivo">ARQUIVO.JUL</div>
+                        </div>
+                    </div>
+                    <span id="emailBpaTamanhoArquivo" style="font-size: 0.76rem; background: #ffffff; color: #0369a1; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 4px; font-weight: 600;">0 KB</span>
+                </div>
+
+                <!-- Corpo da Mensagem Formatado -->
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-weight: 600; font-size: 0.84rem; margin-bottom: 0.35rem; color: #334155;">
+                        <i class="fas fa-align-left"></i> Prévia do Corpo do E-mail:
+                    </label>
+                    <div id="emailBpaCorpoPreview" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 1rem; font-size: 0.83rem; line-height: 1.6; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-height: 230px; overflow-y: auto; white-space: pre-wrap;"></div>
+                </div>
+
+                <div style="font-size: 0.75rem; color: #64748b; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 0.4rem; padding: 0.5rem 0.75rem;">
+                    <i class="fas fa-shield-alt" style="color: #d97706;"></i> <strong>Registro de Segurança:</strong> O envio será registrado no sistema em nome de <strong id="emailBpaAutorNome">-</strong>. A data e hora do envio ficarão gravadas no banco de dados para conferência da Francileide.
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 1rem 1.4rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; border-radius: 0 0 1.1rem 1.1rem;">
+                <button type="button" class="btn-secondary" id="btnCancelEmailBpa">Cancelar</button>
+                <div style="display: flex; gap: 0.6rem;">
+                    <button type="button" class="btn-secondary" id="btnOpenGmailWebBpa" style="background: #ffffff; color: #dc2626; border-color: #fca5a5;" title="Abrir Gmail Web com os dados pré-preenchidos">
+                        <i class="fab fa-google"></i> Abrir no Gmail
+                    </button>
+                    <button type="button" class="btn-primary" id="btnConfirmarEnvioEmailBpa" style="background: linear-gradient(135deg, #0284c7, #0369a1);">
+                        <i class="fas fa-paper-plane"></i> Enviar Agora para Auditoria
+                    </button>
+                </div>
             </div>
         </div>
     </div>

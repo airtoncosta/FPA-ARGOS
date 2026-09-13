@@ -9,6 +9,10 @@ function cleanUnitName(str) {
               .trim();
 }
 
+function roundMoeda(val) {
+    return Math.round((Number(val || 0) + Number.EPSILON) * 100) / 100;
+}
+
 const Parser = {
 
     /**
@@ -177,21 +181,21 @@ const Parser = {
                     const qtGlos = qtPrz - qtApvd;
                     const vlGlos = vlPrz - vlApvd;
 
-                    // Acumular na Unidade
+                    // Acumular na Unidade (com arredondamento fidedigno a 2 decimais)
                     currentUnidade.qtdApresentada += qtPrz;
                     currentUnidade.qtdAprovada += qtApvd;
                     currentUnidade.qtdGlosada += qtGlos;
-                    currentUnidade.valApresentado += vlPrz;
-                    currentUnidade.valAprovado += vlApvd;
-                    currentUnidade.valGlosado += vlGlos;
+                    currentUnidade.valApresentado = roundMoeda(currentUnidade.valApresentado + vlPrz);
+                    currentUnidade.valAprovado = roundMoeda(currentUnidade.valAprovado + vlApvd);
+                    currentUnidade.valGlosado = roundMoeda(currentUnidade.valGlosado + vlGlos);
 
                     // Acumular no Resumo Geral
                     data.resumo.qtdApresentada += qtPrz;
                     data.resumo.qtdAprovada += qtApvd;
                     data.resumo.qtdGlosada += qtGlos;
-                    data.resumo.valApresentado += vlPrz;
-                    data.resumo.valAprovado += vlApvd;
-                    data.resumo.valGlosado += vlGlos;
+                    data.resumo.valApresentado = roundMoeda(data.resumo.valApresentado + vlPrz);
+                    data.resumo.valAprovado = roundMoeda(data.resumo.valAprovado + vlApvd);
+                    data.resumo.valGlosado = roundMoeda(data.resumo.valGlosado + vlGlos);
 
                     // Salvar Linha Fato
                     data.linhas.push({
@@ -222,9 +226,9 @@ const Parser = {
                     mesMap[cmp].qtdApresentada += qtPrz;
                     mesMap[cmp].qtdAprovada += qtApvd;
                     mesMap[cmp].qtdGlosada += qtGlos;
-                    mesMap[cmp].valApresentado += vlPrz;
-                    mesMap[cmp].valAprovado += vlApvd;
-                    mesMap[cmp].valGlosado += vlGlos;
+                    mesMap[cmp].valApresentado = roundMoeda(mesMap[cmp].valApresentado + vlPrz);
+                    mesMap[cmp].valAprovado = roundMoeda(mesMap[cmp].valAprovado + vlApvd);
+                    mesMap[cmp].valGlosado = roundMoeda(mesMap[cmp].valGlosado + vlGlos);
 
                     if (!mesMap[cmp].valoresPorUnidade[currentUnidade.id]) {
                         mesMap[cmp].valoresPorUnidade[currentUnidade.id] = { valApresentado: 0, valAprovado: 0, valGlosado: 0, qtdApresentada: 0, qtdAprovada: 0, qtdGlosada: 0 };
@@ -232,31 +236,45 @@ const Parser = {
                     mesMap[cmp].valoresPorUnidade[currentUnidade.id].qtdApresentada += qtPrz;
                     mesMap[cmp].valoresPorUnidade[currentUnidade.id].qtdAprovada += qtApvd;
                     mesMap[cmp].valoresPorUnidade[currentUnidade.id].qtdGlosada += qtGlos;
-                    mesMap[cmp].valoresPorUnidade[currentUnidade.id].valApresentado += vlPrz;
-                    mesMap[cmp].valoresPorUnidade[currentUnidade.id].valAprovado += vlApvd;
-                    mesMap[cmp].valoresPorUnidade[currentUnidade.id].valGlosado += vlGlos;
+                    mesMap[cmp].valoresPorUnidade[currentUnidade.id].valApresentado = roundMoeda(mesMap[cmp].valoresPorUnidade[currentUnidade.id].valApresentado + vlPrz);
+                    mesMap[cmp].valoresPorUnidade[currentUnidade.id].valAprovado = roundMoeda(mesMap[cmp].valoresPorUnidade[currentUnidade.id].valAprovado + vlApvd);
+                    mesMap[cmp].valoresPorUnidade[currentUnidade.id].valGlosado = roundMoeda(mesMap[cmp].valoresPorUnidade[currentUnidade.id].valGlosado + vlGlos);
 
-                    // Acumular no Procedimento
+                    // Acumular no Procedimento (com correlação fidedigna à Tabela Unificada SIGTAP)
                     if (!procMap[proc]) {
                         const cleanCode = proc.replace(/\D/g, '');
-                        const desc = (window.SIGTAP && window.SIGTAP[cleanCode]) || ('Procedimento ' + proc);
+                        const sigtapItem = (window.getSigtapProcedimento && window.getSigtapProcedimento(cleanCode)) || (window.SIGTAP_TABELA && window.SIGTAP_TABELA[cleanCode]);
+                        const desc = (sigtapItem && sigtapItem.nome) || (window.SIGTAP && window.SIGTAP[cleanCode]) || ('Procedimento ' + proc);
+                        const valTabela = sigtapItem ? (sigtapItem.vl_sa || 0) : 0;
+                        const financ = sigtapItem ? (sigtapItem.financiamento || '') : '';
+                        const complx = sigtapItem ? (sigtapItem.complexidade || '') : '';
+
                         procMap[proc] = {
                             codigo: proc,
                             descricao: desc,
-                            qtdAprovada: 0, valAprovado: 0, valUnitario: 0,
+                            valTabela: valTabela,
+                            financiamento: financ,
+                            complexidade: complx,
+                            qtdAprovada: 0, 
+                            valAprovado: 0, 
+                            valUnitario: 0,
+                            valEsperadoTabela: 0,
                             cbos: {},
                             valoresPorUnidade: {}
                         };
                     }
                     procMap[proc].qtdAprovada += qtApvd;
-                    procMap[proc].valAprovado += vlApvd;
-                    if (vlApvd > 0 && qtApvd > 0) {
-                        procMap[proc].valUnitario = vlApvd / qtApvd;
+                    procMap[proc].valAprovado = roundMoeda(procMap[proc].valAprovado + vlApvd);
+                    if (procMap[proc].valTabela > 0) {
+                        procMap[proc].valEsperadoTabela = roundMoeda(procMap[proc].qtdAprovada * procMap[proc].valTabela);
+                    }
+                    if (procMap[proc].valAprovado > 0 && procMap[proc].qtdAprovada > 0) {
+                        procMap[proc].valUnitario = roundMoeda(procMap[proc].valAprovado / procMap[proc].qtdAprovada);
                     }
                     if (!procMap[proc].valoresPorUnidade[currentUnidade.id]) {
                         procMap[proc].valoresPorUnidade[currentUnidade.id] = { valAprovado: 0, qtdAprovada: 0 };
                     }
-                    procMap[proc].valoresPorUnidade[currentUnidade.id].valAprovado += vlApvd;
+                    procMap[proc].valoresPorUnidade[currentUnidade.id].valAprovado = roundMoeda(procMap[proc].valoresPorUnidade[currentUnidade.id].valAprovado + vlApvd);
                     procMap[proc].valoresPorUnidade[currentUnidade.id].qtdAprovada += qtApvd;
 
                     if (cboCode && cboCode.match(/^[a-zA-Z0-9]{6}$/)) {
@@ -313,25 +331,33 @@ const Parser = {
 
         // Finalizar cálculos
         data.unidades.forEach(u => {
-            u.pctAprovacaoQtd = u.qtdApresentada > 0 ? (u.qtdAprovada / u.qtdApresentada * 100) : 0;
-            u.pctAprovacaoVal = u.valApresentado > 0 ? (u.valAprovado / u.valApresentado * 100) : (u.qtdAprovada > 0 ? 100 : 0);
+            u.pctAprovacaoQtd = u.qtdApresentada > 0 ? roundMoeda(u.qtdAprovada / u.qtdApresentada * 100) : 0;
+            u.pctAprovacaoVal = u.valApresentado > 0 ? roundMoeda(u.valAprovado / u.valApresentado * 100) : (u.qtdAprovada > 0 ? 100 : 0);
             if (u.valAprovado > 0 && u.valApresentado === 0) u.pctAprovacaoVal = 100;
         });
 
-        const totalAprov = data.resumo.valAprovado;
+        const totalAprov = roundMoeda(data.resumo.valAprovado);
         data.unidades.sort((a,b) => b.valAprovado - a.valAprovado);
         data.unidades.forEach((u, i) => {
             u.rank = i + 1;
-            u.pctDoTotal = totalAprov > 0 ? (u.valAprovado / totalAprov * 100) : 0;
+            u.pctDoTotal = totalAprov > 0 ? roundMoeda(u.valAprovado / totalAprov * 100) : 0;
         });
 
         data.resumo.totalUnidades = data.unidades.length;
-        data.resumo.pctAprovacaoQtd = data.resumo.qtdApresentada > 0 ? (data.resumo.qtdAprovada / data.resumo.qtdApresentada * 100) : 0;
-        data.resumo.pctGlosaQtd = data.resumo.qtdApresentada > 0 ? (data.resumo.qtdGlosada / data.resumo.qtdApresentada * 100) : 0;
+        data.resumo.valApresentado = roundMoeda(data.resumo.valApresentado);
+        data.resumo.valAprovado = roundMoeda(data.resumo.valAprovado);
+        data.resumo.valGlosado = roundMoeda(data.resumo.valGlosado);
+        data.resumo.pctAprovacaoQtd = data.resumo.qtdApresentada > 0 ? roundMoeda(data.resumo.qtdAprovada / data.resumo.qtdApresentada * 100) : 0;
+        data.resumo.pctGlosaQtd = data.resumo.qtdApresentada > 0 ? roundMoeda(data.resumo.qtdGlosada / data.resumo.qtdApresentada * 100) : 0;
+        data.resumo.pctAprovacaoVal = data.resumo.valApresentado > 0 ? roundMoeda(data.resumo.valAprovado / data.resumo.valApresentado * 100) : (data.resumo.valAprovado > 0 ? 100 : 0);
+        data.resumo.pctGlosaVal = data.resumo.valApresentado > 0 ? roundMoeda(data.resumo.valGlosado / data.resumo.valApresentado * 100) : 0;
 
         data.faturamentoMensal = Object.values(mesMap);
         data.faturamentoMensal.forEach(m => {
-            m.pctAprovado = m.valApresentado > 0 ? (m.valAprovado / m.valApresentado * 100) : (m.valAprovado > 0 ? 100 : 0);
+            m.valApresentado = roundMoeda(m.valApresentado);
+            m.valAprovado = roundMoeda(m.valAprovado);
+            m.valGlosado = roundMoeda(m.valGlosado);
+            m.pctAprovado = m.valApresentado > 0 ? roundMoeda(m.valAprovado / m.valApresentado * 100) : (m.valAprovado > 0 ? 100 : 0);
         });
 
         data.procedimentos = Object.values(procMap).map(p => {

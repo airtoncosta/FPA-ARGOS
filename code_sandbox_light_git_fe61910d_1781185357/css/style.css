@@ -2563,7 +2563,7 @@ body {
    ========================================================= */
 .arquivos-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 1.4286rem;
     margin-bottom: 1.7143rem;
 }
@@ -2595,11 +2595,6 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 1.3rem;
-}
-
-.arquivos-card.sigtap .arquivos-card-icon {
-    background: rgba(62, 207, 142, 0.1);
-    color: #3ecf8e;
 }
 
 .arquivos-card.logo-pdf .arquivos-card-icon {
@@ -2963,12 +2958,6 @@ body {
 }
 
 /* Responsividade da central de arquivos */
-@media (max-width: 85.7143rem) {
-    .arquivos-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
 @media (max-width: 60.7143rem) {
     .arquivos-grid {
         grid-template-columns: 1fr;
@@ -6224,14 +6213,315 @@ html {
     overflow: hidden;
 }
 
-.bpa-progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #0284c7, #10b981);
-    border-radius: 3px;
-    transition: width 0.5s ease;
+/* CHIPS INTELIGENTES DE RESPONSÁVEIS */
+.bpa-smart-chips-wrapper {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-sm);
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    overflow: hidden;
 }
 
-/* CHECKLIST FRANCILEIDE */
+.bpa-smart-chips-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--gray-600);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.bpa-smart-chips-list {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.2rem 0.1rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-300) transparent;
+}
+
+.bpa-smart-chips-list::-webkit-scrollbar {
+    height: 4px;
+}
+
+.bpa-smart-chips-list::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: 2px;
+}
+
+.bpa-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 2rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: var(--gray-700);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+
+.bpa-chip:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: var(--gray-900);
+    transform: translateY(-1px);
+}
+
+.bpa-chip.active {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    border-color: #0284c7;
+    color: #ffffff;
+    box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3);
+}
+
+.bpa-chip-avatar {
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+
+.bpa-chip.active .bpa-chip-avatar {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+.bpa-chip-badge {
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: #e2e8f0;
+    color: #475569;
+    font-weight: 700;
+}
+
+.bpa-chip.active .bpa-chip-badge {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+.bpa-chip-badge.pending-count {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.bpa-chip.active .bpa-chip-badge.pending-count {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* KPI CARDS INTERATIVOS */
+.bpa-kpi-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.bpa-kpi-card {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    padding: 1.1rem 1.3rem;
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+    position: relative;
+}
+
+.bpa-kpi-card.interactive {
+    cursor: pointer;
+    user-select: none;
+}
+
+.bpa-kpi-card.interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.bpa-kpi-card.interactive.active {
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2), 0 8px 20px rgba(2, 132, 199, 0.15);
+    border-color: #0284c7;
+}
+
+.bpa-kpi-card#bpaCardEnviadas.active {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2), 0 8px 20px rgba(16, 185, 129, 0.15);
+    border-color: #10b981;
+}
+
+.bpa-kpi-card#bpaCardPendentes.active {
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 8px 20px rgba(245, 158, 11, 0.15);
+    border-color: #f59e0b;
+}
+
+.bpa-kpi-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.25rem;
+}
+
+.bpa-kpi-filter-tag {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #e0f2fe;
+    color: #0284c7;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.bpa-kpi-filter-tag.delivered {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.bpa-kpi-filter-tag.pending {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+/* BARRA DE FILTROS ATIVOS */
+.bpa-active-filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    padding: 0.6rem 1rem;
+    border-radius: 0.65rem;
+    font-size: 0.82rem;
+    color: #0369a1;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    animation: fadeIn 0.25s ease;
+}
+
+.bpa-active-filter-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.bpa-active-filter-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.bpa-active-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #ffffff;
+    border: 1px solid #7dd3fc;
+    color: #0369a1;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.bpa-active-pill button {
+    background: none;
+    border: none;
+    color: #0284c7;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+.bpa-active-pill button:hover {
+    color: #ef4444;
+}
+
+.btn-clear-bpa-filters {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s;
+}
+
+.btn-clear-bpa-filters:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+/* LINHAS DE UNIDADES PENDENTES NA TABELA */
+.bpa-table-row.pending-unit-row {
+    background: rgba(254, 243, 199, 0.06);
+    border-left: 3px solid #f59e0b;
+}
+
+.bpa-file-pending-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.4rem;
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.bpa-btn-upload-direct-table {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.38rem 0.75rem;
+    border-radius: 0.4rem;
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.78rem;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+    transition: all 0.2s;
+}
+
+.bpa-btn-upload-direct-table:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(2, 132, 199, 0.35);
+}
 .bpa-checklist-wrapper {
     background: #ffffff;
     border-radius: 0.75rem;
@@ -6340,12 +6630,200 @@ html {
     white-space: nowrap;
 }
 
+.bpa-status-card.partial {
+    background: #fffdf5;
+    border-color: rgba(234, 179, 8, 0.45);
+    border-left: 4px solid #eab308;
+}
+
+.bpa-status-icon.partial {
+    color: #eab308;
+    font-size: 1rem;
+}
+
+.bpa-badge-partial {
+    background: #eab308;
+    color: #ffffff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+/* SLOTS DE MODALIDADES NO CARD (BPA-C + BPA-I) */
+.bpa-modalidades-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0.25rem 0;
+}
+
+.bpa-slot-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.45rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    font-size: 0.76rem;
+    transition: all 0.2s ease;
+}
+
+.bpa-slot-item.delivered {
+    background: #f0fdf4;
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+.bpa-slot-item.pending {
+    background: #fffbeb;
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.bpa-slot-left {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.bpa-slot-file-info {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.74rem;
+    color: #334155;
+}
+
+.bpa-type-tag {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+    white-space: nowrap;
+}
+
+.bpa-type-tag.bpa-c {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.bpa-type-tag.bpa-i {
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+}
+
+.bpa-slot-btn-dl {
+    background: #0284c7;
+    color: #ffffff;
+    border: none;
+    border-radius: 0.25rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.bpa-slot-btn-dl:hover {
+    background: #0369a1;
+}
+
+.bpa-slot-btn-up {
+    background: #ffffff;
+    color: #b45309;
+    border: 1px solid #f59e0b;
+    border-radius: 0.25rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.bpa-slot-btn-up:hover {
+    background: #fef3c7;
+}
+
 .bpa-card-meta {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.4rem 0.8rem;
     font-size: 0.78rem;
     color: var(--gray-600);
+}
+
+/* SELETOR RÁPIDO DE MODALIDADE DIRETO NO CARD */
+.bpa-unit-modalidade-badge-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.4rem;
+    font-size: 0.74rem;
+}
+
+.bpa-unit-modalidade-badge-group .bpa-modalidade-label {
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.72rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.bpa-select-modalidade-card {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    border-radius: 0.3rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0.15rem 0.4rem;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.bpa-select-modalidade-card:hover {
+    border-color: #94a3b8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.bpa-select-modalidade-card.mode-ambos {
+    color: #7e22ce;
+    background: #faf5ff;
+    border-color: #d8b4fe;
+}
+
+.bpa-select-modalidade-card.mode-c {
+    color: #15803d;
+    background: #f0fdf4;
+    border-color: #86efac;
+}
+
+.bpa-select-modalidade-card.mode-i {
+    color: #0369a1;
+    background: #f0f9ff;
+    border-color: #7dd3fc;
 }
 
 .bpa-file-pill {
@@ -6520,9 +6998,31 @@ html {
 .bpa-badge-tipo {
     background: rgba(56, 189, 248, 0.12);
     color: #38bdf8;
-    padding: 0.1rem 0.4rem;
+    padding: 0.12rem 0.45rem;
     border-radius: 0.25rem;
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 0.72rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.bpa-badge-tipo.bpa-c {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.bpa-badge-tipo.bpa-i {
+    background: rgba(14, 165, 233, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+}
+
+.bpa-badge-tipo.bpa-ambos {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 .bpa-cell-comp .comp-text {
@@ -6839,6 +7339,81 @@ html {
 
 .bpa-select-resp-row:focus {
     border-color: #0284c7;
+}
+
+/* BOTÃO E BADGE DE ENVIO PARA AUDITORIA (EMAIL) */
+.btn-bpa-email {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-bpa-email:hover {
+    background: linear-gradient(135deg, #0369a1, #075985);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
+}
+
+.btn-bpa-email.is-sent {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #86efac;
+}
+
+.btn-bpa-email.is-sent:hover {
+    background: #dcfce7;
+    box-shadow: none;
+    transform: none;
+}
+
+.bpa-slot-btn-email {
+    background: #f8fafc;
+    color: #0284c7;
+    border: 1px solid #bae6fd;
+    border-radius: 0.25rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.bpa-slot-btn-email:hover {
+    background: #e0f2fe;
+    border-color: #7dd3fc;
+    color: #0369a1;
+}
+
+.bpa-badge-email-sent {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #166534;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.bpa-badge-email-sent i {
+    color: #16a34a;
 }
 
 

@@ -200,26 +200,70 @@ const SupabaseService = {
        SIGTAP (RPC)
        ========================================================= */
 
-    async uploadSigtap(sigtapMap, onProgress = () => {}) {
+    async uploadSigtap(sigtapTabelaOrMap, onProgress = () => {}) {
         if (!this.init()) throw new Error('Supabase não configurado.');
-        const total = Object.keys(sigtapMap).length;
-        if (total === 0) return;
+        const items = Object.entries(sigtapTabelaOrMap || {});
+        if (items.length === 0) return;
         onProgress('Enviando SIGTAP para a nuvem...');
-        const dados = Object.entries(sigtapMap).map(([codigo, descricao]) => ({
-            codigo, descricao, valor_unitario: 0.00
-        }));
-        const result = await this._rpc('fn_upload_sigtap', { p_dados: dados });
-        onProgress(`Sincronização concluída! ${result.processados} itens processados.`);
+        const dados = items.map(([codigo, val]) => {
+            const descricao = typeof val === 'object' ? (val.nome || val.descricao) : val;
+            const valor_unitario = typeof val === 'object' ? (val.vl_sa || 0.00) : 0.00;
+            return { codigo, descricao, valor_unitario };
+        });
+        
+        const batchSize = 500;
+        for (let i = 0; i < dados.length; i += batchSize) {
+            const batch = dados.slice(i, i + batchSize);
+            const { error } = await this.client.from('procedimentos').upsert(batch, { onConflict: 'codigo' });
+            if (error) console.error("Erro ao salvar lote SIGTAP:", error);
+            onProgress(`Processando ${Math.min(i + batchSize, dados.length)} de ${dados.length}...`);
+        }
+        onProgress(`Sincronização concluída! ${dados.length} itens sincronizados.`);
     },
 
     async loadSigtap() {
         try {
-            const data = await this._rpc('fn_carregar_procedimentos');
-            if (!data || data.length === 0) return null;
+            if (!this.init()) return null;
+            const { data, error } = await this.client
+                .from('procedimentos')
+                .select('codigo, descricao, valor_unitario');
+            
+            if (error || !data || data.length === 0) {
+                const rpcData = await this._rpc('fn_carregar_procedimentos');
+                if (!rpcData || rpcData.length === 0) return null;
+                const map = {};
+                rpcData.forEach(p => {
+                    map[p.codigo] = p.descricao;
+                    if (window.SIGTAP_TABELA && window.SIGTAP_TABELA[p.codigo] && p.valor_unitario !== undefined) {
+                        window.SIGTAP_TABELA[p.codigo].vl_sa = parseFloat(p.valor_unitario) || window.SIGTAP_TABELA[p.codigo].vl_sa;
+                    }
+                });
+                return map;
+            }
+
             const map = {};
-            data.forEach(p => { map[p.codigo] = p.descricao; });
+            data.forEach(p => {
+                map[p.codigo] = p.descricao;
+                if (!window.SIGTAP_TABELA) window.SIGTAP_TABELA = {};
+                if (!window.SIGTAP_TABELA[p.codigo]) {
+                    window.SIGTAP_TABELA[p.codigo] = {
+                        codigo: p.codigo,
+                        nome: p.descricao,
+                        vl_sa: parseFloat(p.valor_unitario) || 0,
+                        vl_sh: 0,
+                        vl_sp: 0,
+                        financiamento: '06',
+                        complexidade: '2'
+                    };
+                } else {
+                    window.SIGTAP_TABELA[p.codigo].vl_sa = parseFloat(p.valor_unitario) || window.SIGTAP_TABELA[p.codigo].vl_sa;
+                }
+            });
             return map;
-        } catch (e) { return null; }
+        } catch (e) {
+            console.error("Erro ao carregar SIGTAP do Supabase:", e);
+            return null;
+        }
     },
 
     async savePortariaDb(portariaData) {

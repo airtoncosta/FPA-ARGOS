@@ -19,13 +19,22 @@ CREATE TABLE IF NOT EXISTS public.producoes_bpa (
     digitador_nome VARCHAR(255) NOT NULL,
     observacoes TEXT,
     status VARCHAR(50) DEFAULT 'ENVIADO', -- 'ENVIADO', 'BAIXADO', 'HOMOLOGADO'
+    email_enviado_em TIMESTAMP WITH TIME ZONE,
+    email_destinatario VARCHAR(255),
+    email_status VARCHAR(50) DEFAULT 'NAO_ENVIADO', -- 'NAO_ENVIADO', 'ENVIADO', 'ERRO'
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Garantir adição de colunas se a tabela já existir previamente
+ALTER TABLE public.producoes_bpa ADD COLUMN IF NOT EXISTS email_enviado_em TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.producoes_bpa ADD COLUMN IF NOT EXISTS email_destinatario VARCHAR(255);
+ALTER TABLE public.producoes_bpa ADD COLUMN IF NOT EXISTS email_status VARCHAR(50) DEFAULT 'NAO_ENVIADO';
 
 -- Índices para pesquisa e filtragem rápida
 CREATE INDEX IF NOT EXISTS idx_producoes_bpa_comp ON public.producoes_bpa(competencia);
 CREATE INDEX IF NOT EXISTS idx_producoes_bpa_estab ON public.producoes_bpa(estabelecimento_nome);
 CREATE INDEX IF NOT EXISTS idx_producoes_bpa_cnes ON public.producoes_bpa(cnes);
+CREATE INDEX IF NOT EXISTS idx_producoes_bpa_tipo ON public.producoes_bpa(tipo_bpa);
 CREATE INDEX IF NOT EXISTS idx_producoes_bpa_digitador ON public.producoes_bpa(digitador_username);
 CREATE INDEX IF NOT EXISTS idx_producoes_bpa_criado ON public.producoes_bpa(criado_em DESC);
 

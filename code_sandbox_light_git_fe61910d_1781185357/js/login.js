@@ -560,7 +560,6 @@ const LoginModule = {
         const btnImportarPage = document.getElementById('btnImportarArquivosPage');
         const btnUploadLogo = document.getElementById('btnUploadLogo');
         const btnExcluirLogo = document.getElementById('btnExcluirLogo');
-        const btnUploadSigtap = document.getElementById('btnUploadSigtap');
         const tabImportPortaria = document.getElementById('tabImportPortaria');
         const navMenuAdmin = document.getElementById('navMenuAdmin'); // Container do Menu Administração
 
@@ -571,7 +570,6 @@ const LoginModule = {
         if (btnImportarPage) btnImportarPage.classList.add('hidden');
         if (btnUploadLogo) btnUploadLogo.classList.add('hidden');
         if (btnExcluirLogo) btnExcluirLogo.classList.add('hidden');
-        if (btnUploadSigtap) btnUploadSigtap.classList.add('hidden');
         if (tabImportPortaria) tabImportPortaria.classList.add('hidden');
         if (navMenuAdmin) navMenuAdmin.style.display = 'none';
 
@@ -583,7 +581,6 @@ const LoginModule = {
             if (btnImportarPage) btnImportarPage.classList.remove('hidden');
             if (btnUploadLogo) btnUploadLogo.classList.remove('hidden');
             if (btnExcluirLogo) btnExcluirLogo.classList.remove('hidden');
-            if (btnUploadSigtap) btnUploadSigtap.classList.remove('hidden');
             if (tabImportPortaria) tabImportPortaria.classList.remove('hidden');
             if (navMenuAdmin) navMenuAdmin.style.display = 'block';
         }
@@ -598,7 +595,6 @@ const LoginModule = {
             // Habilitado para SUPERINTENDENTE conforme solicitado
             if (btnUploadLogo) btnUploadLogo.classList.remove('hidden');
             if (btnExcluirLogo) btnExcluirLogo.classList.remove('hidden');
-            if (btnUploadSigtap) btnUploadSigtap.classList.remove('hidden');
 
             if (user.perm_importar) {
                 if (tabImportPortaria) tabImportPortaria.classList.remove('hidden');
@@ -612,9 +608,6 @@ const LoginModule = {
         else if (role === 'GERENTE') {
             if (btnImportar) btnImportar.classList.remove('hidden');
             if (btnImportarPage) btnImportarPage.classList.remove('hidden');
-            // Oculta completamente o card do SIGTAP e Portaria para GERENTE
-            const cardSigtap = document.querySelector('.arquivos-card.sigtap');
-            if (cardSigtap) cardSigtap.style.display = 'none';
         }
     },
 
@@ -697,7 +690,7 @@ const LoginModule = {
                 await window.AppDB.removeItem('datasets');
 
                 const imports = await window.AppDB.getItem('imported_files') || [];
-                const globais = imports.filter(i => i.type === 'SIGTAP' || i.type === 'PORTARIA');
+                const globais = imports.filter(i => i.type === 'PORTARIA');
                 await window.AppDB.setItem('imported_files', globais);
             } catch (err) {
                 console.error("Erro ao limpar dados locais na saída:", err);
