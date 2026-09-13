@@ -1,0 +1,13 @@
+{
+  "name": "fpa-argos",
+  "version": "4.0.0",
+  "description": "FPA ARGOS — Plataforma Inteligente de Controle, Avaliação, Auditoria e Regulação do SUS",
+  "main": "code_sandbox_light_git_fe61910d_1781185357/index.html",
+  "scripts": {
+    "dev": "npx serve -l 3000 code_sandbox_light_git_fe61910d_1781185357",
+    "start": "npx serve -l 3000 code_sandbox_light_git_fe61910d_1781185357"
+  },
+  "keywords": ["sus", "siasus", "sigtap", "argos"],
+  "author": "Airton Costa",
+  "license": "ISC"
+}

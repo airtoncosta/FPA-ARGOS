@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <base href="/sigtap/">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Consulta rápida à Tabela Unificada do SIGTAP — procedimentos, valores, CIDs, ocupações e relações."
+    />
+    <link rel="preconnect" href="https://rsms.me/" />
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+    <title>SIGTAP — Consulta</title>
+    <script>
+      // Sincroniza tema conforme preferência ou padrão claro do ARGOS
+      (function () {
+        try {
+          var stored = localStorage.getItem("sigtap-theme");
+          if (stored === "dark") {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-BRTXqGpF.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DHryfzsZ.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

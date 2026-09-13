@@ -19,6 +19,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindReports();
     bindSupabase(); // Inicializa o controle do modal e ações do Supabase
 
+    // Inicializar Central de Produções BPA
+    if (window.BpaModule && typeof window.BpaModule.init === 'function') {
+        window.BpaModule.init();
+    }
+
     // Carregar dados do banco de dados ou fallback para empty/demo
     try {
         const savedSigtap = await AppDB.getItem('SIGTAP_DB');
@@ -559,7 +564,7 @@ function navigateTo(section) {
     // Ocultar ou Mostrar a barra de filtros dependendo da seção
     const filterBar = document.getElementById('filter-bar');
     if (filterBar) {
-        if (section === 'minha-conta' || section === 'usuarios' || section === 'relatorios' || section === 'arquivos') {
+        if (section === 'minha-conta' || section === 'usuarios' || section === 'relatorios' || section === 'arquivos' || section === 'sigtap' || section === 'producoes-bpa') {
             filterBar.style.display = 'none';
         } else {
             filterBar.style.display = 'flex';
@@ -571,6 +576,10 @@ function navigateTo(section) {
         } else {
             filterBar.classList.remove('is-sticky');
         }
+    }
+
+    if (section === 'producoes-bpa' && window.BpaModule && typeof window.BpaModule.renderAll === 'function') {
+        setTimeout(() => window.BpaModule.renderAll(), 50);
     }
 
     // Re-renderizar gráficos se necessário
@@ -615,6 +624,13 @@ function loadData(data) {
     populateFilterProcedimentosCbo(data);
     populateFilterMesAno();
     renderAll(data);
+
+    // Atualizar Unidades e Checklist do Módulo BPA com os dados do sistema
+    if (window.BpaModule && typeof window.BpaModule.renderAll === 'function') {
+        window.BpaModule.populateDatalistUnidades();
+        window.BpaModule.renderAll();
+    }
+
     document.getElementById('lblCompetencia').textContent = data.competencia || 'Sem competência';
 
     const lblMunicipio = document.getElementById('lblMunicipio');

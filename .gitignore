@@ -28,3 +28,9 @@ node_modules/
 .idea/
 *.swp
 *.swo
+
+# Build temporário do SIGTAP
+.temp_sigtap/
+
+# GitHub Actions workflows (requer permissão workflow separada)
+.github/

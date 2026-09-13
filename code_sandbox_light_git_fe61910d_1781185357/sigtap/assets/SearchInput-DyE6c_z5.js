@@ -1,0 +1,11 @@
+import{a7 as d,ao as s,am as o,a3 as f,a2 as g}from"./index-BRTXqGpF.js";/**
+ * @license lucide-react v0.453.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const y=d("ChevronsUpDown",[["path",{d:"m7 15 5 5 5-5",key:"1hf1tw"}],["path",{d:"m7 9 5-5 5 5",key:"sgt6xg"}]]);/**
+ * @license lucide-react v0.453.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const h=d("Search",[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["path",{d:"m21 21-4.3-4.3",key:"1qie3q"}]]);function x(e,t=350){const[r,n]=s.useState(e);return s.useEffect(()=>{const c=setTimeout(()=>n(e),t);return()=>clearTimeout(c)},[e,t]),r}const p=s.forwardRef(({className:e,type:t,...r},n)=>o.jsx("input",{type:t,className:f("flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",e),ref:n,...r}));p.displayName="Input";function w({value:e,onDebouncedChange:t,placeholder:r="Buscar por código ou nome…",className:n,delay:c=350,autoFocus:b}){const[i,u]=s.useState(e),a=x(i,c),l=s.useRef(e);return s.useEffect(()=>{u(e),l.current=e},[e]),s.useEffect(()=>{a!==l.current&&(l.current=a,t(a))},[a,t]),o.jsxs("div",{className:f("relative",n),children:[o.jsx(h,{className:"pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"}),o.jsx(p,{value:i,onChange:m=>u(m.target.value),placeholder:r,className:"pl-9 pr-9",autoFocus:b,type:"search","aria-label":"Buscar"}),i&&o.jsx("button",{type:"button",onClick:()=>u(""),"aria-label":"Limpar busca",className:"absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",children:o.jsx(g,{className:"h-4 w-4"})})]})}export{y as C,p as I,h as S,w as a,x as u};

@@ -68,9 +68,13 @@ const SIGTAP = {
     "0101030029": "Visita Domiciliar por Profissional de Nível Superior",
 
     // Fisioterapia e Procedimentos Especiais
+    "0302050019": "Atendimento Fisioterapêutico em Transtornos Motores e Neurológicos",
     "0302050027": "Atendimento Fisioterapêutico nas Alterações Motoras",
     "0302050026": "Atendimento Fisioterapêutico nas Alterações Motoras", // Fallback
+    "0302060014": "Atendimento Fisioterapêutico nas Alterações Traumato-Ortopédicas",
     "0302040013": "Atendimento Fisioterapêutico em Transtornos Respiratórios",
+    "0302010017": "Atendimento Fisioterapêutico em Afecções Reumáticas",
+    "0302020012": "Atendimento Fisioterapêutico em Disfunção Cardiovascular",
     "0309050048": "Sessão de Psicoterapia Individual",
     "0309050056": "Sessão de Psicoterapia em Grupo",
 

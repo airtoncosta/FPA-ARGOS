@@ -473,3 +473,10 @@ let APP_STATE = {
     filters: { ano: 'all', mes: 'all', unidade: 'all', procedimento: 'all', cbo: 'all', status: 'all' },
     chartsInstances: {}
 };
+
+// Expor DEMO_DATA globalmente no objeto window para acessibilidade universal
+if (typeof window !== 'undefined') {
+    window.DEMO_DATA = DEMO_DATA;
+    window.APP_STATE = APP_STATE;
+}
+
