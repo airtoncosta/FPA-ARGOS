@@ -1,0 +1,12 @@
+{
+  "provider": "smtp",
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 465,
+  "smtp_secure": true,
+  "smtp_user": "airtoncosta04@gmail.com",
+  "smtp_pass": "dhdu uetz buab pehb",
+  "from_name": "ARGOS Produções BPA - SMS Bacabal",
+  "from_email": "airtoncosta04@gmail.com",
+  "default_destinatario": "auditoriabacabal@gmail.com",
+  "resend_api_key": ""
+}

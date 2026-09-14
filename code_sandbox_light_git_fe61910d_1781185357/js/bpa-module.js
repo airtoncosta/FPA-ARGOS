@@ -34,7 +34,7 @@ const BpaModule = {
     },
 
     siglasUnidades: {
-        'TOMO': 'TOMOGRAFIA',
+        'TOMO': 'HOSPITAL MARIA SOCORRO BRANDÃO', // Exames de Tomografia do Hospital HMSO
         'HMSO': 'HOSPITAL MARIA SOCORRO BRANDÃO',
         'HMI': 'HOSPITAL MATERNO INFANTIL',
         'CESP': 'CENTRO DE ESPECIALIDADES DR. COELHO',
@@ -155,20 +155,11 @@ const BpaModule = {
             ];
         }
 
-        // 4. Garantir que a TOMOGRAFIA conste na lista se não estiver
-        const hasTomo = unidades.some(u => u.nome.includes('TOMOGRAFIA') || u.nome === 'TOMO');
-        if (!hasTomo) {
-            unidades.unshift({
-                id: 'tomo',
-                nome: 'TOMOGRAFIA',
-                cnes: '2387412'
-            });
-        }
-
-        // 5. Incluir também unidades de produções já enviadas que sejam casos isolados
+        // 4. Incluir unidades de produções já enviadas que sejam casos isolados (exceto exames SADT como Tomografia)
         this.producoes.forEach(p => {
             if (p.estabelecimento_nome) {
                 const nomeNorm = p.estabelecimento_nome.trim().toUpperCase();
+                if (nomeNorm === 'TOMOGRAFIA' || nomeNorm === 'TOMO') return; // Exame SADT do HMSO, não é unidade isolada
                 const cnesP = (p.cnes || '').trim();
                 const exists = unidades.some(u => 
                     (cnesP && u.cnes && u.cnes.replace(/\D/g, '') === cnesP.replace(/\D/g, '')) ||
@@ -260,7 +251,6 @@ const BpaModule = {
             if (str) return JSON.parse(str);
         } catch(e){}
         return {
-            'TOMOGRAFIA': 'Ewerton',
             'HOSPITAL MARIA SOCORRO BRANDÃO': 'Flávia',
             'HOSPITAL MATERNO INFANTIL': 'Jéssica',
             'CENTRO DE ESPECIALIDADES DR. COELHO': 'Carol',
@@ -330,7 +320,6 @@ const BpaModule = {
             'CTA': 'AMBOS',
             'CENTRO DE ESPECIALIDADE ODONTOLOGIC': 'AMBOS',
             'CEO': 'AMBOS',
-            'TOMOGRAFIA': 'BPA-I',
             'UNIDADE DE TRATAMENTO FORA DO DOMIC': 'BPA-I',
             'TFD': 'BPA-I',
             'LABORATÓRIO CENTRAL DR. COELHO DIAS': 'BPA-C',
@@ -828,6 +817,48 @@ const BpaModule = {
             }
         }
 
+        // HIGIENIZAÇÃO AUTOMÁTICA: Tomografia é exame realizado pelo Hospital Maria Socorro Brandão, não estabelecimento isolado
+        let wasSanitized = false;
+        loaded = loaded.map(p => {
+            if (p.estabelecimento_nome === 'TOMOGRAFIA' || p.estabelecimento_nome === 'TOMO') {
+                wasSanitized = true;
+                return {
+                    ...p,
+                    estabelecimento_nome: 'HOSPITAL MARIA SOCORRO BRANDÃO',
+                    cnes: '2387412',
+                    tipo_exame: 'Tomografia Computadorizada',
+                    observacoes: (p.observacoes && !p.observacoes.includes('Tomografia') && !p.observacoes.includes('tomografia'))
+                        ? `Exames de Tomografia: ${p.observacoes}`
+                        : (p.observacoes || 'Produção de exames de tomografia computadorizada — Hospital Maria Socorro Brandão.')
+                };
+            }
+            return p;
+        });
+
+        if (wasSanitized) {
+            localStorage.setItem(this.storageKey, JSON.stringify(loaded));
+        }
+
+        // Limpeza de chaves antigas de TOMOGRAFIA salvas no localStorage do usuário
+        try {
+            const respStr = localStorage.getItem(this.responsaveisKey);
+            if (respStr) {
+                const respObj = JSON.parse(respStr);
+                if (respObj['TOMOGRAFIA']) {
+                    delete respObj['TOMOGRAFIA'];
+                    localStorage.setItem(this.responsaveisKey, JSON.stringify(respObj));
+                }
+            }
+            const modalStr = localStorage.getItem(this.modalidadesKey);
+            if (modalStr) {
+                const modalObj = JSON.parse(modalStr);
+                if (modalObj['TOMOGRAFIA']) {
+                    delete modalObj['TOMOGRAFIA'];
+                    localStorage.setItem(this.modalidadesKey, JSON.stringify(modalObj));
+                }
+            }
+        } catch(e){}
+
         this.producoes = loaded;
         this.renderLoadingState(false);
         this.populateCompetenciaFilter();
@@ -841,16 +872,17 @@ const BpaModule = {
             {
                 id: 'bpa-mock-1',
                 nome_arquivo: 'PATOMO7-.JUL',
-                estabelecimento_nome: 'TOMOGRAFIA',
+                estabelecimento_nome: 'HOSPITAL MARIA SOCORRO BRANDÃO',
                 cnes: '2387412',
                 competencia: '07/2026',
                 tipo_bpa: 'BPA-C',
+                tipo_exame: 'Tomografia Computadorizada',
                 tamanho_bytes: 124800,
                 tamanho_formatado: '124K',
-                conteudo_arquivo: '01#BPA#2026070001200000042387412TOMOGRAFIA HOSPITAL GERAL          02.00\r\n03238741220260722512502040101780001',
+                conteudo_arquivo: '01#BPA#2026070001200000042387412HOSPITAL MARIA DO SOCORRO BRANDAO 02.00\r\n03238741220260722512502040101780001',
                 digitador_username: 'ewerton',
                 digitador_nome: 'Ewerton',
-                observacoes: 'Produção de tomografias do mês de Julho/2026 finalizada e validada no BPA Mag.',
+                observacoes: 'Produção de exames de tomografia do mês de Julho/2026 — Hospital Maria Socorro Brandão.',
                 status: 'ENVIADO',
                 criado_em: new Date('2026-08-05T14:32:00Z').toISOString()
             },
@@ -1050,10 +1082,8 @@ const BpaModule = {
        ========================================================= */
     canSendEmail(prod, currentUser) {
         if (!currentUser) currentUser = this.getCurrentUser();
-        if (!prod) return false;
-        const isPrivileged = this.isAdminOrFrancileide(currentUser);
-        const isOwner = (currentUser.username === prod.digitador_username);
-        return isPrivileged || isOwner;
+        // Permite envio por qualquer usuário autenticado no ARGOS
+        return true;
     },
 
     buildEmailPayload(prod) {
@@ -1072,54 +1102,54 @@ const BpaModule = {
             `• Responsável pelo Envio: ${prod.digitador_nome} (@${prod.digitador_username})\n` +
             `• Data de Registro: ${this.formatTimestamp(prod.criado_em)}\n` +
             (prod.observacoes ? `• Observações: ${prod.observacoes}\n` : '') +
-            `\nO arquivo correspondente segue em anexo para conferência, importação no BPA Magnético e arquivamento oficial.\n\n` +
+            `\nO arquivo oficial correspondente (${prod.nome_arquivo}) encontra-se em anexo nesta mensagem para conferência, validação no BPA Magnético e arquivamento oficial da SMS Bacabal.\n\n` +
             `Atenciosamente,\n` +
             `${prod.digitador_nome}\n` +
             `Setor de Faturamento / ARGOS - Bacabal-MA`;
 
         const corpoHtml = `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; color: #1e293b; line-height: 1.6;">
-                <div style="background: #0284c7; padding: 1.2rem; border-radius: 8px 8px 0 0; color: #ffffff;">
-                    <h2 style="margin: 0; font-size: 1.25rem;">ARGOS — Notificação de Produção BPA</h2>
-                    <p style="margin: 0.25rem 0 0 0; opacity: 0.9; font-size: 0.85rem;">Secretaria Municipal de Saúde de Bacabal / Setor de Auditoria</p>
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; color: #1e293b; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <div style="background: linear-gradient(135deg, #0284c7, #0369a1); padding: 1.3rem; color: #ffffff;">
+                    <h2 style="margin: 0; font-size: 1.25rem;">ARGOS — Notificação Oficial de Produção BPA</h2>
+                    <p style="margin: 0.35rem 0 0 0; opacity: 0.92; font-size: 0.85rem;">Secretaria Municipal de Saúde de Bacabal / Setor de Auditoria</p>
                 </div>
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-top: none; padding: 1.5rem; border-radius: 0 0 8px 8px;">
-                    <p style="margin-top: 0;">Prezada Equipe de Auditoria / Francileide,</p>
-                    <p>Informamos que a produção ambulatorial abaixo foi homologada e anexada no sistema ARGOS:</p>
-                    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem;">
+                <div style="background: #f8fafc; padding: 1.5rem;">
+                    <p style="margin-top: 0; font-size: 0.95rem;">Prezada Equipe de Auditoria / Francileide,</p>
+                    <p style="font-size: 0.92rem; color: #334155;">Informamos que a produção ambulatorial abaixo foi homologada e anexada no sistema ARGOS:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 1.1rem 0; font-size: 0.9rem; background: #ffffff; border-radius: 6px; border: 1px solid #e2e8f0;">
                         <tr style="border-bottom: 1px solid #e2e8f0;">
-                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569; width: 40%;">Unidade de Saúde:</td>
-                            <td style="padding: 0.5rem 0; font-weight: 700; color: #0f172a;">${prod.estabelecimento_nome}</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 600; color: #475569; width: 40%;">Unidade de Saúde:</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 700; color: #0f172a;">${prod.estabelecimento_nome}</td>
                         </tr>
                         <tr style="border-bottom: 1px solid #e2e8f0;">
-                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">CNES:</td>
-                            <td style="padding: 0.5rem 0; font-family: monospace;">${prod.cnes || 'N/D'}</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 600; color: #475569;">CNES:</td>
+                            <td style="padding: 0.6rem 0.8rem; font-family: monospace;">${prod.cnes || 'N/D'}</td>
                         </tr>
                         <tr style="border-bottom: 1px solid #e2e8f0;">
-                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Competência:</td>
-                            <td style="padding: 0.5rem 0;">${compLabel} (${prod.competencia})</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 600; color: #475569;">Competência:</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 600;">${compLabel} (${prod.competencia})</td>
                         </tr>
                         <tr style="border-bottom: 1px solid #e2e8f0;">
-                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Modalidade:</td>
-                            <td style="padding: 0.5rem 0; font-weight: 600; color: #0284c7;">${tipoNome}</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 600; color: #475569;">Modalidade:</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 700; color: #0284c7;">${tipoNome}</td>
                         </tr>
                         <tr style="border-bottom: 1px solid #e2e8f0;">
-                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Arquivo Anexo:</td>
-                            <td style="padding: 0.5rem 0; font-family: monospace; font-weight: 700;">${prod.nome_arquivo} (${prod.tamanho_formatado})</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 600; color: #475569;">Arquivo em Anexo:</td>
+                            <td style="padding: 0.6rem 0.8rem; font-family: monospace; font-weight: 700; color: #0369a1;">📎 ${prod.nome_arquivo} (${prod.tamanho_formatado})</td>
                         </tr>
                         <tr style="border-bottom: 1px solid #e2e8f0;">
-                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Digitador Responsável:</td>
-                            <td style="padding: 0.5rem 0;">${prod.digitador_nome} (@${prod.digitador_username})</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 600; color: #475569;">Digitador Responsável:</td>
+                            <td style="padding: 0.6rem 0.8rem;">${prod.digitador_nome} (@${prod.digitador_username})</td>
                         </tr>
                         <tr>
-                            <td style="padding: 0.5rem 0; font-weight: 600; color: #475569;">Data do Registro:</td>
-                            <td style="padding: 0.5rem 0;">${this.formatTimestamp(prod.criado_em)}</td>
+                            <td style="padding: 0.6rem 0.8rem; font-weight: 600; color: #475569;">Data do Registro:</td>
+                            <td style="padding: 0.6rem 0.8rem;">${this.formatTimestamp(prod.criado_em)}</td>
                         </tr>
                     </table>
-                    ${prod.observacoes ? `<div style="background: #ffffff; border-left: 3px solid #0284c7; padding: 0.6rem 0.8rem; margin: 1rem 0; font-size: 0.85rem;"><strong>Observações:</strong> ${prod.observacoes}</div>` : ''}
-                    <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0;">
-                        📎 O arquivo original encontra-se anexado a este e-mail para processamento e arquivo oficial.
-                    </p>
+                    ${prod.observacoes ? `<div style="background: #ffffff; border-left: 4px solid #0284c7; padding: 0.75rem 1rem; margin: 1rem 0; font-size: 0.86rem; border-radius: 4px;"><strong>Observações:</strong> ${prod.observacoes}</div>` : ''}
+                    <div style="background: #eff6ff; border: 1px dashed #93c5fd; border-radius: 6px; padding: 0.85rem 1rem; margin-top: 1rem; font-size: 0.86rem; color: #0369a1;">
+                        📎 <strong>Anexo Oficial:</strong> O arquivo original <code>${prod.nome_arquivo}</code> encontra-se anexado a este e-mail para processamento no BPA Magnético e arquivo oficial.
+                    </div>
                 </div>
             </div>
         `;
@@ -1142,17 +1172,30 @@ const BpaModule = {
             return;
         }
 
-        const currentUser = this.getCurrentUser();
-        if (!this.canSendEmail(prod, currentUser)) {
-            alert(`Acesso restrito: Apenas o autor deste envio (${prod.digitador_nome}) ou a gestão (Francileide / Administrador) podem disparar o e-mail oficial para a Auditoria.`);
-            return;
-        }
-
         this.pendingEmailProducao = prod;
         const emailData = this.buildEmailPayload(prod);
 
         const modal = document.getElementById('modalPreviewEmailBpa');
         if (!modal) return;
+
+        // Limpar alertas anteriores
+        const alertBox = document.getElementById('alertEmailFeedbackBpa');
+        if (alertBox) {
+            alertBox.classList.add('hidden');
+            alertBox.innerHTML = '';
+        }
+
+        // Fechar gaveta de config
+        const drawer = document.getElementById('emailBpaConfigDrawer');
+        if (drawer) drawer.classList.add('hidden');
+
+        // Preencher dados na tela
+        const inputDest = document.getElementById('emailBpaDestinatario');
+        if (inputDest) {
+            inputDest.value = emailData.destinatario;
+        }
+        const inputCc = document.getElementById('emailBpaCc');
+        if (inputCc) inputCc.value = '';
 
         document.getElementById('emailBpaAssunto').value = emailData.assunto;
         document.getElementById('emailBpaNomeArquivo').textContent = emailData.nomeArquivo;
@@ -1160,13 +1203,218 @@ const BpaModule = {
         document.getElementById('emailBpaCorpoPreview').textContent = emailData.corpoTexto;
         document.getElementById('emailBpaAutorNome').textContent = `${prod.digitador_nome} (@${prod.digitador_username})`;
 
+        // Botão de download direto do anexo no card
+        const btnBaixarAnexo = document.getElementById('btnBaixarAnexoModal');
+        if (btnBaixarAnexo) {
+            btnBaixarAnexo.onclick = () => this.downloadFile(prod.id);
+        }
+
         modal.classList.remove('hidden');
+
+        // Verificar status das credenciais do servidor em segundo plano
+        this.checkServerEmailStatus();
     },
 
     closeEmailModal() {
         const modal = document.getElementById('modalPreviewEmailBpa');
         if (modal) modal.classList.add('hidden');
         this.pendingEmailProducao = null;
+    },
+
+    async checkServerEmailStatus() {
+        const badge = document.getElementById('emailStatusBadgeConfig');
+        if (!badge) return;
+        try {
+            const res = await fetch('/api/bpa/email-config');
+            if (res.ok) {
+                const cfg = await res.json();
+                if (cfg.has_smtp_configured) {
+                    badge.style.background = '#dcfce7';
+                    badge.style.color = '#15803d';
+                    badge.innerHTML = `<i class="fas fa-check-circle"></i> SMTP Configurado (${cfg.smtp_user || cfg.smtp_host})`;
+                } else if (cfg.has_resend_configured) {
+                    badge.style.background = '#dcfce7';
+                    badge.style.color = '#15803d';
+                    badge.innerHTML = `<i class="fas fa-check-circle"></i> Resend API Ativa`;
+                } else {
+                    badge.style.background = '#fef3c7';
+                    badge.style.color = '#92400e';
+                    badge.innerHTML = `<i class="fas fa-info-circle"></i> Servidor Sem Credenciais`;
+                }
+            } else {
+                badge.style.background = '#f1f5f9';
+                badge.style.color = '#64748b';
+                badge.textContent = 'Servidor local';
+            }
+        } catch(e) {
+            badge.style.background = '#f1f5f9';
+            badge.style.color = '#64748b';
+            badge.textContent = 'Servidor local';
+        }
+    },
+
+    generateEmlBlob(prod, emailData) {
+        const boundary = '----=_Part_ARGOS_' + Date.now().toString(16) + Math.random().toString(16).substring(2);
+        const destInput = document.getElementById('emailBpaDestinatario');
+        const destinatario = (destInput && destInput.value.trim()) || emailData.destinatario;
+        const ccInput = document.getElementById('emailBpaCc');
+        const copia = (ccInput && ccInput.value.trim()) || '';
+        const assuntoInput = document.getElementById('emailBpaAssunto');
+        const assunto = (assuntoInput && assuntoInput.value.trim()) || emailData.assunto;
+
+        // Base64 do anexo
+        let base64Content = '';
+        try {
+            base64Content = btoa(unescape(encodeURIComponent(prod.conteudo_arquivo || '')));
+        } catch(e) {
+            base64Content = btoa(prod.conteudo_arquivo || '');
+        }
+        const b64Lines = base64Content.match(/.{1,76}/g) || [base64Content];
+
+        let eml = '';
+        eml += `From: "ARGOS Produções BPA" <noreply@argos.saude.gov.br>\r\n`;
+        eml += `To: ${destinatario}\r\n`;
+        if (copia) eml += `Cc: ${copia}\r\n`;
+        try {
+            eml += `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(assunto)))}?=\r\n`;
+        } catch(e) {
+            eml += `Subject: ${assunto}\r\n`;
+        }
+        eml += `Date: ${new Date().toUTCString()}\r\n`;
+        eml += `MIME-Version: 1.0\r\n`;
+        eml += `Content-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n`;
+
+        // Parte 1: Corpo da mensagem HTML
+        eml += `--${boundary}\r\n`;
+        eml += `Content-Type: text/html; charset=UTF-8\r\n`;
+        eml += `Content-Transfer-Encoding: 8bit\r\n\r\n`;
+        eml += `${emailData.corpoHtml}\r\n\r\n`;
+
+        // Parte 2: Anexo oficial do arquivo BPA
+        const filename = prod.nome_arquivo || 'PRODUCAO.BPA';
+        eml += `--${boundary}\r\n`;
+        eml += `Content-Type: application/octet-stream; name="${filename}"\r\n`;
+        eml += `Content-Disposition: attachment; filename="${filename}"\r\n`;
+        eml += `Content-Transfer-Encoding: base64\r\n\r\n`;
+        eml += b64Lines.join('\r\n') + '\r\n\r\n';
+
+        eml += `--${boundary}--\r\n`;
+
+        return new Blob([eml], { type: 'message/rfc822' });
+    },
+
+    downloadEmlFile() {
+        if (!this.pendingEmailProducao) return;
+        const prod = this.pendingEmailProducao;
+        const emailData = this.buildEmailPayload(prod);
+
+        const emlBlob = this.generateEmlBlob(prod, emailData);
+        const url = URL.createObjectURL(emlBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `EMAIL_PRODUCAO_${prod.nome_arquivo || 'BPA'}.eml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        // Atualizar status
+        const dest = (document.getElementById('emailBpaDestinatario') && document.getElementById('emailBpaDestinatario').value.trim()) || 'auditoriabacabal@gmail.com';
+        prod.email_enviado_em = new Date().toISOString();
+        prod.email_destinatario = dest;
+        prod.email_status = 'EML_GERADO';
+        localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
+
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            try {
+                const client = window.SupabaseConfig.getClient();
+                if (client) {
+                    client.from('producoes_bpa').update({
+                        email_enviado_em: prod.email_enviado_em,
+                        email_destinatario: prod.email_destinatario,
+                        email_status: 'EML_GERADO'
+                    }).eq('id', prod.id);
+                }
+            } catch(e){}
+        }
+
+        const alertBox = document.getElementById('alertEmailFeedbackBpa');
+        if (alertBox) {
+            alertBox.classList.remove('hidden');
+            alertBox.style.background = '#eff6ff';
+            alertBox.style.border = '1px solid #bfdbfe';
+            alertBox.style.color = '#1e40af';
+            alertBox.innerHTML = `
+                <div style="font-weight: 700; margin-bottom: 0.2rem;"><i class="fas fa-check-circle" style="color: #2563eb;"></i> Arquivo .eml com Anexo Gerado com Sucesso!</div>
+                <div>O arquivo <strong>EMAIL_PRODUCAO_${prod.nome_arquivo}.eml</strong> foi baixado e já contém o anexo <strong>${prod.nome_arquivo}</strong> embutido. Ao abrir no Outlook, Windows Mail ou Thunderbird, o anexo já estará anexado automaticamente!</div>
+            `;
+        }
+
+        this.renderAll();
+        this.showToast(`E-mail com anexo embutido (.eml) gerado para ${dest}!`, 'success');
+    },
+
+    openGmailWeb() {
+        if (!this.pendingEmailProducao) return;
+        const prod = this.pendingEmailProducao;
+        const emailData = this.buildEmailPayload(prod);
+
+        // 1. Baixar arquivo imediatamente para a pasta Downloads
+        this.downloadFile(prod.id);
+
+        const dest = (document.getElementById('emailBpaDestinatario') && document.getElementById('emailBpaDestinatario').value.trim()) || 'auditoriabacabal@gmail.com';
+        const cc = (document.getElementById('emailBpaCc') && document.getElementById('emailBpaCc').value.trim()) || '';
+        const assunto = (document.getElementById('emailBpaAssunto') && document.getElementById('emailBpaAssunto').value.trim()) || emailData.assunto;
+
+        // Adicionar instrução amigável no corpo do texto para o usuário não esquecer de anexar no Gmail
+        const corpoGmail = `[ARQUIVO DE PRODUÇÃO: ${prod.nome_arquivo}]\n(O arquivo foi baixado na pasta Downloads. Anexe-o nesta mensagem clicando no clipe 📎 abaixo)\n\n` + emailData.corpoTexto;
+
+        const subjectEnc = encodeURIComponent(assunto);
+        const bodyEnc = encodeURIComponent(corpoGmail);
+        let gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(dest)}&su=${subjectEnc}&body=${bodyEnc}`;
+        if (cc) gmailUrl += `&cc=${encodeURIComponent(cc)}`;
+        window.open(gmailUrl, '_blank');
+
+        prod.email_enviado_em = new Date().toISOString();
+        prod.email_destinatario = dest;
+        prod.email_status = 'GMAIL_ABERTO';
+        localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
+
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            try {
+                const client = window.SupabaseConfig.getClient();
+                if (client) {
+                    client.from('producoes_bpa').update({
+                        email_enviado_em: prod.email_enviado_em,
+                        email_destinatario: prod.email_destinatario,
+                        email_status: 'GMAIL_ABERTO'
+                    }).eq('id', prod.id);
+                }
+            } catch(e){}
+        }
+
+        const alertBox = document.getElementById('alertEmailFeedbackBpa');
+        if (alertBox) {
+            alertBox.classList.remove('hidden');
+            alertBox.style.background = '#fef2f2';
+            alertBox.style.border = '2px solid #f87171';
+            alertBox.style.color = '#991b1b';
+            alertBox.innerHTML = `
+                <div style="font-weight: 700; margin-bottom: 0.35rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fab fa-google" style="color: #dc2626;"></i> Gmail Aberto & Arquivo Baixado em Downloads!
+                </div>
+                <div style="font-size: 0.82rem; line-height: 1.5; color: #374151;">
+                    Por segurança dos navegadores, sites externos não podem inserir arquivos diretamente dentro do Gmail Web.<br>
+                    <strong>Como anexar em 2 segundos:</strong><br>
+                    1. Vá na aba do Gmail que se abriu.<br>
+                    2. Clique no ícone de clipe <strong>📎 Anexar arquivos</strong> (ao lado do botão Enviar).<br>
+                    3. Selecione o arquivo <strong>${prod.nome_arquivo}</strong> da sua pasta <strong>Downloads</strong> (ou arraste-o direto para o Gmail).
+                </div>
+            `;
+        }
+
+        this.renderAll();
+        this.showToast(`Gmail aberto! Arquivo "${prod.nome_arquivo}" baixado na pasta Downloads.`, 'info');
     },
 
     async confirmEmailSend() {
@@ -1176,12 +1424,18 @@ const BpaModule = {
         const btn = document.getElementById('btnConfirmarEnvioEmailBpa');
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando E-mail...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Transmitindo com Anexo...';
         }
+
+        const alertBox = document.getElementById('alertEmailFeedbackBpa');
+        if (alertBox) alertBox.classList.add('hidden');
 
         try {
             const emailData = this.buildEmailPayload(prod);
-            
+            const destinatario = (document.getElementById('emailBpaDestinatario') && document.getElementById('emailBpaDestinatario').value.trim()) || 'auditoriabacabal@gmail.com';
+            const copia = (document.getElementById('emailBpaCc') && document.getElementById('emailBpaCc').value.trim()) || '';
+            const assunto = (document.getElementById('emailBpaAssunto') && document.getElementById('emailBpaAssunto').value.trim()) || emailData.assunto;
+
             // Codificar conteúdo em Base64 para anexo real
             let base64Content = '';
             try {
@@ -1191,27 +1445,128 @@ const BpaModule = {
             }
 
             const payload = {
-                ...emailData,
+                producaoId: prod.id,
+                destinatario,
+                copia,
+                assunto,
+                corpoHtml: emailData.corpoHtml,
+                corpoTexto: emailData.corpoTexto,
+                nomeArquivo: prod.nome_arquivo || 'PRODUCAO.BPA',
                 conteudoBase64: base64Content
             };
 
-            // 1. Tentar disparo via Edge Function Supabase
-            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
-                const client = window.SupabaseConfig.getClient();
-                if (client && client.functions) {
-                    try {
-                        await client.functions.invoke('enviar-bpa-email', {
-                            body: payload
-                        });
-                    } catch (funcErr) {
-                        console.warn('Edge Function indisponível, gravando status diretamente:', funcErr);
+            // Carregar credenciais salvas no navegador para garantir envio mesmo se server.js estiver desincronizado
+            let localCreds = {};
+            try {
+                const s = localStorage.getItem('argos_bpa_email_config_v2');
+                if (s) localCreds = JSON.parse(s);
+            } catch(e){}
+
+            const drawerUser = document.getElementById('cfgEmailSmtpUser');
+            const drawerPass = document.getElementById('cfgEmailSmtpPass');
+            if (drawerUser && drawerUser.value.trim()) localCreds.smtp_user = drawerUser.value.trim();
+            if (drawerPass && drawerPass.value.trim() && drawerPass.value !== '••••••••') localCreds.smtp_pass = drawerPass.value.trim();
+
+            payload.emailConfig = localCreds;
+
+            // Disparo via endpoint oficial no Servidor ARGOS (server.js)
+            let sendSucceeded = false;
+            let deliveryMethod = '';
+
+            try {
+                const response = await fetch('/api/bpa/enviar-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.status === 404) {
+                    throw new Error('SERVIDOR_PRECISA_REINICIAR');
+                }
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        sendSucceeded = true;
+                        deliveryMethod = result.method || 'servidor';
+                    } else if (result.needConfig) {
+                        // Servidor não possui credenciais configuradas ainda
+                        if (alertBox) {
+                            alertBox.classList.remove('hidden');
+                            alertBox.style.background = '#fffbeb';
+                            alertBox.style.border = '1px solid #fde68a';
+                            alertBox.style.color = '#92400e';
+                            alertBox.innerHTML = `
+                                <div style="font-weight: 700; margin-bottom: 0.25rem;"><i class="fas fa-key"></i> Configuração de Envio Necessária</div>
+                                <div>O servidor ARGOS precisa das credenciais de e-mail (SMTP ou Resend). Clique em <strong>Configurar Servidor</strong> abaixo ou use a opção <strong>Abrir com Anexo (.eml)</strong> para envio imediato com o arquivo já anexado.</div>
+                            `;
+                        }
+                        const drawer = document.getElementById('emailBpaConfigDrawer');
+                        if (drawer) drawer.classList.remove('hidden');
+                        return;
+                    } else {
+                        throw new Error(result.error || 'Falha no processamento pelo servidor.');
+                    }
+                }
+            } catch (serverErr) {
+                console.warn('Servidor local não processou envio direto:', serverErr.message);
+
+                if (serverErr.message === 'SERVIDOR_PRECISA_REINICIAR') {
+                    if (alertBox) {
+                        alertBox.classList.remove('hidden');
+                        alertBox.style.background = '#eff6ff';
+                        alertBox.style.border = '2px solid #3b82f6';
+                        alertBox.style.color = '#1e3a8a';
+                        alertBox.innerHTML = `
+                            <div style="font-weight: 700; margin-bottom: 0.35rem; font-size: 0.95rem;">
+                                <i class="fas fa-sync-alt fa-spin" style="color: #2563eb;"></i> Reinicie o Servidor no Terminal para Ativar o Envio Direto
+                            </div>
+                            <div style="font-size: 0.83rem; line-height: 1.5; color: #1f2937;">
+                                Suas credenciais de e-mail já foram salvas com sucesso!<br>
+                                O Node.js está rodando em segundo plano desde antes das modificações. Para conectar ao Gmail:<br>
+                                <strong>1.</strong> No terminal onde está o <code>npm run dev</code>, pressione <strong>Ctrl + C</strong>.<br>
+                                <strong>2.</strong> Digite <code>npm run dev</code> e tecle Enter.<br>
+                                <em>(Você também pode clicar em <strong>"Abrir com Anexo (.eml)"</strong> abaixo para enviar imediatamente pelo Outlook / Windows Mail sem reiniciar nada!)</em>
+                            </div>
+                        `;
+                    }
+                    return;
+                }
+
+                // Fallback: tentar Supabase Edge Function se estiver configurada
+                if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+                    const client = window.SupabaseConfig.getClient();
+                    if (client && client.functions) {
+                        try {
+                            const edgeRes = await client.functions.invoke('enviar-bpa-email', { body: payload });
+                            if (edgeRes && !edgeRes.error && edgeRes.data && edgeRes.data.success) {
+                                sendSucceeded = true;
+                                deliveryMethod = 'supabase-edge';
+                            }
+                        } catch(e){}
                     }
                 }
             }
 
-            // 2. Atualizar registro local e no banco
+            if (!sendSucceeded) {
+                if (alertBox) {
+                    alertBox.classList.remove('hidden');
+                    alertBox.style.background = '#fef2f2';
+                    alertBox.style.border = '1px solid #fecaca';
+                    alertBox.style.color = '#991b1b';
+                    alertBox.innerHTML = `
+                        <div style="font-weight: 700; margin-bottom: 0.25rem;"><i class="fas fa-info-circle"></i> Envio Direto Não Concluído</div>
+                        <div>Para enviar com 1 clique direto pelo sistema, configure o SMTP em <strong>Configurar Servidor</strong>. Como alternativa imediata, clique em <strong>Abrir com Anexo (.eml)</strong> para abrir o e-mail com o arquivo já anexado!</div>
+                    `;
+                }
+                const drawer = document.getElementById('emailBpaConfigDrawer');
+                if (drawer) drawer.classList.remove('hidden');
+                return;
+            }
+
+            // Atualizar registro local e no banco
             prod.email_enviado_em = new Date().toISOString();
-            prod.email_destinatario = 'auditoriabacabal@gmail.com';
+            prod.email_destinatario = destinatario;
             prod.email_status = 'ENVIADO';
 
             if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
@@ -1230,39 +1585,209 @@ const BpaModule = {
             localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
             this.closeEmailModal();
             this.renderAll();
-            this.showToast(`Produção enviada com sucesso para auditoriabacabal@gmail.com!`, 'success');
+            this.showToast(`Produção enviada com sucesso com anexo para ${destinatario}! (${deliveryMethod.toUpperCase()})`, 'success');
         } catch (err) {
             console.error('Erro ao enviar e-mail:', err);
-            alert('Erro ao enviar e-mail: ' + (err.message || err));
+            if (alertBox) {
+                alertBox.classList.remove('hidden');
+                alertBox.style.background = '#fef2f2';
+                alertBox.style.border = '1px solid #fecaca';
+                alertBox.style.color = '#991b1b';
+                alertBox.innerHTML = `<strong>Erro no envio:</strong> ${err.message || err}`;
+            } else {
+                alert('Erro ao enviar e-mail: ' + (err.message || err));
+            }
         } finally {
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Agora para Auditoria';
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Direto pelo Servidor';
             }
         }
     },
 
-    openGmailWeb() {
-        if (!this.pendingEmailProducao) return;
-        const prod = this.pendingEmailProducao;
-        const emailData = this.buildEmailPayload(prod);
+    toggleEmailConfigDrawer() {
+        const drawer = document.getElementById('emailBpaConfigDrawer');
+        if (!drawer) return;
+        drawer.classList.toggle('hidden');
+        if (!drawer.classList.contains('hidden')) {
+            this.loadEmailConfigIntoDrawer();
+        }
+    },
 
-        // Baixar arquivo para anexar facilmente
-        this.downloadFile(prod.id);
+    async loadEmailConfigIntoDrawer() {
+        // 1. Carregar primeiro do localStorage (nunca perde o que o usuário digitou)
+        let localCfg = null;
+        try {
+            const s = localStorage.getItem('argos_bpa_email_config_v2');
+            if (s) localCfg = JSON.parse(s);
+        } catch(e){}
 
-        const subjectEnc = encodeURIComponent(emailData.assunto);
-        const bodyEnc = encodeURIComponent(emailData.corpoTexto);
-        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=auditoriabacabal@gmail.com&su=${subjectEnc}&body=${bodyEnc}`;
-        window.open(gmailUrl, '_blank');
+        if (localCfg) {
+            const user = document.getElementById('cfgEmailSmtpUser');
+            if (user && localCfg.smtp_user) user.value = localCfg.smtp_user;
 
-        prod.email_enviado_em = new Date().toISOString();
-        prod.email_destinatario = 'auditoriabacabal@gmail.com';
-        prod.email_status = 'ENVIADO';
-        localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
+            const pass = document.getElementById('cfgEmailSmtpPass');
+            if (pass && localCfg.smtp_pass) pass.value = localCfg.smtp_pass;
 
-        this.closeEmailModal();
-        this.renderAll();
-        this.showToast(`Gmail aberto e arquivo "${prod.nome_arquivo}" pronto para anexo!`, 'info');
+            const host = document.getElementById('cfgEmailSmtpHost');
+            if (host && localCfg.smtp_host) host.value = localCfg.smtp_host;
+
+            const port = document.getElementById('cfgEmailSmtpPort');
+            if (port && localCfg.smtp_port) port.value = localCfg.smtp_port;
+
+            const selProvider = document.getElementById('cfgEmailProvider');
+            if (selProvider && localCfg.provider) selProvider.value = localCfg.provider;
+        }
+
+        // 2. Buscar do backend se disponível
+        try {
+            const res = await fetch('/api/bpa/email-config');
+            if (res.ok) {
+                const cfg = await res.json();
+                const selProvider = document.getElementById('cfgEmailProvider');
+                if (selProvider && !localCfg?.provider) selProvider.value = cfg.provider || 'smtp';
+                
+                const host = document.getElementById('cfgEmailSmtpHost');
+                if (host && !localCfg?.smtp_host) host.value = cfg.smtp_host || 'smtp.gmail.com';
+
+                const user = document.getElementById('cfgEmailSmtpUser');
+                if (user && !localCfg?.smtp_user) user.value = cfg.smtp_user || '';
+
+                const pass = document.getElementById('cfgEmailSmtpPass');
+                if (pass && !localCfg?.smtp_pass) pass.value = cfg.smtp_pass || '';
+
+                const port = document.getElementById('cfgEmailSmtpPort');
+                if (port && !localCfg?.smtp_port) port.value = cfg.smtp_port || 465;
+
+                const resendKey = document.getElementById('cfgEmailResendKey');
+                if (resendKey) resendKey.value = cfg.resend_api_key || '';
+
+                this.updateProviderView(cfg.provider || (localCfg?.provider) || 'smtp');
+            }
+        } catch(e) {}
+    },
+
+    updateProviderView(provider) {
+        const boxHost = document.getElementById('boxCfgSmtpHost');
+        const boxCred = document.getElementById('boxCfgSmtpCredentials');
+        const boxResend = document.getElementById('boxCfgResendKey');
+
+        if (provider === 'resend') {
+            if (boxHost) boxHost.classList.add('hidden');
+            if (boxCred) boxCred.classList.add('hidden');
+            if (boxResend) boxResend.classList.remove('hidden');
+        } else {
+            if (boxHost) boxHost.classList.remove('hidden');
+            if (boxCred) boxCred.classList.remove('hidden');
+            if (boxResend) boxResend.classList.add('hidden');
+        }
+    },
+
+    async saveEmailConfigFromDrawer() {
+        const btn = document.getElementById('btnSalvarConfigEmail');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        }
+
+        try {
+            const provider = document.getElementById('cfgEmailProvider').value;
+            const payload = {
+                provider,
+                smtp_host: document.getElementById('cfgEmailSmtpHost').value.trim() || 'smtp.gmail.com',
+                smtp_port: parseInt(document.getElementById('cfgEmailSmtpPort').value || '465', 10),
+                smtp_secure: true,
+                smtp_user: document.getElementById('cfgEmailSmtpUser').value.trim(),
+                smtp_pass: document.getElementById('cfgEmailSmtpPass').value.trim(),
+                from_email: document.getElementById('cfgEmailSmtpUser').value.trim(),
+                resend_api_key: document.getElementById('cfgEmailResendKey').value.trim()
+            };
+
+            // 1. Sempre salvar no localStorage imediatamente
+            localStorage.setItem('argos_bpa_email_config_v2', JSON.stringify(payload));
+
+            // 2. Salvar no backend
+            let serverSaved = false;
+            try {
+                const res = await fetch('/api/bpa/email-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    serverSaved = true;
+                }
+            } catch(e){}
+
+            if (serverSaved) {
+                this.showToast('Credenciais salvas com sucesso no servidor!', 'success');
+                this.checkServerEmailStatus();
+                alert('✅ Credenciais salvas com sucesso no servidor ARGOS!');
+            } else {
+                this.showToast('Credenciais salvas no seu navegador!', 'success');
+                alert(`✅ Credenciais salvas no seu navegador para: ${payload.smtp_user}!\n\nImportante: Para que o servidor local envie diretamente pelo Gmail, reinicie o comando "npm run dev" no terminal (Ctrl+C e digite npm run dev).`);
+            }
+        } catch(e) {
+            alert('Erro ao salvar credenciais: ' + e.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Salvar Credenciais';
+            }
+        }
+    },
+
+    async testEmailConnectionFromDrawer() {
+        const btn = document.getElementById('btnTestarConexaoEmail');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testando Conexão...';
+        }
+
+        try {
+            const provider = document.getElementById('cfgEmailProvider').value;
+            const dest = (document.getElementById('emailBpaDestinatario') && document.getElementById('emailBpaDestinatario').value.trim()) || 'auditoriabacabal@gmail.com';
+            const payload = {
+                provider,
+                smtp_host: document.getElementById('cfgEmailSmtpHost').value.trim() || 'smtp.gmail.com',
+                smtp_port: parseInt(document.getElementById('cfgEmailSmtpPort').value || '465', 10),
+                smtp_secure: true,
+                smtp_user: document.getElementById('cfgEmailSmtpUser').value.trim(),
+                smtp_pass: document.getElementById('cfgEmailSmtpPass').value.trim(),
+                from_email: document.getElementById('cfgEmailSmtpUser').value.trim(),
+                resend_api_key: document.getElementById('cfgEmailResendKey').value.trim(),
+                destinatario: dest
+            };
+
+            // Salvar no localStorage
+            localStorage.setItem('argos_bpa_email_config_v2', JSON.stringify(payload));
+
+            const res = await fetch('/api/bpa/testar-conexao-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.status === 404) {
+                alert('⚠️ O servidor local na porta 3000 ainda está rodando a versão anterior.\n\nPara ativar o teste de conexão e o envio direto pelo Gmail:\n1. No terminal onde está rodando o "npm run dev", pressione Ctrl + C\n2. Digite "npm run dev" e dê Enter\n3. Em seguida, clique em Testar Conexão novamente.');
+                return;
+            }
+
+            const data = await res.json();
+            if (data.success) {
+                alert(`✅ Conexão e teste bem sucedidos!\n${data.message}`);
+                this.checkServerEmailStatus();
+            } else {
+                alert(`❌ Falha no teste de e-mail:\n${data.error || 'Não foi possível conectar ao servidor SMTP.'}`);
+            }
+        } catch(e) {
+            alert(`⚠️ Falha ao comunicar com o servidor: ${e.message}\n\nLembre-se de reiniciar o "npm run dev" no terminal para que as novas rotas de e-mail fiquem ativas.`);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-vial"></i> Testar Conexão';
+            }
+        }
     },
 
     /* =========================================================
@@ -1594,11 +2119,13 @@ const BpaModule = {
             return false;
         };
 
-        const prodC = prods.find(isBpaC) || null;
-        const prodI = prods.find(isBpaI) || null;
+        const prodsC = prods.filter(isBpaC);
+        const prodsI = prods.filter(isBpaI);
+        const prodC = prodsC[0] || null;
+        const prodI = prodsI[0] || null;
 
-        const hasC = !!prodC;
-        const hasI = !!prodI;
+        const hasC = prodsC.length > 0;
+        const hasI = prodsI.length > 0;
 
         let expectedCount = 1;
         let deliveredCount = 0;
@@ -1634,6 +2161,8 @@ const BpaModule = {
             estab,
             modalidade,
             prods,
+            prodsC,
+            prodsI,
             prodC,
             prodI,
             hasC,
@@ -1825,7 +2354,7 @@ const BpaModule = {
 
         let html = '';
         filtered.forEach(item => {
-            const { estab, modalidade, prodC, prodI, hasC, hasI, status, isComplete, isPartial } = item;
+            const { estab, modalidade, prodsC, prodsI, prodC, prodI, hasC, hasI, status, isComplete, isPartial } = item;
             const escapedNome = (estab.nome || '').replace(/'/g, "\\'");
 
             const modalidadeSelectHtml = `
@@ -1856,6 +2385,54 @@ const BpaModule = {
                     statusIcon = '<i class="fas fa-exclamation-circle bpa-status-icon pending"></i>';
                 }
 
+                const renderSlotFiles = (prodsList, typeTagClass, typeLabel, emptyText) => {
+                    if (!prodsList || prodsList.length === 0) {
+                        return `
+                            <div class="bpa-slot-item pending">
+                                <div class="bpa-slot-left">
+                                    <span class="bpa-type-tag ${typeTagClass}"><i class="fas fa-clock"></i> ${typeLabel}</span>
+                                    <span class="bpa-slot-file-info"><em style="color: #b45309;">${emptyText}</em></span>
+                                </div>
+                                <div style="display: flex; align-items: center;">
+                                    <button class="bpa-slot-btn-up" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${estab.cnes}', '${typeLabel}')" title="Anexar produção ${typeLabel}">
+                                        <i class="fas fa-upload"></i> Anexar ${typeLabel}
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    return prodsList.map(p => {
+                        const isTomo = p.tipo_exame === 'Tomografia Computadorizada' || (p.nome_arquivo && p.nome_arquivo.includes('TOMO'));
+                        return `
+                            <div class="bpa-slot-item delivered" style="margin-bottom: 0.35rem;">
+                                <div class="bpa-slot-left" style="flex: 1; min-width: 0;">
+                                    <span class="bpa-type-tag ${typeTagClass}"><i class="fas fa-check"></i> ${typeLabel}</span>
+                                    <div style="display: inline-flex; flex-direction: column; vertical-align: middle; max-width: calc(100% - 75px);">
+                                        <span class="bpa-slot-file-info" title="${p.nome_arquivo} (${p.digitador_nome})">
+                                            <strong>${p.nome_arquivo}</strong> <small>(${p.tamanho_formatado})</small>
+                                            ${isTomo ? '<span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; margin-left: 4px;"><i class="fas fa-x-ray"></i> Exame: Tomografia</span>' : ''}
+                                        </span>
+                                        <span style="font-size: 0.68rem; color: #64748b;">Enviado por: <strong>${p.digitador_nome}</strong></span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                    <button class="bpa-slot-btn-dl" onclick="BpaModule.downloadFile('${p.id}')" title="Baixar ${p.nome_arquivo}">
+                                        <i class="fas fa-download"></i> Baixar
+                                    </button>
+                                    ${this.canSendEmail(p, currentUser) ? `
+                                        <button class="bpa-slot-btn-email ${p.email_enviado_em ? 'is-sent' : ''}" onclick="BpaModule.openEmailModal('${p.id}')" title="${p.email_enviado_em ? `Enviado em ${this.formatTimestamp(p.email_enviado_em)}. Clique para reenviar.` : 'Enviar para auditoriabacabal@gmail.com'}">
+                                            <i class="fas ${p.email_enviado_em ? 'fa-check' : 'fa-paper-plane'}"></i> ${p.email_enviado_em ? 'Email OK' : 'Email'}
+                                        </button>
+                                    ` : `
+                                        <span style="font-size: 0.72rem; color: #94a3b8; padding: 0 4px;" title="Apenas o autor (${p.digitador_nome}) pode enviar ao e-mail"><i class="fas fa-lock"></i></span>
+                                    `}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                };
+
                 html += `
                     <div class="bpa-status-card ${status}">
                         <div class="bpa-card-header">
@@ -1878,67 +2455,16 @@ const BpaModule = {
 
                         <!-- SLOTS INTERATIVOS BPA-C E BPA-I -->
                         <div class="bpa-modalidades-slots">
-                            <!-- SLOT 1: BPA-C (CONSOLIDADO) -->
-                            <div class="bpa-slot-item ${hasC ? 'delivered' : 'pending'}">
-                                <div class="bpa-slot-left">
-                                    <span class="bpa-type-tag bpa-c"><i class="fas ${hasC ? 'fa-check' : 'fa-clock'}"></i> BPA-C</span>
-                                    <span class="bpa-slot-file-info" title="${hasC ? prodC.nome_arquivo : 'Pendente de envio'}">
-                                        ${hasC ? `${prodC.nome_arquivo} <small>(${prodC.tamanho_formatado})</small>` : '<em style="color: #b45309;">Consolidado Pendente</em>'}
-                                    </span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                                    ${hasC ? `
-                                        <button class="bpa-slot-btn-dl" onclick="BpaModule.downloadFile('${prodC.id}')" title="Baixar ${prodC.nome_arquivo}">
-                                            <i class="fas fa-download"></i> Baixar
-                                        </button>
-                                        ${this.canSendEmail(prodC, currentUser) ? `
-                                            <button class="bpa-slot-btn-email" onclick="BpaModule.openEmailModal('${prodC.id}')" title="${prodC.email_enviado_em ? `Enviado em ${this.formatTimestamp(prodC.email_enviado_em)}. Clique para reenviar.` : 'Enviar para auditoriabacabal@gmail.com'}">
-                                                <i class="fas ${prodC.email_enviado_em ? 'fa-check' : 'fa-paper-plane'}"></i> ${prodC.email_enviado_em ? 'Email OK' : 'Email'}
-                                            </button>
-                                        ` : `
-                                            <span style="font-size: 0.72rem; color: #94a3b8; padding: 0 4px;" title="Apenas o autor (${prodC.digitador_nome}) pode enviar ao e-mail"><i class="fas fa-lock"></i></span>
-                                        `}
-                                    ` : `
-                                        <button class="bpa-slot-btn-up" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${estab.cnes}', 'BPA-C')" title="Anexar produção BPA-C">
-                                            <i class="fas fa-upload"></i> Anexar BPA-C
-                                        </button>
-                                    `}
-                                </div>
-                            </div>
-
-                            <!-- SLOT 2: BPA-I (INDIVIDUALIZADO) -->
-                            <div class="bpa-slot-item ${hasI ? 'delivered' : 'pending'}">
-                                <div class="bpa-slot-left">
-                                    <span class="bpa-type-tag bpa-i"><i class="fas ${hasI ? 'fa-check' : 'fa-clock'}"></i> BPA-I</span>
-                                    <span class="bpa-slot-file-info" title="${hasI ? prodI.nome_arquivo : 'Pendente de envio'}">
-                                        ${hasI ? `${prodI.nome_arquivo} <small>(${prodI.tamanho_formatado})</small>` : '<em style="color: #0369a1;">Individualizado Pendente</em>'}
-                                    </span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                                    ${hasI ? `
-                                        <button class="bpa-slot-btn-dl" onclick="BpaModule.downloadFile('${prodI.id}')" title="Baixar ${prodI.nome_arquivo}">
-                                            <i class="fas fa-download"></i> Baixar
-                                        </button>
-                                        ${this.canSendEmail(prodI, currentUser) ? `
-                                            <button class="bpa-slot-btn-email" onclick="BpaModule.openEmailModal('${prodI.id}')" title="${prodI.email_enviado_em ? `Enviado em ${this.formatTimestamp(prodI.email_enviado_em)}. Clique para reenviar.` : 'Enviar para auditoriabacabal@gmail.com'}">
-                                                <i class="fas ${prodI.email_enviado_em ? 'fa-check' : 'fa-paper-plane'}"></i> ${prodI.email_enviado_em ? 'Email OK' : 'Email'}
-                                            </button>
-                                        ` : `
-                                            <span style="font-size: 0.72rem; color: #94a3b8; padding: 0 4px;" title="Apenas o autor (${prodI.digitador_nome}) pode enviar ao e-mail"><i class="fas fa-lock"></i></span>
-                                        `}
-                                    ` : `
-                                        <button class="bpa-slot-btn-up" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${estab.cnes}', 'BPA-I')" title="Anexar produção BPA-I">
-                                            <i class="fas fa-upload"></i> Anexar BPA-I
-                                        </button>
-                                    `}
-                                </div>
-                            </div>
+                            ${renderSlotFiles(prodsC, 'bpa-c', 'BPA-C', 'Consolidado Pendente')}
+                            ${renderSlotFiles(prodsI, 'bpa-i', 'BPA-I', 'Individualizado Pendente')}
                         </div>
                     </div>
                 `;
             } else {
                 // CASO MODALIDADE ÚNICA (APENAS BPA-C OU APENAS BPA-I)
-                const singleProd = modalidade === 'BPA-I' ? prodI : prodC;
+                const singleProds = modalidade === 'BPA-I' ? prodsI : prodsC;
+                const singleProd = (singleProds && singleProds[0]) || null;
+                const isTomoSingle = singleProd && (singleProd.tipo_exame === 'Tomografia Computadorizada' || (singleProd.nome_arquivo && singleProd.nome_arquivo.includes('TOMO')));
 
                 if (isComplete && singleProd) {
                     const canSendSingle = this.canSendEmail(singleProd, currentUser);
@@ -1952,7 +2478,10 @@ const BpaModule = {
                                 <span class="bpa-badge-delivered">Enviado (${modalidade})</span>
                             </div>
                             <div class="bpa-card-meta">
-                                <span class="bpa-file-pill"><i class="fas fa-file-code"></i> ${singleProd.nome_arquivo}</span>
+                                <span class="bpa-file-pill">
+                                    <i class="fas fa-file-code"></i> ${singleProd.nome_arquivo}
+                                    ${isTomoSingle ? '<span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; margin-left: 4px;"><i class="fas fa-x-ray"></i> Exame: Tomografia</span>' : ''}
+                                </span>
                                 <span class="bpa-meta-item"><i class="fas fa-user"></i> Enviado por: <strong>${singleProd.digitador_nome}</strong></span>
                                 <span class="bpa-meta-item"><i class="fas fa-clock"></i> ${this.formatTimestamp(singleProd.criado_em)}</span>
                                 <span class="bpa-meta-item"><i class="fas fa-database"></i> ${singleProd.tamanho_formatado}</span>
@@ -2247,6 +2776,7 @@ const BpaModule = {
                         <div class="estab-sub">
                             <span class="${badgeClass}">${badgeIcon} ${p.tipo_bpa || 'BPA-C'}</span>
                             ${p.cnes ? `<span class="cnes-code">CNES: ${p.cnes}</span>` : ''}
+                            ${(p.tipo_exame === 'Tomografia Computadorizada' || (p.nome_arquivo && p.nome_arquivo.includes('TOMO'))) ? '<span style="background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; border: 1px solid #bae6fd;"><i class="fas fa-x-ray"></i> Exame: Tomografia</span>' : ''}
                         </div>
                     </td>
 
@@ -2443,9 +2973,16 @@ const BpaModule = {
                 observacoes: document.getElementById('inputBpaObservacoes').value.trim()
             };
 
-            await this.saveProducao(finalData);
+            const shouldSendEmail = document.getElementById('checkEnviarEmailAposUpload') && document.getElementById('checkEnviarEmailAposUpload').checked;
+            const newRecord = await this.saveProducao(finalData);
             this.closeUploadModal();
-            this.showToast(`Produção "${finalData.nomeArquivo}" enviada com sucesso!`, 'success');
+            this.showToast(`Produção "${finalData.nomeArquivo}" salva com sucesso!`, 'success');
+
+            if (shouldSendEmail && newRecord && newRecord.id) {
+                setTimeout(() => {
+                    this.openEmailModal(newRecord.id);
+                }, 350);
+            }
         } catch (e) {
             console.error('Erro ao salvar produção BPA:', e);
             alert('Erro ao salvar produção: ' + (e.message || e));
@@ -2494,6 +3031,16 @@ const BpaModule = {
         if (btnConfirmEmail) btnConfirmEmail.addEventListener('click', () => this.confirmEmailSend());
         const btnOpenGmailWeb = document.getElementById('btnOpenGmailWebBpa');
         if (btnOpenGmailWeb) btnOpenGmailWeb.addEventListener('click', () => this.openGmailWeb());
+        const btnDownloadEml = document.getElementById('btnDownloadEmlBpa');
+        if (btnDownloadEml) btnDownloadEml.addEventListener('click', () => this.downloadEmlFile());
+        const btnToggleConfig = document.getElementById('btnToggleEmailConfig');
+        if (btnToggleConfig) btnToggleConfig.addEventListener('click', () => this.toggleEmailConfigDrawer());
+        const btnSalvarConfig = document.getElementById('btnSalvarConfigEmail');
+        if (btnSalvarConfig) btnSalvarConfig.addEventListener('click', () => this.saveEmailConfigFromDrawer());
+        const btnTestarConexao = document.getElementById('btnTestarConexaoEmail');
+        if (btnTestarConexao) btnTestarConexao.addEventListener('click', () => this.testEmailConnectionFromDrawer());
+        const selProvider = document.getElementById('cfgEmailProvider');
+        if (selProvider) selProvider.addEventListener('change', (e) => this.updateProviderView(e.target.value));
 
         // Filtros
         const selectComp = document.getElementById('selectBpaCompetencia');

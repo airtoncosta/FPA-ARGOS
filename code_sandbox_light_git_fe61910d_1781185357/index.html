@@ -2127,6 +2127,17 @@
                         </label>
                         <textarea id="inputBpaObservacoes" class="bpa-input" rows="2" placeholder="Ex: Produção validada no BPA Mag sem erros..."></textarea>
                     </div>
+
+                    <!-- OPÇÃO DE ENVIO AUTOMÁTICO DE E-MAIL COM ANEXO -->
+                    <div style="margin-top: 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 0.5rem; padding: 0.75rem 1rem;">
+                        <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; margin: 0; font-size: 0.86rem; font-weight: 600; color: #166534;">
+                            <input type="checkbox" id="checkEnviarEmailAposUpload" checked style="width: 17px; height: 17px; accent-color: #16a34a;">
+                            <span><i class="fas fa-paper-plane" style="color: #16a34a;"></i> Preparar envio por e-mail com anexo para auditoriabacabal@gmail.com</span>
+                        </label>
+                        <div style="font-size: 0.75rem; color: #15803d; margin-top: 0.25rem; margin-left: 1.7rem;">
+                            Ao salvar a produção, abre imediatamente o despachante com o arquivo anexo pronto para a auditoria.
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer" style="padding: 1rem 1.5rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.75rem; border-radius: 0 0 1.1rem 1.1rem;">
@@ -2180,7 +2191,7 @@
 
     <!-- ===== MODAL DE PREVIEW E ENVIO DE E-MAIL BPA (AUDITORIA) ===== -->
     <div id="modalPreviewEmailBpa" class="modal-overlay hidden">
-        <div class="modal-box modal-medium" style="max-width: 48rem;">
+        <div class="modal-box modal-medium" style="max-width: 52rem;">
             <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem; border-radius: 1.1rem 1.1rem 0 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
                 <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.15rem;">
                     <i class="fas fa-envelope-open-text" style="color: #38bdf8;"></i> Enviar Produção para Auditoria por E-mail
@@ -2190,20 +2201,20 @@
                 </button>
             </div>
             <div class="modal-body" style="padding: 1.4rem; max-height: 72vh; overflow-y: auto;">
-                <!-- Card de Destinatário Fixo -->
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.65rem; padding: 0.85rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 0.6rem;">
-                        <span style="width: 38px; height: 38px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
-                            <i class="fas fa-at"></i>
-                        </span>
-                        <div>
-                            <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 700;">Destinatário Oficial</div>
-                            <div style="font-size: 0.95rem; font-weight: 700; color: #0f172a; font-family: monospace;" id="emailBpaDestinatario">auditoriabacabal@gmail.com</div>
-                        </div>
+                <!-- Destinatários (Principal + Cópia) -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.82rem; margin-bottom: 0.35rem; color: #334155;">
+                            <i class="fas fa-at" style="color: #dc2626;"></i> Destinatário Oficial da Auditoria:
+                        </label>
+                        <input type="email" id="emailBpaDestinatario" class="bpa-input" value="auditoriabacabal@gmail.com" style="font-weight: 700; color: #0f172a; font-family: monospace;">
                     </div>
-                    <span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 9999px;">
-                        <i class="fas fa-check-circle"></i> Setor de Auditoria SMS
-                    </span>
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.82rem; margin-bottom: 0.35rem; color: #334155;">
+                            <i class="fas fa-copy" style="color: #64748b;"></i> Cópia para (CC - Opcional):
+                        </label>
+                        <input type="email" id="emailBpaCc" class="bpa-input" placeholder="seu-email@gmail.com (para receber comprovante)" style="font-family: monospace;">
+                    </div>
                 </div>
 
                 <!-- Assunto Padronizado -->
@@ -2211,41 +2222,126 @@
                     <label style="display: block; font-weight: 600; font-size: 0.84rem; margin-bottom: 0.35rem; color: #334155;">
                         <i class="fas fa-heading"></i> Assunto Padronizado do E-mail:
                     </label>
-                    <input type="text" id="emailBpaAssunto" class="bpa-input" style="font-weight: 600; color: #0f172a;" readonly>
+                    <input type="text" id="emailBpaAssunto" class="bpa-input" style="font-weight: 600; color: #0f172a;">
                 </div>
 
-                <!-- Card do Arquivo em Anexo -->
-                <div style="background: #eff6ff; border: 1px dashed #93c5fd; border-radius: 0.65rem; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 0.6rem;">
-                        <i class="fas fa-paperclip" style="font-size: 1.2rem; color: #0284c7;"></i>
-                        <div>
-                            <div style="font-size: 0.75rem; color: #0369a1; font-weight: 700; text-transform: uppercase;">Arquivo Anexo na Mensagem</div>
-                            <div style="font-family: monospace; font-size: 0.9rem; font-weight: 700; color: #0f172a;" id="emailBpaNomeArquivo">ARQUIVO.JUL</div>
+                <!-- Card de Arquivo em Anexo Oficial -->
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.65rem; padding: 0.85rem 1.1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="width: 40px; height: 40px; border-radius: 8px; background: #0284c7; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                                <i class="fas fa-paperclip"></i>
+                            </span>
+                            <div>
+                                <div style="font-size: 0.72rem; color: #0369a1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Arquivo Oficial em Anexo</div>
+                                <div style="font-family: monospace; font-size: 0.95rem; font-weight: 700; color: #0f172a;" id="emailBpaNomeArquivo">ARQUIVO.JUL</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <span id="emailBpaTamanhoArquivo" style="font-size: 0.78rem; background: #ffffff; color: #0369a1; border: 1px solid #93c5fd; padding: 3px 8px; border-radius: 4px; font-weight: 700;">0 KB</span>
+                            <button type="button" id="btnBaixarAnexoModal" class="btn-secondary" style="padding: 4px 10px; font-size: 0.76rem; border-color: #93c5fd; color: #0284c7; background: #ffffff;" title="Baixar este arquivo para seu computador">
+                                <i class="fas fa-download"></i> Baixar Anexo
+                            </button>
                         </div>
                     </div>
-                    <span id="emailBpaTamanhoArquivo" style="font-size: 0.76rem; background: #ffffff; color: #0369a1; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 4px; font-weight: 600;">0 KB</span>
                 </div>
 
-                <!-- Corpo da Mensagem Formatado -->
+                <!-- Prévia do Corpo do E-mail -->
                 <div style="margin-bottom: 1rem;">
-                    <label style="display: block; font-weight: 600; font-size: 0.84rem; margin-bottom: 0.35rem; color: #334155;">
-                        <i class="fas fa-align-left"></i> Prévia do Corpo do E-mail:
-                    </label>
-                    <div id="emailBpaCorpoPreview" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 1rem; font-size: 0.83rem; line-height: 1.6; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-height: 230px; overflow-y: auto; white-space: pre-wrap;"></div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                        <label style="font-weight: 600; font-size: 0.84rem; color: #334155;">
+                            <i class="fas fa-align-left"></i> Conteúdo da Notificação Oficial:
+                        </label>
+                        <span style="font-size: 0.74rem; color: #64748b;"><i class="fas fa-info-circle"></i> O arquivo acima irá anexado nesta mensagem</span>
+                    </div>
+                    <div id="emailBpaCorpoPreview" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 1rem; font-size: 0.83rem; line-height: 1.6; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-height: 180px; overflow-y: auto; white-space: pre-wrap;"></div>
                 </div>
+
+                <!-- Painel Retrátil de Configurações de Envio (SMTP / Resend) -->
+                <div id="emailBpaConfigDrawer" class="hidden" style="margin-bottom: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.65rem; padding: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h4 style="margin: 0; font-size: 0.9rem; color: #0f172a; display: flex; align-items: center; gap: 0.4rem;">
+                            <i class="fas fa-server" style="color: #0284c7;"></i> Configurações do Servidor de E-mail (Envio Direto)
+                        </h4>
+                        <span id="emailStatusBadgeConfig" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: #fef3c7; color: #92400e; font-weight: 600;">Verificando...</span>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <div>
+                            <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 0.2rem; color: #475569;">Método de Disparo:</label>
+                            <select id="cfgEmailProvider" class="bpa-input" style="padding: 0.45rem; font-size: 0.82rem;">
+                                <option value="smtp">SMTP Direto (Gmail / Outlook / Institucional)</option>
+                                <option value="resend">Resend API Oficial</option>
+                            </select>
+                        </div>
+                        <div id="boxCfgSmtpHost">
+                            <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 0.2rem; color: #475569;">Servidor SMTP (Host):</label>
+                            <input type="text" id="cfgEmailSmtpHost" class="bpa-input" placeholder="smtp.gmail.com" value="smtp.gmail.com" style="padding: 0.45rem; font-size: 0.82rem;">
+                        </div>
+                    </div>
+
+                    <div id="boxCfgSmtpCredentials" style="display: grid; grid-template-columns: 1fr 1fr 80px; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <div>
+                            <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 0.2rem; color: #475569;">E-mail do Remetente (Gmail / Institucional):</label>
+                            <input type="email" id="cfgEmailSmtpUser" class="bpa-input" placeholder="Ex: ac4creatif@gmail.com" autocomplete="off" style="padding: 0.45rem; font-size: 0.82rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 0.2rem; color: #475569;">Senha de Aplicativo (Gmail / SMTP):</label>
+                            <input type="password" id="cfgEmailSmtpPass" class="bpa-input" placeholder="Senha de App (16 letras)" autocomplete="new-password" style="padding: 0.45rem; font-size: 0.82rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 0.2rem; color: #475569;">Porta:</label>
+                            <input type="number" id="cfgEmailSmtpPort" class="bpa-input" value="465" style="padding: 0.45rem; font-size: 0.82rem;">
+                        </div>
+                    </div>
+
+                    <div style="background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 0.45rem; padding: 0.6rem 0.8rem; margin-bottom: 0.75rem; font-size: 0.76rem; color: #0369a1; line-height: 1.45;">
+                        <i class="fas fa-lightbulb" style="color: #0284c7;"></i> <strong>Dica para contas @gmail.com:</strong> O Google não aceita sua senha pessoal de login comum. Ele exige uma <strong>Senha de Aplicativo (16 letras)</strong> gerada em: <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: #0284c7; font-weight: 700; text-decoration: underline;">myaccount.google.com/apppasswords</a>. Basta colar a senha de 16 letras acima e clicar em Salvar Credenciais.
+                    </div>
+
+                    <div id="boxCfgResendKey" class="hidden" style="margin-bottom: 0.75rem;">
+                        <label style="display: block; font-size: 0.76rem; font-weight: 600; margin-bottom: 0.2rem; color: #475569;">Chave de API Resend (re_...):</label>
+                        <input type="password" id="cfgEmailResendKey" class="bpa-input" placeholder="re_123456789..." autocomplete="new-password" style="padding: 0.45rem; font-size: 0.82rem;">
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                        <button type="button" id="btnTestarConexaoEmail" class="btn-secondary" style="font-size: 0.78rem; padding: 0.4rem 0.8rem;">
+                            <i class="fas fa-vial"></i> Testar Conexão
+                        </button>
+                        <button type="button" id="btnSalvarConfigEmail" class="btn-primary" style="font-size: 0.78rem; padding: 0.4rem 0.8rem; background: #0284c7;">
+                            <i class="fas fa-save"></i> Salvar Credenciais
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Alerta Orientador do Gmail / E-mail -->
+                <div id="alertEmailFeedbackBpa" class="hidden" style="margin-bottom: 0.75rem; padding: 0.65rem 0.85rem; border-radius: 0.45rem; font-size: 0.8rem;"></div>
 
                 <div style="font-size: 0.75rem; color: #64748b; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 0.4rem; padding: 0.5rem 0.75rem;">
                     <i class="fas fa-shield-alt" style="color: #d97706;"></i> <strong>Registro de Segurança:</strong> O envio será registrado no sistema em nome de <strong id="emailBpaAutorNome">-</strong>. A data e hora do envio ficarão gravadas no banco de dados para conferência da Francileide.
                 </div>
             </div>
-            <div class="modal-footer" style="padding: 1rem 1.4rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; border-radius: 0 0 1.1rem 1.1rem;">
-                <button type="button" class="btn-secondary" id="btnCancelEmailBpa">Cancelar</button>
-                <div style="display: flex; gap: 0.6rem;">
-                    <button type="button" class="btn-secondary" id="btnOpenGmailWebBpa" style="background: #ffffff; color: #dc2626; border-color: #fca5a5;" title="Abrir Gmail Web com os dados pré-preenchidos">
-                        <i class="fab fa-google"></i> Abrir no Gmail
+            <div class="modal-footer" style="padding: 1rem 1.4rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; border-radius: 0 0 1.1rem 1.1rem;">
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn-secondary" id="btnCancelEmailBpa">Fechar</button>
+                    <button type="button" class="btn-secondary" id="btnToggleEmailConfig" style="color: #475569;" title="Configurar credenciais de e-mail (SMTP/Resend)">
+                        <i class="fas fa-cog"></i> Configurar Servidor
                     </button>
-                    <button type="button" class="btn-primary" id="btnConfirmarEnvioEmailBpa" style="background: linear-gradient(135deg, #0284c7, #0369a1);">
-                        <i class="fas fa-paper-plane"></i> Enviar Agora para Auditoria
+                </div>
+                <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                    <!-- Opção 1: Mensagem Completa com Anexo Embutido (.eml) -->
+                    <button type="button" class="btn-secondary" id="btnDownloadEmlBpa" style="background: #ffffff; color: #0284c7; border-color: #93c5fd; font-weight: 700;" title="Baixa o e-mail completo com o arquivo BPA já embutido em anexo. Abre no Outlook, Mail do Windows ou Thunderbird">
+                        <i class="fas fa-paperclip"></i> Abrir com Anexo (.eml)
+                    </button>
+
+                    <!-- Opção 2: Gmail Web -->
+                    <button type="button" class="btn-secondary" id="btnOpenGmailWebBpa" style="background: #ffffff; color: #dc2626; border-color: #fca5a5; font-weight: 600;" title="Abre o Gmail Web no navegador e salva o arquivo em Downloads para anexar via clipe 📎">
+                        <i class="fab fa-google"></i> Abrir no Gmail Web
+                    </button>
+
+                    <!-- Opção 3: Disparo Direto pelo Servidor -->
+                    <button type="button" class="btn-primary" id="btnConfirmarEnvioEmailBpa" style="background: linear-gradient(135deg, #0284c7, #0369a1); font-weight: 700;" title="Dispara o e-mail diretamente pelo servidor com o anexo incluído (requer credenciais configuradas)">
+                        <i class="fas fa-paper-plane"></i> Enviar Direto pelo Servidor
                     </button>
                 </div>
             </div>
