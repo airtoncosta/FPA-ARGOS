@@ -3,6 +3,12 @@
 # PDFs (Portarias, DOU, etc.)
 *.pdf
 
+# Arquivos de dados brutos e dumps grandes (>100MB)
+*.zip
+*.ZIP
+*.csv
+*.CSV
+
 # Dados de município extraídos
 *.txt
 
