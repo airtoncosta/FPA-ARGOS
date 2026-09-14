@@ -1512,23 +1512,35 @@ const BpaModule = {
                 console.warn('Servidor local não processou envio direto:', serverErr.message);
 
                 if (serverErr.message === 'SERVIDOR_PRECISA_REINICIAR') {
+                    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
                     if (alertBox) {
                         alertBox.classList.remove('hidden');
                         alertBox.style.background = '#eff6ff';
                         alertBox.style.border = '2px solid #3b82f6';
                         alertBox.style.color = '#1e3a8a';
-                        alertBox.innerHTML = `
-                            <div style="font-weight: 700; margin-bottom: 0.35rem; font-size: 0.95rem;">
-                                <i class="fas fa-sync-alt fa-spin" style="color: #2563eb;"></i> Reinicie o Servidor no Terminal para Ativar o Envio Direto
-                            </div>
-                            <div style="font-size: 0.83rem; line-height: 1.5; color: #1f2937;">
-                                Suas credenciais de e-mail já foram salvas com sucesso!<br>
-                                O Node.js está rodando em segundo plano desde antes das modificações. Para conectar ao Gmail:<br>
-                                <strong>1.</strong> No terminal onde está o <code>npm run dev</code>, pressione <strong>Ctrl + C</strong>.<br>
-                                <strong>2.</strong> Digite <code>npm run dev</code> e tecle Enter.<br>
-                                <em>(Você também pode clicar em <strong>"Abrir com Anexo (.eml)"</strong> abaixo para enviar imediatamente pelo Outlook / Windows Mail sem reiniciar nada!)</em>
-                            </div>
-                        `;
+                        
+                        if (isLocal) {
+                            alertBox.innerHTML = `
+                                <div style="font-weight: 700; margin-bottom: 0.35rem; font-size: 0.95rem;">
+                                    <i class="fas fa-sync-alt" style="color: #2563eb;"></i> Atualização do Servidor Local Necessária
+                                </div>
+                                <div style="font-size: 0.83rem; line-height: 1.5; color: #1f2937;">
+                                    O servidor local ainda está inicializando as rotas de e-mail.<br>
+                                    <strong>Opção Imediata:</strong> Clique em <strong>"Abrir com Anexo (.eml)"</strong> abaixo para abrir o e-mail pronto no Outlook / Windows Mail sem esperar nada!<br>
+                                    <em>Para ambiente local: reinicie o comando no seu terminal quando conveniente.</em>
+                                </div>
+                            `;
+                        } else {
+                            alertBox.innerHTML = `
+                                <div style="font-weight: 700; margin-bottom: 0.35rem; font-size: 0.95rem;">
+                                    <i class="fas fa-paperclip" style="color: #0284c7;"></i> Envio Alternativo Imediato Disponível
+                                </div>
+                                <div style="font-size: 0.83rem; line-height: 1.5; color: #1f2937;">
+                                    O serviço em nuvem está finalizando a implantação.<br>
+                                    Clique no botão <strong>"Abrir com Anexo (.eml)"</strong> abaixo para abrir a mensagem com o arquivo oficial já anexado no seu aplicativo de e-mail (Outlook / Windows Mail)!
+                                </div>
+                            `;
+                        }
                     }
                     return;
                 }
@@ -1725,7 +1737,12 @@ const BpaModule = {
                 alert('✅ Credenciais salvas com sucesso no servidor ARGOS!');
             } else {
                 this.showToast('Credenciais salvas no seu navegador!', 'success');
-                alert(`✅ Credenciais salvas no seu navegador para: ${payload.smtp_user}!\n\nImportante: Para que o servidor local envie diretamente pelo Gmail, reinicie o comando "npm run dev" no terminal (Ctrl+C e digite npm run dev).`);
+                const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                if (isLocal) {
+                    alert(`✅ Credenciais salvas no seu navegador para: ${payload.smtp_user}!\n\nNo ambiente de desenvolvimento local, reinicie o "npm run dev" quando puder.`);
+                } else {
+                    alert(`✅ Credenciais salvas com sucesso para: ${payload.smtp_user}!`);
+                }
             }
         } catch(e) {
             alert('Erro ao salvar credenciais: ' + e.message);
@@ -1769,7 +1786,12 @@ const BpaModule = {
             });
 
             if (res.status === 404) {
-                alert('⚠️ O servidor local na porta 3000 ainda está rodando a versão anterior.\n\nPara ativar o teste de conexão e o envio direto pelo Gmail:\n1. No terminal onde está rodando o "npm run dev", pressione Ctrl + C\n2. Digite "npm run dev" e dê Enter\n3. Em seguida, clique em Testar Conexão novamente.');
+                const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                if (isLocal) {
+                    alert('⚠️ As rotas de e-mail ainda não estão ativas no servidor local.\n\nReinicie o comando no terminal (Ctrl+C e npm run dev) para carregar as novas rotas.');
+                } else {
+                    alert('⚠️ A rota de teste em nuvem está sendo inicializada no Vercel. Aguarde alguns instantes e tente novamente, ou utilize o botão "Abrir com Anexo (.eml)".');
+                }
                 return;
             }
 
@@ -1781,7 +1803,12 @@ const BpaModule = {
                 alert(`❌ Falha no teste de e-mail:\n${data.error || 'Não foi possível conectar ao servidor SMTP.'}`);
             }
         } catch(e) {
-            alert(`⚠️ Falha ao comunicar com o servidor: ${e.message}\n\nLembre-se de reiniciar o "npm run dev" no terminal para que as novas rotas de e-mail fiquem ativas.`);
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isLocal) {
+                alert(`⚠️ Falha ao comunicar com o servidor: ${e.message}\n\nVerifique se o terminal local está rodando.`);
+            } else {
+                alert(`⚠️ Falha ao comunicar com o servidor: ${e.message}\n\nUtilize a opção "Abrir com Anexo (.eml)" para envio imediato pelo seu aplicativo de e-mail.`);
+            }
         } finally {
             if (btn) {
                 btn.disabled = false;
