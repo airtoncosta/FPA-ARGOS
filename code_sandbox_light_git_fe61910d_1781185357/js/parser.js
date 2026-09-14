@@ -257,7 +257,7 @@ const Parser = {
                             complexidade: complx,
                             qtdAprovada: 0, 
                             valAprovado: 0, 
-                            valUnitario: 0,
+                            valUnitario: valTabela,
                             valEsperadoTabela: 0,
                             cbos: {},
                             valoresPorUnidade: {}
@@ -267,9 +267,9 @@ const Parser = {
                     procMap[proc].valAprovado = roundMoeda(procMap[proc].valAprovado + vlApvd);
                     if (procMap[proc].valTabela > 0) {
                         procMap[proc].valEsperadoTabela = roundMoeda(procMap[proc].qtdAprovada * procMap[proc].valTabela);
-                    }
-                    if (procMap[proc].valAprovado > 0 && procMap[proc].qtdAprovada > 0) {
-                        procMap[proc].valUnitario = roundMoeda(procMap[proc].valAprovado / procMap[proc].qtdAprovada);
+                        procMap[proc].valUnitario = procMap[proc].valTabela;
+                    } else if (procMap[proc].valUnitario === undefined || procMap[proc].valUnitario === null) {
+                        procMap[proc].valUnitario = (procMap[proc].valAprovado > 0 && procMap[proc].qtdAprovada > 0) ? roundMoeda(procMap[proc].valAprovado / procMap[proc].qtdAprovada) : 0;
                     }
                     if (!procMap[proc].valoresPorUnidade[currentUnidade.id]) {
                         procMap[proc].valoresPorUnidade[currentUnidade.id] = { valAprovado: 0, qtdAprovada: 0 };
@@ -361,6 +361,11 @@ const Parser = {
         });
 
         data.procedimentos = Object.values(procMap).map(p => {
+            const cleanCode = p.codigo.replace(/\D/g, '');
+            const sigtapItem = (window.getSigtapProcedimento && window.getSigtapProcedimento(cleanCode)) || (window.SIGTAP_TABELA && window.SIGTAP_TABELA[cleanCode]);
+            const vlSa = (sigtapItem && sigtapItem.vl_sa !== undefined) ? Number(sigtapItem.vl_sa) : (p.valTabela !== undefined ? Number(p.valTabela) : 0);
+            p.valTabela = vlSa;
+            p.valUnitario = (vlSa > 0 || sigtapItem) ? vlSa : (p.qtdAprovada > 0 ? roundMoeda(p.valAprovado / p.qtdAprovada) : 0);
             p.cbos = Object.values(p.cbos || {}).sort((a,b) => b.valAprovado - a.valAprovado);
             return p;
         }).sort((a,b) => b.valAprovado - a.valAprovado);

@@ -7,6 +7,10 @@
     <title>ARGOS - Monitoramento Inteligente. Gestão Eficiente</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/fns-module.css">
+    <link rel="stylesheet" href="css/boletim-executivo.css">
+    <link rel="stylesheet" href="css/cnes-module.css">
+    <link rel="stylesheet" href="css/malha-fina.css">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -138,6 +142,12 @@
                 <span id="lblCompetencia">Jan–Abr / 2026</span>
             </div>
             <div class="header-actions">
+                <button class="btn-header-premium btn-premium-boletim" id="btnBoletimTop" onclick="window.BoletimExecutivo.abrir()" title="Boletim Executivo para o Secretário e Prefeito" style="background: linear-gradient(135deg, #0f172a, #1e293b); border: 1px solid #38bdf8; color: #38bdf8;">
+                    <i class="fas fa-crown"></i><span>Boletim Executivo</span>
+                </button>
+                <button class="btn-header-premium btn-premium-malhafina" id="btnMalhaFinaTop" onclick="window.MalhaFinaEngine.executar()" title="Auditoria de Malha Fina Anti-Glosa DATASUS" style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #818cf8; color: #a5b4fc;">
+                    <i class="fas fa-shield-alt"></i><span>Malha Fina</span>
+                </button>
                 <button class="btn-header-premium btn-premium-import" id="btnImportar" title="Importar TXT SIA/SUS">
                     <i class="fas fa-file-import"></i><span>Importar</span>
                 </button>
@@ -197,6 +207,12 @@
             </li>
             <li class="nav-item" data-section="producoes-bpa">
                 <i class="fas fa-file-medical-alt"></i><span>Produções BPA</span>
+            </li>
+            <li class="nav-item" data-section="cnes">
+                <i class="fas fa-hospital-user"></i><span>CNES & Vínculos</span>
+            </li>
+            <li class="nav-item" data-section="conciliacao-fns">
+                <i class="fas fa-landmark"></i><span>Conciliação FNS</span>
             </li>
             <li class="nav-item" data-section="arquivos"
                 style="border-top: 1px solid rgba(255,255,255,0.15); margin-top: 0.5714rem; padding-top: 1rem;">
@@ -1267,7 +1283,7 @@
                                     style="font-size: 0.72rem; margin-left: 0.2857rem; opacity: 0.7;"></i></th>
                             <th class="text-right" style="cursor: pointer;"
                                 onclick="toggleSortProcedimentos('valUnitario')" id="thValUnitario"
-                                title="Ordenar por Valor Unitário (Maior para Menor)">Valor Unitário (R$) <i
+                                title="Valor Unitário Ambulatorial Oficial da Tabela SIGTAP (VL_SA) — Clique para ordenar">Valor Unitário (R$) <i
                                     class="fas fa-sort-amount-down"
                                     style="font-size: 0.72rem; margin-left: 0.2857rem; opacity: 0.7;"></i></th>
                             <th class="text-right">% do Total</th>
@@ -2004,6 +2020,20 @@
             </div>
         </section>
 
+        <!-- ======================== SEÇÃO CONCILIAÇÃO FNS & AUDITORIA FEDERAL ======================== -->
+        <section id="section-conciliacao-fns" class="content-section">
+            <div id="viewConciliacaoFns">
+                <!-- Inserido dinamicamente pelo FnsModule -->
+            </div>
+        </section>
+
+        <!-- ======================== SEÇÃO CNES & VÍNCULOS ======================== -->
+        <section id="section-cnes" class="content-section">
+            <div id="viewCnes">
+                <!-- Inserido dinamicamente pelo CnesModule -->
+            </div>
+        </section>
+
     </main>
 
     <!-- ===== MODAL DE UPLOAD DE PRODUÇÃO BPA ===== -->
@@ -2051,6 +2081,13 @@
                         <div id="bpaRaioXContent" class="bpa-raiox-box" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1; font-size: 0.8rem; text-align: left;">
                             <div id="bpaTipoExplicacao" style="font-weight: 600; color: #1e293b; margin-bottom: 0.4rem;"></div>
                             <div id="bpaProcedimentosAmostra" style="color: #475569; line-height: 1.4;"></div>
+                        </div>
+
+                        <!-- Botão de Ação Imediata da Malha Fina -->
+                        <div style="margin-top: 0.75rem;">
+                            <button type="button" onclick="window.MalhaFinaEngine.executar(BpaModule.filePendingUpload)" style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #818cf8; color: #c7d2fe; font-weight: 700; width: 100%; padding: 0.6rem; border-radius: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(49, 46, 129, 0.3); transition: all 0.2s ease;">
+                                <i class="fas fa-shield-alt" style="color: #818cf8;"></i> Auditar Agora com a Malha Fina Anti-Glosa
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -2458,6 +2495,34 @@
         </div>
     </div>
 
+    <!-- ===== MODAL BOLETIM EXECUTIVO ONE-PAGE ===== -->
+    <div id="modalBoletimExecutivo" class="boletim-modal-overlay hidden">
+        <div class="boletim-actions-bar">
+            <div class="boletim-bar-title">
+                <i class="fas fa-crown"></i>
+                <span>Boletim Executivo de Gestão (Prefeito & Secretário)</span>
+            </div>
+            <div class="boletim-bar-buttons">
+                <button class="btn-boletim-action btn-boletim-whatsapp" onclick="window.BoletimExecutivo.copiarWhatsApp()" title="Copiar resumo formatado para colar no WhatsApp">
+                    <i class="fab fa-whatsapp"></i> Copiar WhatsApp
+                </button>
+                <button class="btn-boletim-action btn-boletim-pdf" onclick="window.BoletimExecutivo.baixarPDF()" title="Baixar documento oficial em PDF (A4)">
+                    <i class="fas fa-file-pdf"></i> Baixar PDF (A4)
+                </button>
+                <button class="btn-boletim-action btn-boletim-print" onclick="window.BoletimExecutivo.imprimir()" title="Imprimir documento">
+                    <i class="fas fa-print"></i> Imprimir
+                </button>
+                <button class="btn-boletim-action btn-boletim-close" onclick="window.BoletimExecutivo.fechar()" title="Fechar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="boletim-page" id="boletimPageContent">
+            <!-- Renderizado dinamicamente por window.BoletimExecutivo.abrir() -->
+        </div>
+    </div>
+
     <!-- ===== TOAST ===== -->
     <div id="toast" class="toast hidden"></div>
 
@@ -2521,6 +2586,10 @@
     <script src="js/users.js"></script>
     <script src="js/municipio-context.js"></script>
     <script src="js/bpa-module.js"></script>
+    <script src="js/fns-module.js"></script>
+    <script src="js/boletim-executivo.js"></script>
+    <script src="js/cnes-module.js"></script>
+    <script src="js/malha-fina-engine.js"></script>
 
     <!-- Script Principal da Aplicação -->
     <script src="js/app.js?v=4.0.0"></script>

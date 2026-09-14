@@ -132,6 +132,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const savedDatasets = await AppDB.getItem('datasets');
             if (savedDatasets && savedDatasets.length > 0) {
                 window.datasets = savedDatasets;
+                window.datasets.forEach(ds => {
+                    if (ds && ds.procedimentos) enrichProcedimentosWithSigtap(ds.procedimentos);
+                });
                 const agg = buildAggregatedData(window.datasets);
                 await PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
                 loadData(agg);
@@ -561,7 +564,7 @@ function navigateTo(section) {
     // Ocultar ou Mostrar a barra de filtros dependendo da seção
     const filterBar = document.getElementById('filter-bar');
     if (filterBar) {
-        if (section === 'minha-conta' || section === 'usuarios' || section === 'relatorios' || section === 'arquivos' || section === 'sigtap' || section === 'producoes-bpa') {
+        if (section === 'minha-conta' || section === 'usuarios' || section === 'relatorios' || section === 'arquivos' || section === 'sigtap' || section === 'producoes-bpa' || section === 'conciliacao-fns' || section === 'cnes') {
             filterBar.style.display = 'none';
         } else {
             filterBar.style.display = 'flex';
@@ -577,6 +580,14 @@ function navigateTo(section) {
 
     if (section === 'producoes-bpa' && window.BpaModule && typeof window.BpaModule.renderAll === 'function') {
         setTimeout(() => window.BpaModule.renderAll(), 50);
+    }
+
+    if (section === 'cnes' && window.CnesModule && typeof window.CnesModule.init === 'function') {
+        setTimeout(() => window.CnesModule.init(), 50);
+    }
+
+    if (section === 'conciliacao-fns' && window.FnsModule && typeof window.FnsModule.init === 'function') {
+        setTimeout(() => window.FnsModule.init(), 50);
     }
 
     // Re-renderizar gráficos se necessário
@@ -614,7 +625,76 @@ function getEmptyData() {
     };
 }
 
+function getFinanciamentoTooltip(codigo) {
+    if (!codigo && codigo !== 0) return '';
+    const clean = String(codigo).trim();
+    const map = {
+        '01': 'Financiamento: 01 — Atenção Básica (PAB)',
+        '02': 'Financiamento: 02 — Assistência Farmacêutica',
+        '04': 'Financiamento: 04 — Fundo de Ações Estratégicas e Compensação (FAEC)',
+        '05': 'Financiamento: 05 — Incentivo da Atenção Básica',
+        '06': 'Financiamento: 06 — Média e Alta Complexidade (MAC)',
+        '07': 'Financiamento: 07 — Vigilância em Saúde',
+        '08': 'Financiamento: 08 — Gestão do SUS'
+    };
+    if (map[clean]) return map[clean];
+    if (clean.includes('MAC')) return 'Financiamento: 06 — Média e Alta Complexidade (MAC)';
+    if (clean.includes('PAB') || clean.includes('Básica')) return 'Financiamento: 01 — Atenção Básica (PAB)';
+    if (clean.includes('FAEC')) return 'Financiamento: 04 — FAEC (Fundo de Ações Estratégicas e Compensação)';
+    return `Financiamento SUS: ${clean}`;
+}
+
+function getComplexidadeTooltip(codigo) {
+    if (!codigo && codigo !== 0) return '';
+    const clean = String(codigo).trim();
+    const map = {
+        '0': 'Complexidade: 0 — Não se Aplica',
+        '00': 'Complexidade: 00 — Não se Aplica',
+        '1': 'Complexidade: 1 — Atenção Básica (Primária)',
+        '01': 'Complexidade: 01 — Atenção Básica (Primária)',
+        '2': 'Complexidade: 2 — Média Complexidade',
+        '02': 'Complexidade: 02 — Média Complexidade',
+        '3': 'Complexidade: 3 — Alta Complexidade',
+        '03': 'Complexidade: 03 — Alta Complexidade'
+    };
+    if (map[clean]) return map[clean];
+    if (clean.toLowerCase().includes('alta')) return 'Complexidade: 3 — Alta Complexidade';
+    if (clean.toLowerCase().includes('média') || clean.toLowerCase().includes('media')) return 'Complexidade: 2 — Média Complexidade';
+    if (clean.toLowerCase().includes('básica') || clean.toLowerCase().includes('basica')) return 'Complexidade: 1 — Atenção Básica';
+    return `Nível de Complexidade: ${clean}`;
+}
+
+function enrichProcedimentosWithSigtap(procedimentos) {
+    if (!procedimentos || !Array.isArray(procedimentos)) return procedimentos;
+    procedimentos.forEach(p => {
+        if (!p || !p.codigo) return;
+        const cleanCode = String(p.codigo).replace(/\D/g, '');
+        const sigtapInfo = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : (window.SIGTAP_TABELA ? window.SIGTAP_TABELA[cleanCode] : null);
+        if (sigtapInfo) {
+            if (!p.descricao || p.descricao.startsWith('Proc ')) {
+                p.descricao = sigtapInfo.nome || p.descricao;
+            }
+            p.valTabela = (sigtapInfo.vl_sa !== undefined && sigtapInfo.vl_sa !== null) ? Number(sigtapInfo.vl_sa) : (p.valTabela || 0);
+            p.financiamento = sigtapInfo.financiamento || p.financiamento || '';
+            p.complexidade = sigtapInfo.complexidade || p.complexidade || '';
+            p.valUnitario = p.valTabela;
+        } else if (p.valTabela !== undefined && p.valTabela !== null && p.valTabela > 0) {
+            p.valUnitario = Number(p.valTabela);
+        } else if ((p.valUnitario === undefined || p.valUnitario === null || p.valUnitario === 0) && p.qtdAprovada > 0 && p.valAprovado > 0) {
+            p.valUnitario = Math.round((p.valAprovado / p.qtdAprovada + Number.EPSILON) * 100) / 100;
+        }
+        p.valEsperadoTabela = Math.round((p.qtdAprovada * (p.valTabela !== undefined ? p.valTabela : (p.valUnitario || 0)) + Number.EPSILON) * 100) / 100;
+    });
+    return procedimentos;
+}
+window.getFinanciamentoTooltip = getFinanciamentoTooltip;
+window.getComplexidadeTooltip = getComplexidadeTooltip;
+window.enrichProcedimentosWithSigtap = enrichProcedimentosWithSigtap;
+
 function loadData(data) {
+    if (data && data.procedimentos) {
+        enrichProcedimentosWithSigtap(data.procedimentos);
+    }
     APP_STATE.data = data;
     APP_STATE.filteredData = data;
     populateFilterUnidades(data);
@@ -626,6 +706,11 @@ function loadData(data) {
     if (window.BpaModule && typeof window.BpaModule.renderAll === 'function') {
         window.BpaModule.populateDatalistUnidades();
         window.BpaModule.renderAll();
+    }
+
+    // Atualizar Módulo de Conciliação FNS com os dados importados
+    if (window.FnsModule && typeof window.FnsModule.render === 'function') {
+        window.FnsModule.render();
     }
 
     document.getElementById('lblCompetencia').textContent = data.competencia || 'Sem competência';
@@ -700,13 +785,14 @@ function aggregateLinhas(linhas, cmpFallback, anoFallback, municipioFallback, uf
         if (!pMap[l.proc]) {
             const cleanCode = l.proc.replace(/\D/g, '');
             const sigtapInfo = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : null;
+            const vlSa = (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? Number(sigtapInfo.vl_sa) : 0;
             pMap[l.proc] = { 
                 codigo: l.proc, 
                 descricao: sigtapInfo?.nome || window.SIGTAP?.[cleanCode] || 'Proc '+l.proc, 
                 qtdAprovada: 0, 
                 valAprovado: 0, 
-                valUnitario: 0,
-                valTabela: (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? sigtapInfo.vl_sa : 0,
+                valUnitario: vlSa,
+                valTabela: vlSa,
                 financiamento: sigtapInfo?.financiamento || '',
                 complexidade: sigtapInfo?.complexidade || '',
                 subgrupo: sigtapInfo?.subgrupo || '',
@@ -786,8 +872,12 @@ function aggregateLinhas(linhas, cmpFallback, anoFallback, municipioFallback, uf
     let procedimentos = Object.values(pMap).map(p => {
         p.cbos = Object.values(p.cbos).sort((a,b) => b.valAprovado - a.valAprovado);
         p.valAprovado = Math.round((p.valAprovado + Number.EPSILON) * 100) / 100;
-        if (p.qtdAprovada > 0) p.valUnitario = Math.round((p.valAprovado / p.qtdAprovada + Number.EPSILON) * 100) / 100;
-        p.valEsperadoTabela = Math.round((p.qtdAprovada * (p.valTabela || 0) + Number.EPSILON) * 100) / 100;
+        const cleanCode = p.codigo.replace(/\D/g, '');
+        const sigtapInfo = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : null;
+        const vlSa = (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? Number(sigtapInfo.vl_sa) : (p.valTabela !== undefined ? Number(p.valTabela) : 0);
+        p.valTabela = vlSa;
+        p.valUnitario = (vlSa > 0 || sigtapInfo) ? vlSa : (p.qtdAprovada > 0 ? Math.round((p.valAprovado / p.qtdAprovada + Number.EPSILON) * 100) / 100 : 0);
+        p.valEsperadoTabela = Math.round((p.qtdAprovada * vlSa + Number.EPSILON) * 100) / 100;
         return p;
     }).sort((a,b) => b.valAprovado - a.valAprovado);
 
@@ -1671,6 +1761,9 @@ function renderDashboardProcedimentos(d) {
         }
     }
 
+    // Garantir que todos os procedimentos utilizam valores fidedignos da tabela oficial SIGTAP
+    enrichProcedimentosWithSigtap(d.procedimentos);
+
     // Ordenar cópia do array
     let sortedProcs = [...d.procedimentos];
     if (PROCEDIMENTO_SORT_ORDER === 'valUnitario') {
@@ -1690,16 +1783,15 @@ function renderDashboardProcedimentos(d) {
             <td class="table-code" style="font-size:.75rem; white-space: nowrap;">${p.codigo.replace(/-/g, '\u2011')}</td>
             <td>
                 <div><strong>${p.descricao}</strong></div>
-                ${(p.financiamento || p.complexidade || (p.valTabela && p.valTabela > 0)) ? `
+                ${(p.financiamento || p.complexidade) ? `
                 <div style="margin-top: 4px; display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                    ${(p.valTabela && p.valTabela > 0) ? `<span class="badge" style="font-size: 0.68rem; padding: 2px 7px; background: #e6f4ea; color: #137333; border: 1px solid #ceead6; border-radius: 4px; font-weight: 700;" title="Valor Unitário Ambulatorial Oficial da Tabela SIGTAP (VL_SA)"><i class="fas fa-check-circle" style="margin-right: 3px; font-size: 0.65rem;"></i>SIGTAP: ${fmt.moeda(p.valTabela)}</span>` : ''}
-                    ${p.financiamento ? `<span class="badge" style="font-size: 0.68rem; padding: 2px 6px; background: ${p.financiamento.includes('MAC') ? '#e8f0fe; color: #1a73e8; border: 1px solid #d2e3fc;' : '#fef7e0; color: #b06000; border: 1px solid #feefc3;'} border-radius: 4px; font-weight: 600;"><i class="fas fa-coins" style="margin-right: 3px; font-size: 0.65rem;"></i>${p.financiamento}</span>` : ''}
-                    ${p.complexidade ? `<span class="badge" style="font-size: 0.68rem; padding: 2px 6px; background: #f1f3f4; color: #5f6368; border-radius: 4px; font-weight: 500;">${p.complexidade}</span>` : ''}
+                    ${p.financiamento ? `<span class="badge" style="font-size: 0.68rem; padding: 2px 6px; background: #fef7e0; color: #b06000; border: 1px solid #feefc3; border-radius: 4px; font-weight: 600; cursor: help;" title="${getFinanciamentoTooltip(p.financiamento)}"><i class="fas fa-coins" style="margin-right: 3px; font-size: 0.65rem;"></i>${p.financiamento}</span>` : ''}
+                    ${p.complexidade ? `<span class="badge" style="font-size: 0.68rem; padding: 2px 6px; background: #f1f3f4; color: #5f6368; border-radius: 4px; font-weight: 500; cursor: help;" title="${getComplexidadeTooltip(p.complexidade)}">${p.complexidade}</span>` : ''}
                 </div>` : ''}
             </td>
             <td class="text-right mono">${fmt.numero(p.qtdAprovada)}</td>
             <td class="text-right mono fw-bold">${fmt.moeda(p.valAprovado)}</td>
-            <td class="text-right mono">${fmt.moeda(p.valUnitario || 0)}</td>
+            <td class="text-right mono" title="Valor Unitário Ambulatorial Oficial da Tabela SIGTAP (VL_SA): ${fmt.moeda(p.valUnitario || 0)}">${fmt.moeda(p.valUnitario || 0)}</td>
             <td class="text-right mono">${fmt.pct(pct)}</td>
             <td class="text-center">
                 <div style="height:6px;background:#E2E8F0;border-radius:3px;width:80px;display:inline-block;">
@@ -1815,13 +1907,15 @@ function renderDashboardCbo(d) {
                         <tbody>
                             ${c.procedimentos.map(p => {
                                 const procPct = c.valAprovado > 0 ? (p.valAprovado / c.valAprovado * 100) : 0;
-                                const valUnit = p.qtdAprovada > 0 ? (p.valAprovado / p.qtdAprovada) : 0;
+                                const cleanCode = String(p.codigo).replace(/\D/g, '');
+                                const sigtapItem = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : null;
+                                const valUnit = (sigtapItem && sigtapItem.vl_sa !== undefined) ? Number(sigtapItem.vl_sa) : (p.valUnitario !== undefined ? Number(p.valUnitario) : (p.qtdAprovada > 0 ? (p.valAprovado / p.qtdAprovada) : 0));
                                 return `
                                 <tr style="border-bottom: 1px solid #f1f5f9;">
                                     <td style="padding: 6px 12px; text-align: left;"><strong style="white-space: nowrap;">${p.codigo}</strong> — ${p.descricao}</td>
                                     <td style="padding: 6px 12px; text-align: right;" class="mono">${fmt.numero(p.qtdAprovada)}</td>
                                     <td style="padding: 6px 12px; text-align: right;" class="mono fw-bold">${fmt.moeda(p.valAprovado)}</td>
-                                    <td style="padding: 6px 12px; text-align: right;" class="mono">${fmt.moeda(valUnit)}</td>
+                                    <td style="padding: 6px 12px; text-align: right;" class="mono" title="Valor Unitário Ambulatorial Oficial SIGTAP">${fmt.moeda(valUnit)}</td>
                                     <td style="padding: 6px 12px; text-align: right;" class="mono">${fmt.pct(procPct)}</td>
                                 </tr>
                                 `;
@@ -2880,6 +2974,13 @@ function processContent(content, fileName = 'arquivo') {
                         
                         hideModal('modalImportar');
                         showToast(`✅ ${parsed.competencia} — ${parsed.municipio}-${parsed.uf} importado com sucesso!`, 'success');
+
+                        // Aciona a Malha Fina Anti-Glosa com o Radar Cyber ARGOS
+                        if (window.MalhaFinaEngine && typeof window.MalhaFinaEngine.executar === 'function') {
+                            setTimeout(() => {
+                                window.MalhaFinaEngine.executar(parsed);
+                            }, 400);
+                        }
                     } catch(err) {
                         showToast('❌ Erro na finalização do processamento: ' + err.message, 'error');
                     } finally {
@@ -3037,11 +3138,13 @@ function buildAggregatedData(datasets) {
             const cleanCode = p.codigo.replace(/\D/g, '');
             const sigtapInfo = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : null;
             const correctDesc = sigtapInfo?.nome || (window.SIGTAP && window.SIGTAP[cleanCode]) || p.descricao;
+            const vlSa = (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? Number(sigtapInfo.vl_sa) : (p.valTabela !== undefined ? Number(p.valTabela) : (p.valUnitario || 0));
             if (!pMap[p.codigo]) {
                 pMap[p.codigo] = { 
                     ...p, 
                     descricao: correctDesc, 
-                    valTabela: (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? sigtapInfo.vl_sa : (p.valTabela || 0),
+                    valTabela: vlSa,
+                    valUnitario: vlSa,
                     financiamento: sigtapInfo?.financiamento || p.financiamento || '',
                     complexidade: sigtapInfo?.complexidade || p.complexidade || '',
                     qtdAprovada: 0, 
@@ -3051,12 +3154,13 @@ function buildAggregatedData(datasets) {
                 };
             }
             pMap[p.codigo].descricao = correctDesc; // Garantir atualização
-            if (sigtapInfo?.vl_sa !== undefined) pMap[p.codigo].valTabela = sigtapInfo.vl_sa;
+            pMap[p.codigo].valTabela = vlSa;
+            pMap[p.codigo].valUnitario = (vlSa > 0 || sigtapInfo) ? vlSa : (pMap[p.codigo].valUnitario || 0);
             if (sigtapInfo?.financiamento) pMap[p.codigo].financiamento = sigtapInfo.financiamento;
             if (sigtapInfo?.complexidade) pMap[p.codigo].complexidade = sigtapInfo.complexidade;
             pMap[p.codigo].qtdAprovada += p.qtdAprovada;
             pMap[p.codigo].valAprovado = Math.round((pMap[p.codigo].valAprovado + p.valAprovado + Number.EPSILON) * 100) / 100;
-            if (pMap[p.codigo].valAprovado > 0 && pMap[p.codigo].qtdAprovada > 0) {
+            if (!sigtapInfo && (pMap[p.codigo].valUnitario === undefined || pMap[p.codigo].valUnitario === null || pMap[p.codigo].valUnitario === 0) && pMap[p.codigo].valAprovado > 0 && pMap[p.codigo].qtdAprovada > 0) {
                 pMap[p.codigo].valUnitario = Math.round((pMap[p.codigo].valAprovado / pMap[p.codigo].qtdAprovada + Number.EPSILON) * 100) / 100;
             }
             pMap[p.codigo].valEsperadoTabela = Math.round((pMap[p.codigo].qtdAprovada * (pMap[p.codigo].valTabela || 0) + Number.EPSILON) * 100) / 100;
@@ -3162,8 +3266,12 @@ function buildAggregatedData(datasets) {
     agg.procedimentos = Object.values(pMap).map(p => {
         p.cbos = Object.values(p.cbos || {}).sort((a,b) => b.valAprovado - a.valAprovado);
         p.valAprovado = Math.round((p.valAprovado + Number.EPSILON) * 100) / 100;
-        if (p.qtdAprovada > 0) p.valUnitario = Math.round((p.valAprovado / p.qtdAprovada + Number.EPSILON) * 100) / 100;
-        p.valEsperadoTabela = Math.round((p.qtdAprovada * (p.valTabela || 0) + Number.EPSILON) * 100) / 100;
+        const cleanCode = p.codigo.replace(/\D/g, '');
+        const sigtapInfo = (typeof window.getSigtapProcedimento === 'function') ? window.getSigtapProcedimento(cleanCode) : null;
+        const vlSa = (sigtapInfo && sigtapInfo.vl_sa !== undefined) ? Number(sigtapInfo.vl_sa) : (p.valTabela !== undefined ? Number(p.valTabela) : 0);
+        p.valTabela = vlSa;
+        p.valUnitario = (vlSa > 0 || sigtapInfo) ? vlSa : (p.qtdAprovada > 0 ? Math.round((p.valAprovado / p.qtdAprovada + Number.EPSILON) * 100) / 100 : 0);
+        p.valEsperadoTabela = Math.round((p.qtdAprovada * vlSa + Number.EPSILON) * 100) / 100;
         return p;
     }).sort((a,b) => b.valAprovado - a.valAprovado);
     agg.cbos = Object.values(cboMap).map(c => {

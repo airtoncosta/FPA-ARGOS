@@ -1,0 +1,833 @@
+/**
+ * ARGOS — cnes-module.css v2.0
+ * System Design Corporativo SUS / SIGTAP & CNESNet Oficial DATASUS
+ * Fundo limpo, cartões brancos nítidos, tipografia Inter de alto contraste,
+ * e réplica visual fiel aos portais de consulta e tabelas oficiais do CNES.
+ */
+
+/* Container Principal do Módulo CNES */
+.cnes-container {
+    padding: 1.5rem;
+    max-width: 1540px;
+    margin: 0 auto;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+    background: #f8fafc;
+    min-height: calc(100vh - 4.5rem);
+}
+
+/* Barra Superior / Header Institucional */
+.cnes-top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.625rem;
+    padding: 0.85rem 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.cnes-top-breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.875rem;
+    color: #475569;
+}
+
+.cnes-top-breadcrumbs a,
+.cnes-top-breadcrumbs button {
+    background: none;
+    border: none;
+    color: #0284c7;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.cnes-top-breadcrumbs a:hover,
+.cnes-top-breadcrumbs button:hover {
+    text-decoration: underline;
+}
+
+.cnes-top-badge-competencia {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid #bae6fd;
+}
+
+/* ==========================================================================
+   PORTAIS DE CONSULTA (IMAGEM 2: ESTABELECIMENTO & PROFISSIONAL)
+   ========================================================================== */
+.cnes-search-portals-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Box 1: Consulta Estabelecimento (Topo Roxo) */
+.cnes-portal-box {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.cnes-portal-stripe-purple {
+    height: 5px;
+    background-color: #4c1d95; /* Roxo Oficial DATASUS */
+    width: 100%;
+}
+
+.cnes-portal-stripe-orange {
+    height: 5px;
+    background-color: #c2410c; /* Laranja Oficial DATASUS */
+    width: 100%;
+}
+
+.cnes-portal-inner {
+    padding: 1.25rem 1.5rem;
+}
+
+.cnes-portal-title-purple {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #4c1d95;
+    margin: 0 0 1rem 0;
+    letter-spacing: -0.01em;
+}
+
+.cnes-portal-title-orange {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #c2410c;
+    margin: 0 0 1rem 0;
+    letter-spacing: -0.01em;
+}
+
+.cnes-portal-form {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 820px;
+}
+
+.cnes-portal-input {
+    flex: 1;
+    height: 40px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.92rem;
+    color: #0f172a;
+    background-color: #ffffff;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.cnes-portal-input:focus {
+    border-color: #0284c7;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
+.cnes-portal-input::placeholder {
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.cnes-btn-search {
+    height: 40px;
+    padding: 0 1.5rem;
+    background-color: #5b92e5;
+    border: 1px solid #4a82d2;
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.15s ease;
+}
+
+.cnes-btn-search:hover {
+    background-color: #4380db;
+    border-color: #3570c9;
+}
+
+/* ==========================================================================
+   CARDS DE VISÃO GERAL DE ESTABELECIMENTOS (CLEAN LIGHT DESIGN)
+   ========================================================================== */
+.cnes-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.cnes-section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cnes-units-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.cnes-unit-card-clean {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.cnes-unit-card-clean:hover {
+    border-color: #0284c7;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.1);
+    transform: translateY(-2px);
+}
+
+.cnes-unit-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.cnes-unit-badge-tipo {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #0369a1;
+    background: #e0f2fe;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+}
+
+.cnes-unit-badge-code {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #dc2626;
+    background: #fee2e2;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    font-family: 'Roboto Mono', monospace;
+}
+
+.cnes-unit-card-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 0.35rem 0;
+    line-height: 1.35;
+}
+
+.cnes-unit-card-razao {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin: 0 0 0.85rem 0;
+}
+
+.cnes-unit-card-info {
+    font-size: 0.82rem;
+    color: #334155;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+    flex: 1;
+}
+
+.cnes-unit-card-info i {
+    width: 16px;
+    color: #64748b;
+}
+
+.cnes-unit-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.85rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.cnes-btn-outline {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.45rem 0.85rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.15s ease;
+}
+
+.cnes-btn-outline:hover {
+    background: #f8fafc;
+    border-color: #0284c7;
+    color: #0284c7;
+}
+
+.cnes-btn-primary-blue {
+    background: #0284c7;
+    border: 1px solid #0369a1;
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.45rem 0.85rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.15s ease;
+}
+
+.cnes-btn-primary-blue:hover {
+    background: #0369a1;
+}
+
+/* ==========================================================================
+   FICHA DO ESTABELECIMENTO DE SAÚDE (IMAGEM 3)
+   ========================================================================== */
+.cnes-ficha-container {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.35rem;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cnes-ficha-header-banner {
+    background: #003366; /* Azul Escuro Oficial DATASUS */
+    color: #ffffff;
+    text-align: center;
+    padding: 0.75rem 1rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.cnes-ficha-identificacao-bar {
+    background: #034b8c;
+    color: #ffffff;
+    padding: 0.6rem 1rem;
+    font-size: 0.82rem;
+    text-align: center;
+    border-bottom: 1px solid #023666;
+}
+
+.cnes-ficha-identificacao-title {
+    font-weight: 700;
+    display: block;
+    margin-bottom: 0.2rem;
+    color: #fde047;
+    text-transform: uppercase;
+}
+
+.cnes-ficha-identificacao-meta {
+    font-size: 0.76rem;
+    color: #e0f2fe;
+    letter-spacing: 0.03em;
+}
+
+/* Ações rápidas abaixo da identificação */
+.cnes-ficha-action-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    background: #e2e8f0;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 0.82rem;
+}
+
+.cnes-ficha-action-row-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #1e3a8a;
+    font-weight: 700;
+}
+
+.cnes-ficha-action-row-right {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.cnes-btn-ficha-action {
+    background: #ffffff;
+    border: 1px solid #94a3b8;
+    color: #0f172a;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cnes-btn-ficha-action:hover {
+    background: #f1f5f9;
+    border-color: #0284c7;
+    color: #0284c7;
+}
+
+/* Tabela de Dados Cadastrais da Ficha */
+.cnes-ficha-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+}
+
+.cnes-ficha-table tr {
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.cnes-ficha-table tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+.cnes-ficha-table td {
+    padding: 0.55rem 0.85rem;
+    vertical-align: middle;
+}
+
+.cnes-ficha-label {
+    font-weight: 700;
+    color: #1e3a8a;
+    width: 14%;
+    white-space: nowrap;
+}
+
+.cnes-ficha-val {
+    color: #0f172a;
+}
+
+.cnes-ficha-val-red {
+    color: #dc2626 !important;
+    font-weight: 700;
+    font-family: 'Roboto Mono', monospace;
+}
+
+/* Grade de Módulos Oficiais (15 Botões) */
+.cnes-modulos-section {
+    background: #f1f5f9;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid #cbd5e1;
+}
+
+.cnes-modulos-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1e3a8a;
+    margin-bottom: 0.6rem;
+}
+
+.cnes-modulos-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.4rem;
+}
+
+@media (max-width: 1024px) {
+    .cnes-modulos-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.cnes-btn-modulo {
+    background: #ffffff;
+    border: 1px solid #3b82f6;
+    color: #1d4ed8;
+    padding: 0.45rem 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 3px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cnes-btn-modulo:hover,
+.cnes-btn-modulo.active {
+    background: #1d4ed8;
+    color: #ffffff;
+}
+
+.cnes-btn-modulo.highlight-prof {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    color: #0369a1;
+    font-weight: 700;
+}
+
+.cnes-btn-modulo.highlight-prof:hover {
+    background: #0284c7;
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   MÓDULO PROFISSIONAL — PROFISSIONAIS POR ESTABELECIMENTO (IMAGEM 4)
+   ========================================================================== */
+.cnes-prof-module-wrapper {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.35rem;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cnes-prof-header-title {
+    background: #003366;
+    color: #ffffff;
+    padding: 0.65rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.01em;
+}
+
+.cnes-prof-unit-bar {
+    background: #f1f5f9;
+    border-bottom: 1px solid #cbd5e1;
+    padding: 0.6rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.cnes-prof-unit-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e3a8a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cnes-prof-action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cnes-btn-xls {
+    background: #ffffff;
+    border: 1px solid #16a34a;
+    color: #15803d;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.35rem 0.75rem;
+    border-radius: 3px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.15s ease;
+}
+
+.cnes-btn-xls:hover {
+    background: #15803d;
+    color: #ffffff;
+}
+
+/* Toolbar de Paginação e Busca */
+.cnes-prof-toolbar {
+    padding: 0.65rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.84rem;
+}
+
+.cnes-prof-per-page {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #334155;
+}
+
+.cnes-prof-per-page select {
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.84rem;
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.cnes-prof-search-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #334155;
+}
+
+.cnes-prof-search-inline input {
+    border: 1px solid #cbd5e1;
+    border-radius: 3px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.84rem;
+    width: 200px;
+    color: #0f172a;
+}
+
+.cnes-prof-disclaimer {
+    padding: 0.35rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #dc2626;
+    background: #fff5f5;
+    border-bottom: 1px solid #fed7d7;
+}
+
+/* Grade de 17 Colunas CNESNet */
+.cnes-table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.cnes-table-17cols {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.cnes-table-17cols thead th {
+    background-color: #0284c7;
+    color: #ffffff;
+    font-weight: 700;
+    padding: 0.5rem 0.5rem;
+    border: 1px solid #0369a1;
+    text-align: left;
+    font-size: 0.75rem;
+}
+
+.cnes-table-17cols thead th.th-group-vinculo {
+    background-color: #0369a1;
+    text-align: center;
+}
+
+.cnes-table-17cols thead th.th-center {
+    text-align: center;
+}
+
+.cnes-table-17cols tbody td {
+    padding: 0.45rem 0.5rem;
+    border: 1px solid #cbd5e1;
+    color: #0f172a;
+}
+
+.cnes-table-17cols tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+.cnes-table-17cols tbody tr:hover {
+    background-color: #eff6ff;
+}
+
+.cnes-prof-name-link {
+    color: #0284c7;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.cnes-prof-name-link:hover {
+    text-decoration: underline;
+}
+
+.cnes-status-ativo-red {
+    color: #dc2626 !important;
+    font-weight: 700;
+    text-align: center;
+}
+
+.cnes-status-desligado-gray {
+    color: #64748b !important;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Paginação Inferior */
+.cnes-pagination-bar {
+    padding: 0.65rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    font-size: 0.8rem;
+    color: #475569;
+}
+
+.cnes-pagination-buttons {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.cnes-btn-page {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #1e293b;
+    padding: 0.25rem 0.6rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.cnes-btn-page.active {
+    background: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+}
+
+/* ==========================================================================
+   MODAL DE COMPETÊNCIAS HISTÓRICAS
+   ========================================================================== */
+.cnes-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+}
+
+.cnes-modal-box {
+    background: #ffffff;
+    border-radius: 0.5rem;
+    width: 100%;
+    max-width: 460px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    animation: cnesFadeIn 0.2s ease-out;
+}
+
+@keyframes cnesFadeIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.cnes-modal-header {
+    background: #003366;
+    color: #ffffff;
+    padding: 0.85rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.cnes-modal-header button {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 1.25rem;
+    cursor: pointer;
+}
+
+.cnes-modal-body {
+    padding: 1.25rem;
+}
+
+.cnes-competencia-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cnes-competencia-item:hover {
+    background: #eff6ff;
+    border-color: #0284c7;
+}
+
+.cnes-competencia-item.active {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    font-weight: 700;
+    color: #0369a1;
+}
+
+/* Modal de Detalhes do Profissional */
+.cnes-prof-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.cnes-prof-detail-field {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 0.6rem 0.75rem;
+}
+
+.cnes-prof-detail-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.2rem;
+}
+
+.cnes-prof-detail-val {
+    font-weight: 600;
+    color: #0f172a;
+}

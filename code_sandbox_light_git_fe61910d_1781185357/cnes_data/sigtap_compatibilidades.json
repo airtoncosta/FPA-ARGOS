@@ -1,0 +1,54 @@
+{
+  "versao": "2026.08",
+  "descricao": "Tabela de Regras Relacionais e Compatibilidades do SIGTAP para Validação de Glosas",
+  "regras_cbo": {
+    "0101": ["225125", "225124", "223505", "223208", "322205", "322405", "515105", "515120"],
+    "0201": ["225125", "225225", "225250", "225135", "225160", "225320", "223208"],
+    "0202": ["221205", "223405", "225320", "324205"],
+    "0204": ["225320", "324115", "324120"],
+    "0205": ["225320", "225250", "225120"],
+    "0206": ["225320"],
+    "0211": ["225120", "225112", "225165", "225140"],
+    "0301": ["225125", "225124", "225250", "225120", "225133", "225135", "225155", "225160", "225165", "225112", "225103", "223505", "223208", "223605", "251510", "251605"],
+    "0307": ["223208", "223216", "223240", "322405"],
+    "0401": ["225225", "225135", "225160", "223208"],
+    "0411": ["225250", "223505"]
+  },
+  "regras_servicos": {
+    "0204": { "servico": "122", "classificacao": "001", "nome": "DIAGNÓSTICO POR RADIOLOGIA" },
+    "0205": { "servico": "122", "classificacao": "002", "nome": "DIAGNÓSTICO POR ULTRASSONOGRAFIA" },
+    "0206": { "servico": "122", "classificacao": "003", "nome": "DIAGNÓSTICO POR TOMOGRAFIA" },
+    "0202": { "servico": "121", "classificacao": "001", "nome": "PATOLOGIA CLÍNICA / LABORATÓRIO" },
+    "0307": { "servico": "106", "classificacao": "001", "nome": "ODONTOLOGIA ESPECIALIZADA" },
+    "030106": { "servico": "134", "classificacao": "001", "nome": "ATENÇÃO PSICOSSOCIAL" },
+    "0302": { "servico": "159", "classificacao": "001", "nome": "FISIOTERAPIA" }
+  },
+  "regras_sexo": {
+    "0201010151": "F",
+    "0201010160": "F",
+    "0201010011": "F",
+    "0201010569": "F",
+    "0201010070": "M",
+    "0201010100": "M",
+    "0201010178": "M",
+    "0201010380": "M",
+    "0201010410": "M",
+    "0201010461": "M"
+  },
+  "regras_idade": {
+    "0201010011": { "minMeses": 144, "maxMeses": 720 },
+    "0201010410": { "minMeses": 480, "maxMeses": 1440 },
+    "0101040059": { "minMeses": 6, "maxMeses": 72 }
+  },
+  "glosas_catalogo": {
+    "501": { "codigo": "501", "gravidade": "CRITICA", "titulo": "Profissional não cadastrado no CNES da unidade", "sugestao": "Vincular o CNS do profissional no CNES do estabelecimento ou retificar o CNS informante." },
+    "502": { "codigo": "502", "gravidade": "CRITICA", "titulo": "CNS do profissional inválido ou não localizado na base nacional", "sugestao": "Conferir o número de 15 dígitos do Cartão Nacional de Saúde (CNS) no CADSUS/CNES." },
+    "507": { "codigo": "507", "gravidade": "CRITICA", "titulo": "CBO incompatível com o procedimento faturado", "sugestao": "O procedimento exige habilitação específica segundo a Tabela SIGTAP. Retificar o CBO ou o procedimento informado." },
+    "513": { "codigo": "513", "gravidade": "CRITICA", "titulo": "Unidade sem Serviço Especializado e Classificação exigida", "sugestao": "O estabelecimento não possui cadastro ativo do serviço/classificação no CNES. Procedimento será rejeitado pelo DATASUS." },
+    "518": { "codigo": "518", "gravidade": "ALERTA", "titulo": "CID-10 incompatível com o procedimento clínico", "sugestao": "Verificar no prontuário médico a hipótese diagnóstica principal compatível com a tabela unificada." },
+    "521": { "codigo": "521", "gravidade": "CRITICA", "titulo": "Incompatibilidade de Sexo do Paciente", "sugestao": "O procedimento possui restrição de sexo biológico no SIGTAP. Corrigir o cadastro do paciente ou o procedimento." },
+    "525": { "codigo": "525", "gravidade": "CRITICA", "titulo": "Faixa Etária do Paciente fora dos limites do SIGTAP", "sugestao": "A idade do paciente está fora dos limites mínimos/máximos aceitos pelo Ministério da Saúde." },
+    "530": { "codigo": "530", "gravidade": "CRITICA", "titulo": "Quantidade apresentada excede o limite máximo permitido", "sugestao": "Ajustar a quantidade para o teto regulatório estipulado pelo SIGTAP para instrumento de registro único." },
+    "540": { "codigo": "540", "gravidade": "ALERTA", "titulo": "Carga horária ambulatorial em potencial extrapolação", "sugestao": "Verificar se o profissional possui acúmulo de vínculos que ultrapasse os limites regulatórios da auditoria." }
+  }
+}
