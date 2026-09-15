@@ -1,0 +1,124 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "w": 1600,
+      "h": 777,
+      "width": 1016,
+      "columns": 2,
+      "hero": "block",
+      "subtitle": "none",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 1366,
+      "h": 650,
+      "width": 1016,
+      "columns": 2,
+      "hero": "block",
+      "subtitle": "none",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 1024,
+      "h": 768,
+      "width": 976,
+      "columns": 2,
+      "hero": "block",
+      "subtitle": "none",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 1920,
+      "h": 1080,
+      "width": 1016,
+      "columns": 2,
+      "hero": "block",
+      "subtitle": "none",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 2560,
+      "h": 1080,
+      "width": 1016,
+      "columns": 2,
+      "hero": "block",
+      "subtitle": "none",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 760,
+      "h": 900,
+      "width": 432,
+      "columns": 1,
+      "hero": "none",
+      "subtitle": "block",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 761,
+      "h": 900,
+      "width": 713,
+      "columns": 2,
+      "hero": "block",
+      "subtitle": "none",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 390,
+      "h": 844,
+      "width": 358,
+      "columns": 1,
+      "hero": "none",
+      "subtitle": "block",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 320,
+      "h": 568,
+      "width": 288,
+      "columns": 1,
+      "hero": "none",
+      "subtitle": "block",
+      "overflow": false,
+      "font": "16px"
+    },
+    {
+      "w": 844,
+      "h": 390,
+      "width": 796,
+      "columns": 2,
+      "hero": "block",
+      "subtitle": "none",
+      "overflow": false,
+      "font": "16px"
+    }
+  ],
+  "elapsed": 4166,
+  "media": {
+    "time": 1.783895,
+    "paused": true,
+    "ready": 4,
+    "duration": 10,
+    "playing": false
+  },
+  "tests": [
+    "invalid login",
+    "online login",
+    "offline login",
+    "duplicate submission",
+    "video playback and pause",
+    "autoplay fallback",
+    "session restore",
+    "reduced motion",
+    "keyboard"
+  ]
+}

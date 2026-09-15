@@ -519,3 +519,23 @@
 .mf-sugestao-cell i {
     color: #38bdf8;
 }
+
+/* Diagnóstico auditável */
+.mf-modal-results-overlay { z-index: 30000; }
+.mf-audit-summary { padding: 22px; margin: 0 0 20px; border: 1px solid #fbbf24; border-radius: 12px; background: #172033; color: #e2e8f0; }
+.mf-audit-summary h2 { margin: 12px 0; font-size: 1.5rem; }
+.mf-audit-summary p { line-height: 1.6; }
+.mf-financial-note { color: #bae6fd; border-top: 1px solid rgba(56,189,248,.25); padding-top: 12px; }
+.mf-kpi-financial { border-color: rgba(56,189,248,.35); }
+.mf-kpi-card small { display: block; color: #94a3b8; margin-top: 5px; font-size: .72rem; }
+.mf-value-cell { white-space: nowrap; color: #bae6fd !important; font-variant-numeric: tabular-nums; }
+.mf-audit-summary.mf-conforme { border-color: #34d399; }
+.mf-audit-summary.mf-nao_conforme { border-color: #fb7185; }
+.mf-audit-bases { padding: 16px; margin: 20px 0; background: #172033; color: #e2e8f0; border-radius: 10px; }
+.mf-audit-bases summary { cursor: pointer; font-weight: 700; }
+.mf-audit-bases li { margin: 10px 0; }
+.mf-audit-pagination { display: flex; justify-content: space-between; gap: 12px; padding: 16px; align-items: center; color: #e2e8f0; }
+.mf-audit-pagination button, .mf-table-header select { padding: 9px 14px; border-radius: 6px; background: #e2e8f0; color: #0f172a; }
+.mf-audit-pagination button:disabled { opacity: .4; }
+.mf-audit-footnote { color: #94a3b8; overflow-wrap: anywhere; font-size: .75rem; padding: 16px; }
+@media(max-width: 700px) { .mf-table-header { flex-wrap: wrap; gap: 12px; } .mf-audit-pagination { flex-wrap: wrap; } }

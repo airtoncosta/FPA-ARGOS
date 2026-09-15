@@ -1,0 +1,136 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "screen": "1600x777",
+      "login": {
+        "cardWidth": 460,
+        "left": 570,
+        "top": 36.421875,
+        "font": "16px",
+        "overflow": false
+      }
+    },
+    {
+      "screen": "1366x650",
+      "login": {
+        "cardWidth": 460,
+        "left": 453,
+        "top": 16,
+        "font": "16px",
+        "overflow": false
+      }
+    },
+    {
+      "screen": "1024x768",
+      "login": {
+        "cardWidth": 460,
+        "left": 282,
+        "top": 31.921875,
+        "font": "16px",
+        "overflow": false
+      }
+    },
+    {
+      "screen": "1920x1080",
+      "login": {
+        "cardWidth": 460,
+        "left": 730,
+        "top": 159.609375,
+        "font": "16px",
+        "overflow": false
+      }
+    },
+    {
+      "screen": "2560x1080",
+      "login": {
+        "cardWidth": 460,
+        "left": 1050,
+        "top": 159.609375,
+        "font": "16px",
+        "overflow": false
+      }
+    },
+    {
+      "screen": "390x844",
+      "login": {
+        "cardWidth": 366,
+        "left": 12,
+        "top": 70.921875,
+        "font": "16px",
+        "overflow": false
+      }
+    },
+    {
+      "screen": "320x568",
+      "login": {
+        "cardWidth": 296,
+        "left": 12,
+        "top": 16,
+        "font": "16px",
+        "overflow": false
+      }
+    },
+    {
+      "screen": "844x390",
+      "login": {
+        "cardWidth": 460,
+        "left": 192,
+        "top": 16,
+        "font": "16px",
+        "overflow": false
+      }
+    },
+    {
+      "variant": "orbita",
+      "screen": "1440x900",
+      "overflow": false
+    },
+    {
+      "variant": "orbita",
+      "screen": "1366x650",
+      "overflow": false
+    },
+    {
+      "variant": "orbita",
+      "screen": "390x844",
+      "overflow": false
+    },
+    {
+      "variant": "orbita",
+      "screen": "320x568",
+      "overflow": false
+    },
+    {
+      "variant": "orbita",
+      "screen": "844x390",
+      "overflow": false
+    },
+    {
+      "variant": "observatorio",
+      "screen": "1440x900",
+      "overflow": false
+    },
+    {
+      "variant": "observatorio",
+      "screen": "1366x650",
+      "overflow": false
+    },
+    {
+      "variant": "observatorio",
+      "screen": "390x844",
+      "overflow": false
+    },
+    {
+      "variant": "observatorio",
+      "screen": "320x568",
+      "overflow": false
+    },
+    {
+      "variant": "observatorio",
+      "screen": "844x390",
+      "overflow": false
+    }
+  ],
+  "interactions": "switch, password, demo submit, reduced motion"
+}

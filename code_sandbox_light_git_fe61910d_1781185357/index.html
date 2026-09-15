@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/boletim-executivo.css">
     <link rel="stylesheet" href="css/cnes-module.css">
     <link rel="stylesheet" href="css/malha-fina.css">
+    <link rel="stylesheet" href="css/login-responsive.css">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -32,88 +33,20 @@
 
 <body>
 
-    <!-- ===== TELA DE LOGIN (SOBREPOSIÇÃO) ===== -->
-    <div id="login-container" class="hidden">
-        <!-- Vídeo de Plano de Fundo Loop -->
-        <video autoplay loop muted playsinline id="login-video-bg">
-            <source src="img/logo_background.mp4" type="video/mp4">
-        </video>
-        <div class="login-overlay"></div>
-
-        <div class="login-card">
-            <div class="login-logo-area">
-                <div class="cyber-eye-logo" title="Radar Argos">
-                    <div class="eye-image-wrapper">
-                        <!-- Salve a imagem que você enviou dentro da pasta img com o nome olho-cyber.png -->
-                        <img src="img/olho-cyber.png" alt="Olho Tecnológico" id="eye-custom-img">
-                    </div>
-                    <div class="eye-inner">
-                        <div class="radar-sweep"></div>
-                        <div class="radar-dot"></div>
-                    </div>
-                </div>
-                <h1 class="login-title"><span class="argos-highlight-login">ARGOS</span></h1>
-                <p class="login-subtitle">Monitoramento Inteligente. Gestão Eficiente.</p>
-                <p class="login-instruction">Faça login para acessar o sistema</p>
-            </div>
-
-            <!-- MENSAGEM DE ERRO INLINE -->
-            <div id="login-error-msg" class="hidden"
-                style="background-color: #ffebee; color: #c62828; padding: 0.7143rem; border-radius: 0.2857rem; font-size: 0.85rem; font-weight: 600; text-align: center; margin-bottom: 1.0714rem; border-left: 0.2857rem solid #c62828;">
-            </div>
-
-            <form id="login-form">
-                <div class="login-input-group">
-                    <label for="login-username"
-                        style="font-size: 1.05rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.5714rem;"><i
-                            class="fas fa-user-circle" style="font-size: 1.2rem; margin-right: 0.4286rem;"></i> Nome de Acesso
-                        ou E-mail</label>
-                    <div class="login-input-wrapper">
-                        <i class="fas fa-user input-icon"></i>
-                        <input type="text" id="login-username" required placeholder="Digite seu Usuário Aqui">
-                    </div>
-                </div>
-
-                <div class="login-input-group">
-                    <label for="login-password"
-                        style="font-size: 1.05rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.5714rem;"><i
-                            class="fas fa-key" style="font-size: 1.2rem; margin-right: 0.4286rem;"></i> Senha</label>
-                    <div class="login-input-wrapper">
-                        <i class="fas fa-lock input-icon"></i>
-                        <input type="password" id="login-password" required placeholder="Sua senha">
-                        <i class="fas fa-eye toggle-password" id="toggle-password-visibility"></i>
-                    </div>
-                    <!-- Requisitos mínimos de senha -->
-                    <div class="password-requirements" id="password-reqs">
-                        <div class="requirement-item" id="req-letter"><i class="fas fa-circle"></i> Pelo menos uma letra
-                        </div>
-                        <div class="requirement-item" id="req-number"><i class="fas fa-circle"></i> Pelo menos um número
-                        </div>
-                        <div class="requirement-item" id="req-special"><i class="fas fa-circle"></i> Pelo menos um
-                            caractere especial (@, #, etc.)</div>
-                    </div>
-                </div>
-
-                <div class="login-options">
-                    <label>
-                        <input type="checkbox" id="login-remember"> Lembrar-me neste navegador
-                    </label>
-                </div>
-
-                <button type="submit" class="btn-login" id="btn-login-submit">
-                    <i class="fas fa-sign-in-alt"></i> Entrar no Sistema
-                </button>
-            </form>
-
-            <div class="login-divider"></div>
-
-            <div class="login-footer">
-                <div class="restricted-access"><i class="fas fa-shield-alt"></i> Sistema interno · Acesso restrito</div>
-                <div class="scaar-info scaar-highlight">
-                    SCAAR – Superintendência de Controle, Avaliação, Auditoria e Regulação</div>
-                <div class="made-by">Feito com <span class="heart-pulse">❤</span> por Airton Costa</div>
-            </div>
-        </div>
+    <!-- Observatório no desktop, Órbita no mobile. -->
+    <div id="login-container" class="hidden"><div class="auth-scene"><div class="ambient" aria-hidden="true"></div><section class="shell login-card" aria-label="Login ARGOS">
+<div class="brand"><div class="eyebrow"><span class="status-dot" aria-hidden="true"></span>Inteligência para a gestão do SUS</div><div class="emblem"><div class="scan" aria-hidden="true"></div><img src="img/olho-cyber.png" alt="Olho tecnológico ARGOS"></div><h1 class="wordmark">ARGOS</h1><p class="brand-subtitle">Monitoramento inteligente. Gestão eficiente.</p><p class="hero-copy">Uma visão completa.<br><span>Uma gestão mais eficiente.</span></p><div class="features"><span>Controle</span><span>Avaliação</span><span>Auditoria</span><span>Regulação</span></div></div>
+<div class="access"><div class="welcome"><h2>Bem-vindo ao ARGOS</h2><p>Acesse seu ambiente de gestão.</p></div>
+<div id="login-error-msg" class="hidden" role="alert"></div><form id="login-form"><div class="field"><label for="login-username">Nome de acesso ou e-mail</label><div class="input-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg><input id="login-username" type="text" placeholder="Seu usuário ou e-mail" autocomplete="username" required spellcheck="false" autocapitalize="none"></div></div>
+<div class="field"><label for="login-password">Senha</label><div class="input-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg><input id="login-password" type="password" placeholder="Digite sua senha" autocomplete="current-password" required><button class="eye-toggle" id="toggle-password-visibility" type="button" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+<label class="remember"><input type="checkbox" id="login-remember">Lembrar-me neste navegador</label><button class="enter" id="btn-login-submit" type="submit">Entrar no sistema<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></form>
+<div class="secure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg>Sistema interno · Acesso restrito</div></div></section>
+<p class="scaar"><strong>SCAAR</strong><br>Superintendência de Controle, Avaliação, Auditoria e Regulação</p><p class="credits">Feito com <span>♥</span> por Airton Costa</p></div></div>
+    <!-- O vídeo original só é reproduzido após autenticação bem-sucedida. -->
+    <div id="login-transition" class="hidden" role="status" aria-live="polite" tabindex="-1" aria-label="Acesso confirmado. Entrando no ARGOS.">
+        <div class="auth-opening-fallback" aria-hidden="true"><img src="img/olho-cyber.png" alt=""></div>
+        <video id="login-opening-video" muted playsinline preload="auto" aria-hidden="true"><source src="img/logo_background.mp4" type="video/mp4"></video>
+        <div class="auth-opening-caption"><strong>ARGOS</strong><span>Acesso confirmado · Entrando no sistema</span></div>
     </div>
 
     <!-- ===== MOBILE OVERLAY ===== -->
@@ -1862,7 +1795,7 @@
             <div class="section-header">
                 <div>
                     <h2><i class="fas fa-file-medical-alt"></i> Central de Produções BPA</h2>
-                    <div class="section-badge">Controle, Recepção e Download de Arquivos de Faturamento Ambulatorial</div>
+                    <div class="section-badge" id="bpaAccessScope" role="status">Carregando suas unidades...</div>
                 </div>
                 <div class="bpa-top-actions">
                     <button class="btn-primary" id="btnNovoEnvioBpa">
@@ -1983,8 +1916,8 @@
             <!-- QUADRO DE STATUS DAS UNIDADES (CHECKLIST DA FRANCILEIDE) -->
             <div class="bpa-checklist-wrapper">
                 <div class="bpa-checklist-header">
-                    <h4><i class="fas fa-tasks"></i> Painel de Status das Unidades (Quem Enviou vs Quem Falta)</h4>
-                    <span class="bpa-checklist-tip"><i class="fas fa-info-circle"></i> Acompanhe em tempo real as entregas de cada setor e digitador</span>
+                    <h4><i class="fas fa-tasks"></i> Entregas por unidade</h4>
+                    <span class="bpa-checklist-tip"><i class="fas fa-info-circle"></i> Confira BPA-C e BPA-I da competência e anexe no espaço que falta</span>
                 </div>
                 <div class="bpa-checklist-grid" id="bpaChecklistContainer">
                     <!-- Gerado dinamicamente pelo bpa-module.js -->
@@ -2050,7 +1983,7 @@
             <div class="modal-body" style="padding: 1.5rem;">
                 <!-- DROPZONE -->
                 <div class="bpa-dropzone" id="bpaDropzone">
-                    <input type="file" id="bpaFileInput" style="display: none;" accept=".JAN,.FEV,.MAR,.ABR,.MAI,.JUN,.JUL,.AGO,.SET,.OUT,.NOV,.DEZ,.BPA,.BPI,.TXT,.EXE,*">
+                    <input type="file" id="bpaFileInput" style="display: none;" accept=".txt,.jan,.fev,.mar,.abr,.mai,.jun,.jul,.ago,.set,.out,.nov,.dez">
                     <div id="bpaDropPrompt">
                         <i class="fas fa-cloud-upload-alt bpa-drop-icon"></i>
                         <h4>Arraste e solte o arquivo de produção aqui</h4>
@@ -2098,9 +2031,9 @@
                         <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem; color: #334155;">
                             <i class="fas fa-hospital"></i> Estabelecimento de Saúde:
                         </label>
-                        <input type="text" id="inputBpaEstabelecimento" list="datalistUnidadesBpa" class="bpa-input" placeholder="Selecione da lista ou digite o nome...">
+                        <input type="text" id="inputBpaEstabelecimento" list="datalistUnidadesBpa" class="bpa-input" placeholder="Selecione a unidade da produção...">
                         <datalist id="datalistUnidadesBpa"></datalist>
-                        <span class="bpa-input-help"><i class="fas fa-info-circle"></i> Selecione uma unidade cadastrada no sistema ou digite uma nova para casos isolados.</span>
+                        <span class="bpa-input-help"><i class="fas fa-info-circle"></i> Selecione uma das suas unidades. O CNES do arquivo será conferido antes do envio.</span>
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
@@ -2115,6 +2048,7 @@
                                 <i class="fas fa-tag"></i> Tipo de Produção (Auto-detectado):
                             </label>
                             <select id="selectBpaTipo" class="bpa-input">
+                                <option value="AMBOS">BPA-C + BPA-I (arquivo misto)</option>
                                 <option value="BPA-C">BPA-C (Consolidado)</option>
                                 <option value="BPA-I">BPA-I (Individualizado)</option>
                             </select>
@@ -2677,6 +2611,7 @@
     <script src="js/export.js?v=4.0.0"></script>
 
     <!-- Módulos de Interface (Telas) -->
+    <script src="js/login-transition.js"></script>
     <script src="js/login.js"></script>
     <script src="js/account.js"></script>
     <script src="js/users.js"></script>
@@ -2687,6 +2622,8 @@
     <script src="js/cnes-municipios-base.js"></script>
     <script src="js/cnes-diff-engine.js"></script>
     <script src="js/cnes-module.js"></script>
+    <script src="js/bpa-audit-core.js"></script>
+    <script src="js/sigtap-audit-api.js"></script>
     <script src="js/malha-fina-engine.js"></script>
 
     <!-- Script Principal da Aplicação -->

@@ -1,0 +1,17 @@
+{
+  "versao": 1,
+  "cnes": {
+    "202608": {
+      "url": "cnes_data/cnes_210120_202608.json",
+      "fonte": "DATASUS/CNES — dump oficial de agosto/2026 importado no sistema",
+      "oficial": true,
+      "completo": true,
+      "cobertura": {
+        "profissionais": true,
+        "servicos": false,
+        "habilitacoes": false
+      }
+    }
+  },
+  "sigtap": {}
+}

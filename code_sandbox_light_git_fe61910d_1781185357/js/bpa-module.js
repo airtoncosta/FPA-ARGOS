@@ -10,7 +10,12 @@
  */
 
 const BpaModule = {
-    storageKey: 'argos_producoes_bpa',
+    get storageKey() {
+        return 'argos_producoes_bpa:' + (this.getCurrentUser().username || 'sem-sessao');
+    },
+    accessLoadError: '',
+    persistenceMode: 'cloud',
+    localProducoesKey: 'argos_producoes_bpa',
     responsaveisKey: 'argos_bpa_responsaveis',
     modalidadesKey: 'argos_bpa_modalidades',
     producoes: [],
@@ -102,6 +107,7 @@ const BpaModule = {
        CATÁLOGO DINÂMICO DE UNIDADES DO SISTEMA + CASOS ISOLADOS
        ========================================================= */
     getUnidadesSistema() {
+        if (this.accessLoadError) return [];
         let unidades = [];
 
         // 1. Obter unidades carregadas no estado ativo do sistema (APP_STATE)
@@ -183,15 +189,11 @@ const BpaModule = {
         const modalMap = this.getModalidadesMap();
         unidades.forEach(u => {
             const cleanCnes = (u.cnes || '').replace(/\D/g, '');
-            u.responsavel = respMap[cleanCnes] || respMap[u.cnes] || respMap[u.nome] || respMap[u.id];
-            if (!u.responsavel) {
-                for (const [k, resp] of Object.entries(respMap)) {
-                    if (u.nome.includes(k) || k.includes(u.nome)) {
-                        u.responsavel = resp;
-                        break;
-                    }
-                }
-            }
+            // Uma atribuição vazia é uma remoção explícita; não recuperar um alias antigo.
+            const keys = [cleanCnes, u.cnes, u.nome, u.id].filter(Boolean);
+            const key = keys.find(k => Object.prototype.hasOwnProperty.call(respMap, k))
+                ?? Object.keys(respMap).find(k => this.normalizeIdentity(k) === this.normalizeIdentity(u.nome));
+            u.responsavel = key !== undefined ? respMap[key] : '';
             if (!u.responsavel) u.responsavel = 'Não atribuído';
 
             // Modalidade esperada: 'AMBOS' (BPA-C + BPA-I), 'BPA-C' ou 'BPA-I'
@@ -207,7 +209,7 @@ const BpaModule = {
             if (!u.modalidade) u.modalidade = 'AMBOS';
         });
 
-        return unidades;
+        return this.isAdminOrFrancileide() ? unidades : unidades.filter(u => this.isAssignedToUser(u));
     },
 
     /* =========================================================
@@ -218,7 +220,7 @@ const BpaModule = {
             const str = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
             if (str) return JSON.parse(str);
         } catch(e){}
-        return { username: 'digitador', name: 'Digitador', role: 'DIGITADOR' };
+        return {};
     },
 
     isAdminOrFrancileide(user) {
@@ -226,7 +228,48 @@ const BpaModule = {
         if (!user) return false;
         const uname = (user.username || '').toLowerCase();
         const role = (user.role || '').toUpperCase();
-        return uname === 'airton' || uname === 'francileide' || role === 'ADM' || role === 'SUPERINTENDENTE';
+        return !!uname && (uname.trim() === 'francileide' || role.trim() === 'ADM');
+    },
+
+    normalizeIdentity(value) {
+        return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    },
+
+    isAssignedToUser(unit, user = this.getCurrentUser()) {
+        if (!user.username) return false;
+        const assigned = this.normalizeIdentity(unit.responsavel);
+        if (!assigned || assigned === 'nao atribuido') return false;
+        return [user.username, user.name].filter(Boolean).some(value => this.normalizeIdentity(value) === assigned);
+    },
+
+    matchesUnit(record, unit) {
+        const cnes = String(record.cnes || '').replace(/\D/g, '');
+        const unitCnes = String(unit.cnes || '').replace(/\D/g, '');
+        // CNES divergentes nunca são conciliados pelo nome.
+        if (cnes) return !!unitCnes && cnes === unitCnes;
+        return !!record.estabelecimento_nome && this.normalizeIdentity(record.estabelecimento_nome) === this.normalizeIdentity(unit.nome);
+    },
+
+    canAccessProducao(record) {
+        if (!record || this.accessLoadError || !this.getCurrentUser().username) return false;
+        return this.isAdminOrFrancileide() || this.getUnidadesSistema().some(u => this.matchesUnit(record, u));
+    },
+
+    getAccessibleProducoes() {
+        return this.producoes.filter(p => this.canAccessProducao(p));
+    },
+
+    assertUploadAccess(data) {
+        if (this.accessLoadError || !this.getCurrentUser().username) throw new Error('Acesso indisponível. Entre novamente e recarregue as unidades.');
+        if (data.cnesList?.length > 1) throw new Error('O arquivo contém várias unidades. A auditoria verifica todas as linhas, mas para salvar nesta unidade exporte um arquivo por CNES.');
+        const record = { cnes: data.cnes, estabelecimento_nome: data.estabelecimentoNome };
+        const unit = this.getUnidadesSistema().find(u => this.matchesUnit(record, u));
+        if (!this.isAdminOrFrancileide() && !unit) throw new Error('Você só pode anexar produções das unidades atribuídas a você.');
+        if (unit && this.normalizeIdentity(unit.nome) !== this.normalizeIdentity(data.estabelecimentoNome)) {
+            throw new Error('A unidade selecionada não corresponde ao CNES do arquivo. Confira antes de enviar.');
+        }
+        if (!data.estabelecimentoNome || data.estabelecimentoNome === 'ESTABELECIMENTO NÃO IDENTIFICADO') throw new Error('Selecione a unidade da produção.');
+        if (unit) data.cnes = unit.cnes;
     },
 
     getSystemUsers() {
@@ -403,7 +446,7 @@ const BpaModule = {
         if (modal) modal.classList.add('hidden');
     },
 
-    saveResponsaveis() {
+    async saveResponsaveis() {
         if (!this.isAdminOrFrancileide()) return;
 
         // Salvar Responsáveis
@@ -416,7 +459,6 @@ const BpaModule = {
             if (key) newMap[key] = val;
             if (cnes) newMap[cnes] = val;
         });
-        localStorage.setItem(this.responsaveisKey, JSON.stringify(newMap));
 
         // Salvar Modalidades Esperadas
         const modalSelects = document.querySelectorAll('.bpa-select-modal-row');
@@ -428,24 +470,23 @@ const BpaModule = {
             if (key) newModalMap[key] = val;
             if (cnes) newModalMap[cnes] = val;
         });
-        localStorage.setItem(this.modalidadesKey, JSON.stringify(newModalMap));
 
-        // Tentar salvar no Supabase se conectado
         try {
             if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
                 const client = window.SupabaseConfig.getClient();
-                if (client) {
-                    client.from('configuracoes').upsert({
-                        chave: 'bpa_responsaveis',
-                        valor: JSON.stringify(newMap)
-                    });
-                    client.from('configuracoes').upsert({
-                        chave: 'bpa_modalidades',
-                        valor: JSON.stringify(newModalMap)
-                    });
-                }
+                if (!client) throw new Error('Conexão indisponível.');
+                const { error } = await client.from('configuracoes').upsert([
+                    { chave: 'bpa_responsaveis', valor: JSON.stringify(newMap) },
+                    { chave: 'bpa_modalidades', valor: JSON.stringify(newModalMap) }
+                ], { onConflict: 'chave' });
+                if (error) throw error;
             }
-        } catch(e){}
+            localStorage.setItem(this.responsaveisKey, JSON.stringify(newMap));
+            localStorage.setItem(this.modalidadesKey, JSON.stringify(newModalMap));
+        } catch (error) {
+            alert('Não foi possível salvar as atribuições. Elas não foram alteradas. ' + error.message);
+            return;
+        }
 
         this.closeAssignResponsaveisModal();
         this.populateResponsaveisFilter();
@@ -457,279 +498,35 @@ const BpaModule = {
        PARSER INTELIGENTE E LEITURA PROFUNDA DO ARQUIVO BPA
        ========================================================= */
     parseBpaFile(file, textContent) {
-        const fileName = (file && file.name) ? file.name.trim() : '';
-        const sizeBytes = file ? file.size : (textContent ? textContent.length : 0);
-        const sizeFormatted = this.formatFileSize(sizeBytes);
-
-        let detectedComp = '';
-        let detectedYear = '2026';
-        let detectedMonth = '07';
-        let detectedEstabelecimento = '';
-        let detectedCnes = '';
-        let detectedTipo = 'BPA-C';
-        let tipoExplicacao = '';
-        let countBpaI = 0; // Registros Individualizados (03)
-        let countBpaC = 0; // Registros Consolidados (02)
-        let totalLinhas = 0;
-        let totalAtendimentos = 0;
-        let procedimentosMap = {};
-
-        const lines = (textContent || '').split(/\r?\n/).filter(l => l.trim().length > 0);
-        totalLinhas = lines.length;
-
-        // 1. LEITURA DO CABEÇALHO DATASUS (Registro 01)
-        if (lines.length > 0 && lines[0].startsWith('01') && lines[0].includes('#BPA#')) {
-            const header = lines[0];
-            // 01#BPA#AAAAMM
-            const compMatch = header.match(/#BPA#(\d{4})(\d{2})/);
-            if (compMatch) {
-                detectedYear = compMatch[1];
-                detectedMonth = compMatch[2];
-                detectedComp = `${detectedMonth}/${detectedYear}`;
-            }
-
-            // CNES no cabeçalho
-            const cnesMatch = header.match(/#BPA#\d{6}\d{6}\d{6}(\d{7})/);
-            if (cnesMatch) {
-                detectedCnes = cnesMatch[1];
-            } else if (header.length >= 34) {
-                const cnesSub = header.substring(27, 34).trim();
-                if (/^\d{7}$/.test(cnesSub)) {
-                    detectedCnes = cnesSub;
-                }
-            }
-
-            // Nome do Órgão / Estabelecimento no cabeçalho
-            if (header.length >= 70) {
-                const rawNome = header.substring(34, 74).trim();
-                // Ignorar se vazio, apenas zeros ou números isolados (ex: 00000000)
-                if (rawNome && rawNome.length > 3 && !/^0+$/.test(rawNome) && !/^\d+$/.test(rawNome)) {
-                    detectedEstabelecimento = rawNome;
-                }
-            }
+        if (!window.BpaAuditCore) throw new Error('O leitor BPA não carregou. Atualize a página.');
+        const parsed = window.BpaAuditCore.parse(textContent);
+        const records = parsed.records;
+        const cnesList = [...new Set(records.map(r => r.cnes).filter(Boolean))];
+        const competencies = [...new Set(records.map(r => r.competencia).filter(Boolean))];
+        const cnes = cnesList.length === 1 ? cnesList[0] : '';
+        const unit = this.getUnidadesSistema().find(u => u.cnes === cnes);
+        const presentation = window.BpaAuditCore.competencia(parsed.header?.competencia);
+        const comp = presentation || (competencies.length === 1 ? window.BpaAuditCore.competencia(competencies[0]) : '');
+        const competencia = comp ? comp.slice(4) + '/' + comp.slice(0, 4) : '';
+        const count02 = records.filter(r => r.tipo === 'BPA-C').length;
+        const count03 = records.filter(r => r.tipo === 'BPA-I').length;
+        const procedures = new Map();
+        for (const r of records) {
+            if (!/^\d{10}$/.test(r.procedimento) || !/^\d+$/.test(r.quantidade)) continue;
+            procedures.set(r.procedimento, (procedures.get(r.procedimento) || 0) + Number(r.quantidade));
         }
-
-        // 2. LEITURA DOS REGISTROS DE CORPO (03 = Individualizado, 02 = Consolidado)
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line.startsWith('03')) {
-                // REGISTRO 03 = BPA-I (Individualizado)
-                countBpaI++;
-                if (!detectedCnes && line.length >= 9) {
-                    detectedCnes = line.substring(2, 9).trim();
-                }
-                if (!detectedComp && line.length >= 15) {
-                    const y = line.substring(9, 13);
-                    const m = line.substring(13, 15);
-                    if (m >= '01' && m <= '12' && y.startsWith('20')) {
-                        detectedComp = `${m}/${y}`;
-                        detectedMonth = m;
-                        detectedYear = y;
-                    }
-                }
-                // Procedimento no BPA-I: pos 36..46 (10 dígitos)
-                if (line.length >= 46) {
-                    const procCode = line.substring(36, 46).trim();
-                    if (/^\d{10}$/.test(procCode)) {
-                        let qtd = 1;
-                        if (line.length >= 81) {
-                            const qtdStr = line.substring(75, 81).trim();
-                            qtd = parseInt(qtdStr, 10) || 1;
-                        }
-                        procedimentosMap[procCode] = (procedimentosMap[procCode] || 0) + qtd;
-                        totalAtendimentos += qtd;
-                    } else {
-                        totalAtendimentos++;
-                    }
-                } else {
-                    totalAtendimentos++;
-                }
-            } else if (line.startsWith('02')) {
-                // REGISTRO 02 = BPA-C (Consolidado)
-                countBpaC++;
-                if (!detectedCnes && line.length >= 9) {
-                    detectedCnes = line.substring(2, 9).trim();
-                }
-                if (!detectedComp && line.length >= 15) {
-                    const y = line.substring(9, 13);
-                    const m = line.substring(13, 15);
-                    if (m >= '01' && m <= '12' && y.startsWith('20')) {
-                        detectedComp = `${m}/${y}`;
-                        detectedMonth = m;
-                        detectedYear = y;
-                    }
-                }
-                // Procedimento no BPA-C: pos 26..36 (10 dígitos)
-                if (line.length >= 36) {
-                    const procCode = line.substring(26, 36).trim();
-                    if (/^\d{10}$/.test(procCode)) {
-                        let qtd = 1;
-                        if (line.length >= 44) {
-                            const qtdStr = line.substring(38, 44).trim();
-                            qtd = parseInt(qtdStr, 10) || 1;
-                        }
-                        procedimentosMap[procCode] = (procedimentosMap[procCode] || 0) + qtd;
-                        totalAtendimentos += qtd;
-                    } else {
-                        totalAtendimentos++;
-                    }
-                } else {
-                    totalAtendimentos++;
-                }
-            }
-        }
-
-        // 3. DETERMINAÇÃO DO TIPO: INDIVIDUALIZADO (BPA-I) OU CONSOLIDADO (BPA-C)
-        const upperName = fileName.toUpperCase();
-        const isNameBpaI = upperName.includes('BPA_I') || upperName.includes('BPA-I') || upperName.includes('BPAI') || upperName.includes('INDIV');
-        const isNameBpaC = upperName.includes('BPA_C') || upperName.includes('BPA-C') || upperName.includes('BPAC') || upperName.includes('CONSOLID');
-
-        if (countBpaI > 0 && countBpaI >= countBpaC) {
-            detectedTipo = 'BPA-I';
-            tipoExplicacao = `✅ <strong>BPA Individualizado (BPA-I)</strong> detectado: foram lidos <strong>${countBpaI} registros de atendimentos individualizados</strong> com identificação de profissionais e pacientes.`;
-        } else if (countBpaC > 0) {
-            detectedTipo = 'BPA-C';
-            tipoExplicacao = `✅ <strong>BPA Consolidado (BPA-C)</strong> detectado: foram lidos <strong>${countBpaC} registros consolidados</strong> de faturamento ambulatorial.`;
-        } else if (isNameBpaI) {
-            detectedTipo = 'BPA-I';
-            tipoExplicacao = `✅ <strong>BPA Individualizado (BPA-I)</strong> detectado pela identificação nominal do arquivo.`;
-        } else if (isNameBpaC) {
-            detectedTipo = 'BPA-C';
-            tipoExplicacao = `✅ <strong>BPA Consolidado (BPA-C)</strong> detectado pela identificação nominal do arquivo.`;
-        } else if (upperName.startsWith('PB') || upperName.startsWith('PI') || upperName.startsWith('BI')) {
-            detectedTipo = 'BPA-I';
-            tipoExplicacao = `✅ <strong>BPA Individualizado (BPA-I)</strong> identificado pelo prefixo DATASUS (<code>${upperName.substring(0, 2)}</code>).`;
-        } else {
-            detectedTipo = 'BPA-C';
-            tipoExplicacao = `✅ <strong>BPA Consolidado (BPA-C)</strong> identificado pelo padrão do arquivo.`;
-        }
-
-        // 4. ANÁLISE COMPLEMENTAR POR NOME DO ARQUIVO (ex: PAFISIO_JUNHO_2026_BPA_I_CORRIGIDO.TXT ou PATOMO7-.JUL)
-        const ext = upperName.split('.').pop() || '';
-        if (this.siglasMeses[ext]) {
-            detectedMonth = this.siglasMeses[ext];
-        }
-
-        const yearMatch = upperName.match(/202\d/);
-        if (yearMatch) detectedYear = yearMatch[0];
-
-        const mesesNomes = {
-            'JANEIRO': '01', 'FEVEREIRO': '02', 'MARCO': '03', 'MARÇO': '03', 'ABRIL': '04',
-            'MAIO': '05', 'JUNHO': '06', 'JULHO': '07', 'AGOSTO': '08', 'SETEMBRO': '09',
-            'OUTUBRO': '10', 'NOVEMBRO': '11', 'DEZEMBRO': '12'
-        };
-        for (const [mNome, mNum] of Object.entries(mesesNomes)) {
-            if (upperName.includes(mNome)) {
-                detectedMonth = mNum;
-                break;
-            }
-        }
-
-        const singleMonthMatch = upperName.match(/[A-Z]+(\d{1,2})[-_.]/);
-        if (singleMonthMatch && !detectedComp) {
-            const m = parseInt(singleMonthMatch[1], 10);
-            if (m >= 1 && m <= 12) detectedMonth = String(m).padStart(2, '0');
-        }
-
-        if (!detectedComp) {
-            detectedComp = `${detectedMonth}/${detectedYear}`;
-        }
-
-        // 5. IDENTIFICAÇÃO DO ESTABELECIMENTO E CNES
-        const catalog = this.getUnidadesSistema();
-
-        // Cruzar CNES extraído do arquivo com o catálogo do sistema
-        if (detectedCnes) {
-            const cleanDetectedCnes = detectedCnes.replace(/\D/g, '');
-            const matchCnes = catalog.find(u => (u.cnes || '').replace(/\D/g, '') === cleanDetectedCnes);
-            if (matchCnes) {
-                detectedEstabelecimento = matchCnes.nome;
-            } else if (this.cnesUnidadesMap && this.cnesUnidadesMap[detectedCnes]) {
-                detectedEstabelecimento = this.cnesUnidadesMap[detectedCnes];
-            }
-        }
-
-        // Se ainda não detectou ou veio apenas zeros/números (ex: "00000000"), buscar por siglas no nome
-        if (!detectedEstabelecimento || /^0+$/.test(detectedEstabelecimento) || /^\d+$/.test(detectedEstabelecimento)) {
-            for (const [sigla, nome] of Object.entries(this.siglasUnidades)) {
-                if (upperName.includes(sigla)) {
-                    const matchCatalog = catalog.find(u => u.nome.includes(nome) || nome.includes(u.nome));
-                    detectedEstabelecimento = matchCatalog ? matchCatalog.nome : nome;
-                    if (matchCatalog && matchCatalog.cnes) {
-                        detectedCnes = matchCatalog.cnes;
-                    }
-                    break;
-                }
-            }
-        }
-
-        // Se encontrou estabelecimento mas ainda não tem CNES, buscar do catálogo
-        if (detectedEstabelecimento && !detectedCnes) {
-            const matchNome = catalog.find(u => u.nome.toUpperCase() === detectedEstabelecimento.toUpperCase() || u.nome.includes(detectedEstabelecimento) || detectedEstabelecimento.includes(u.nome));
-            if (matchNome && matchNome.cnes) {
-                detectedCnes = matchNome.cnes;
-            }
-        }
-
-        // Fallback seguro se não reconheceu nenhum estabelecimento
-        if (!detectedEstabelecimento || /^0+$/.test(detectedEstabelecimento) || /^\d+$/.test(detectedEstabelecimento)) {
-            if (catalog.length > 0) {
-                detectedEstabelecimento = catalog[0].nome;
-                detectedCnes = catalog[0].cnes || detectedCnes;
-            } else {
-                detectedEstabelecimento = 'ESTABELECIMENTO NÃO IDENTIFICADO';
-            }
-        }
-
-        // 6. VALORAÇÃO FINANCEIRA REAL COM BASE NO SIGTAP OFICIAL (SUS)
-        let valorTotalEstimado = 0;
-        const procedimentosDetalhados = Object.entries(procedimentosMap).map(([cod, qtd]) => {
-            const clean = cod.replace(/\D/g, '');
-            const sigtapItem = (window.getSigtapProcedimento && window.getSigtapProcedimento(clean)) || (window.SIGTAP_TABELA && window.SIGTAP_TABELA[clean]);
-            const desc = (sigtapItem && sigtapItem.nome) || (window.SIGTAP && window.SIGTAP[clean]) || `Procedimento ${cod}`;
-            const vlSa = sigtapItem ? (sigtapItem.vl_sa || 0) : 0;
-            const subtotal = Math.round((qtd * vlSa + Number.EPSILON) * 100) / 100;
-            valorTotalEstimado += subtotal;
-            return {
-                codigo: cod,
-                descricao: desc,
-                quantidade: qtd,
-                valorUnitario: vlSa,
-                valorTotal: subtotal,
-                financiamento: sigtapItem ? sigtapItem.financiamento : ''
-            };
-        });
-        valorTotalEstimado = Math.round((valorTotalEstimado + Number.EPSILON) * 100) / 100;
-
-        const formatMoedaBpa = (v) => (window.fmt && typeof window.fmt.moeda === 'function') 
-            ? window.fmt.moeda(v) 
-            : 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-        const procedimentosAmostra = procedimentosDetalhados.slice(0, 5).map(p => {
-            const valorTxt = p.valorTotal > 0 
-                ? ` — Estimado: <strong>${formatMoedaBpa(p.valorTotal)}</strong>` 
-                : ' <em>(PAB/Financ. Global)</em>';
-            return `• <code>${p.codigo}</code>: ${p.descricao} (Qtd: <strong>${p.quantidade}</strong>${valorTxt})`;
-        });
-
+        const detalhes = [...procedures].map(([codigo, quantidade]) => ({codigo, quantidade}));
         return {
-            nomeArquivo: fileName,
-            estabelecimentoNome: detectedEstabelecimento,
-            cnes: detectedCnes,
-            competencia: detectedComp,
-            competenciaFormatada: this.formatCompetenciaLabel(detectedComp),
-            tipoBpa: detectedTipo,
-            tipoExplicacao: tipoExplicacao,
-            count02: countBpaC,
-            count03: countBpaI,
-            totalLinhas: totalLinhas,
-            totalAtendimentos: totalAtendimentos || totalLinhas,
-            valorTotalEstimado: valorTotalEstimado,
-            valorTotalFormatado: formatMoedaBpa(valorTotalEstimado),
-            procedimentosDetalhados: procedimentosDetalhados,
-            procedimentosAmostra: procedimentosAmostra,
-            tamanhoBytes: sizeBytes,
-            tamanhoFormatado: sizeFormatted,
+            nomeArquivo: file?.name || '', estabelecimentoNome: unit?.nome || '', cnes, cnesList,
+            competencia, competenciasAtendimento: competencies, competenciaFormatada: this.formatCompetenciaLabel(competencia),
+            tipoBpa: count02 && count03 ? 'AMBOS' : count03 ? 'BPA-I' : 'BPA-C',
+            tipoExplicacao: records.length + ' registros reais: ' + count02 + ' BPA-C e ' + count03 + ' BPA-I. ' + (parsed.issues.length ? 'Há pontos de estrutura para conferir na auditoria.' : 'Execute a auditoria para verificar as regras e bases da competência.'),
+            count02, count03, totalLinhas: records.length,
+            totalAtendimentos: detalhes.reduce((n, p) => n + p.quantidade, 0),
+            valorTotalEstimado: null, valorTotalFormatado: 'Disponível após auditoria da competência',
+            procedimentosDetalhados: detalhes,
+            procedimentosAmostra: detalhes.slice(0, 5).map(p => '• <code>' + p.codigo + '</code> — quantidade: ' + p.quantidade),
+            tamanhoBytes: file?.size || 0, tamanhoFormatado: this.formatFileSize(file?.size || 0),
             conteudo: textContent
         };
     },
@@ -755,66 +552,88 @@ const BpaModule = {
     /* =========================================================
        CARREGAMENTO E PERSISTÊNCIA (SUPABASE + FALLBACK LOCAL)
        ========================================================= */
+    isMissingProducoesTable(error) {
+        return error && ['PGRST205', '42P01'].includes(error.code)
+            && String(error.message || '').includes('producoes_bpa');
+    },
+
+    readLocalProducoes() {
+        const originalText = localStorage.getItem(this.localProducoesKey);
+        const original = JSON.parse(originalText || '[]');
+        const scoped = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+        if (!Array.isArray(original) || !Array.isArray(scoped)) throw new Error('Armazenamento local inválido. Os dados originais foram preservados.');
+        // A base antiga continua sendo a fonte local. Cache de nuvem não é um envio local.
+        const records = new Map(original.map(p => [p.id, { ...p, _localOnly: true }]));
+        if (originalText === null) {
+            for (const p of scoped) if (p._localOnly && !records.has(p.id)) records.set(p.id, p);
+        }
+        return [...records.values()];
+    },
+
+    persistLocalProducao(record, remove = false) {
+        const all = this.readLocalProducoes();
+        const updated = all.filter(p => p.id !== record.id);
+        if (!remove) updated.unshift({ ...record, _localOnly: true });
+        // Preserva produções de outras unidades/contas ao salvar um único registro.
+        localStorage.setItem(this.localProducoesKey, JSON.stringify(updated));
+    },
+
     async loadProducoes() {
+        const loadId = this.loadId = (this.loadId || 0) + 1;
+        const username = this.getCurrentUser().username;
         this.renderLoadingState(true);
         let loaded = [];
 
-        // 1. Tentar carregar do Supabase
+        this.accessLoadError = '';
+        this.persistenceMode = 'cloud';
+        this.producoes = [];
+        this.pendingEmailProducao = null;
+        this.filePendingUpload = null;
+        this.currentResponsavelFiltro = '';
         try {
-            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            const connected = window.SupabaseConfig && window.SupabaseConfig.isConnected();
+            if (connected) {
                 const client = window.SupabaseConfig.getClient();
-                if (client) {
-                    const { data, error } = await client
-                        .from('producoes_bpa')
-                        .select('*')
-                        .order('criado_em', { ascending: false });
-
-                    if (!error && Array.isArray(data)) {
-                        loaded = data;
-                        localStorage.setItem(this.storageKey, JSON.stringify(loaded));
-                    }
+                if (!client) throw new Error('Não foi possível conectar para consultar suas unidades.');
+                const config = await client.from('configuracoes').select('chave,valor').in('chave', ['bpa_responsaveis', 'bpa_modalidades']);
+                if (config.error) throw config.error;
+                for (const row of config.data || []) {
+                    const value = typeof row.valor === 'string' ? JSON.parse(row.valor) : row.valor;
+                    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Configuração de unidades inválida.');
+                    localStorage.setItem(row.chave === 'bpa_responsaveis' ? this.responsaveisKey : this.modalidadesKey, JSON.stringify(value));
                 }
+                const unidades = this.getUnidadesSistema();
+                let results = [];
+                if (this.isAdminOrFrancileide()) {
+                    results = [await client.from('producoes_bpa').select('*').order('criado_em', { ascending: false })];
+                } else if (unidades.length) {
+                    const cnes = unidades.map(u => u.cnes).filter(Boolean);
+                    const nomes = unidades.map(u => u.nome);
+                    results = await Promise.all([
+                        client.from('producoes_bpa').select('*').in('cnes', cnes),
+                        client.from('producoes_bpa').select('*').in('estabelecimento_nome', nomes).is('cnes', null),
+                        client.from('producoes_bpa').select('*').in('estabelecimento_nome', nomes).eq('cnes', '')
+                    ]);
+                }
+                const failure = results.find(r => r.error);
+                if (failure && !this.isMissingProducoesTable(failure.error)) throw failure.error;
+                if (failure) this.persistenceMode = 'local';
+                const cloud = failure ? [] : results.flatMap(r => r.data || []);
+                const local = this.readLocalProducoes();
+                loaded = [...new Map([...local, ...cloud].map(p => [p.id, p])).values()];
+            } else {
+                this.persistenceMode = 'local';
+                loaded = this.readLocalProducoes();
             }
-        } catch (e) {
-            console.warn('Erro ao carregar do Supabase em Produções BPA:', e);
-        }
-
-        // 2. Fallback no LocalStorage
-        if (!loaded || loaded.length === 0) {
-            try {
-                const localData = localStorage.getItem(this.storageKey);
-                if (localData) loaded = JSON.parse(localData);
-            } catch (e) {
-                loaded = [];
-            }
-        }
-
-        // 3. Carga de exemplo no primeiro acesso
-        if (!loaded || loaded.length === 0) {
-            loaded = this.getMockInitialData();
+            if (loadId !== this.loadId || username !== this.getCurrentUser().username) return;
+            if (!Array.isArray(loaded)) throw new Error('Lista de produções inválida.');
+            loaded = loaded.filter(p => this.canAccessProducao(p)).sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)));
             localStorage.setItem(this.storageKey, JSON.stringify(loaded));
-        } else {
-            // Garantir que a produção BPA-I de exemplo conste se os mocks iniciais antigos estiverem salvos
-            const hasBpaI = loaded.some(p => p.tipo_bpa === 'BPA-I');
-            if (!hasBpaI && loaded.some(p => p.id === 'bpa-mock-2')) {
-                loaded.push({
-                    id: 'bpa-mock-4',
-                    nome_arquivo: 'IBHMSO07-.JUL',
-                    estabelecimento_nome: 'HOSPITAL MARIA SOCORRO BRANDÃO',
-                    cnes: '2387412',
-                    competencia: '07/2026',
-                    tipo_bpa: 'BPA-I',
-                    tamanho_bytes: 285400,
-                    tamanho_formatado: '285K',
-                    conteudo_arquivo: '01#BPA#2026070002800000082387412HOSPITAL MARIA DO SOCORRO BRANDAO 02.00\r\n03238741220260722512502040101780001',
-                    digitador_username: 'flavia',
-                    digitador_nome: 'Flávia',
-                    observacoes: 'Produção BPA-I Individualizada HMSO Julho/2026.',
-                    status: 'ENVIADO',
-                    criado_em: new Date('2026-08-06T14:30:00Z').toISOString()
-                });
-                localStorage.setItem(this.storageKey, JSON.stringify(loaded));
-            }
+        } catch (error) {
+            if (loadId !== this.loadId || username !== this.getCurrentUser().username) return;
+            this.accessLoadError = 'Não foi possível carregar suas unidades e produções. Recarregue para tentar novamente.';
+            loaded = [];
+            console.error('Falha ao carregar BPA:', error.message);
         }
 
         // HIGIENIZAÇÃO AUTOMÁTICA: Tomografia é exame realizado pelo Hospital Maria Socorro Brandão, não estabelecimento isolado
@@ -860,6 +679,7 @@ const BpaModule = {
         } catch(e){}
 
         this.producoes = loaded;
+        this.loadedUsername = username;
         this.renderLoadingState(false);
         this.populateCompetenciaFilter();
         this.populateDatalistUnidades();
@@ -950,9 +770,10 @@ const BpaModule = {
     },
 
     async saveProducao(producaoData) {
+        this.assertUploadAccess(producaoData);
         const currentUser = this.getCurrentUser();
         const newRecord = {
-            id: 'bpa_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            id: crypto.randomUUID(),
             nome_arquivo: producaoData.nomeArquivo,
             estabelecimento_nome: (producaoData.estabelecimentoNome || 'OUTRO ESTABELECIMENTO').trim().toUpperCase(),
             cnes: producaoData.cnes || '',
@@ -970,19 +791,25 @@ const BpaModule = {
 
         // Salvar no Supabase se disponível
         try {
-            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            if (this.persistenceMode !== 'local' && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
                 const client = window.SupabaseConfig.getClient();
+                if (!client) throw new Error('Conexão indisponível.');
                 if (client) {
                     const { data, error } = await client.from('producoes_bpa').insert([newRecord]).select();
-                    if (!error && data && data[0]) {
+                    if (error) throw error;
+                    if (data && data[0]) {
                         newRecord.id = data[0].id;
                     }
                 }
             }
         } catch (e) {
-            console.warn('Erro ao inserir no Supabase, gravando localmente:', e);
+            throw new Error('Não foi possível salvar a produção na nuvem: ' + e.message);
         }
 
+        if (this.persistenceMode === 'local' || !window.SupabaseConfig || !window.SupabaseConfig.isConnected()) {
+            newRecord._localOnly = true;
+            this.persistLocalProducao(newRecord);
+        }
         // Salvar localmente
         this.producoes.unshift(newRecord);
         localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
@@ -999,6 +826,7 @@ const BpaModule = {
         if (index === -1) return false;
 
         const prod = this.producoes[index];
+        if (!this.canAccessProducao(prod)) return false;
         const currentUser = this.getCurrentUser();
 
         // VALIDAÇÃO ESTRITA DE PERMISSÃO:
@@ -1017,17 +845,24 @@ const BpaModule = {
 
         // Deletar no Supabase se disponível
         try {
-            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            if (!prod._localOnly && this.persistenceMode !== 'local' && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
                 const client = window.SupabaseConfig.getClient();
+                if (!client) throw new Error('Conexão indisponível.');
                 if (client) {
-                    await client.from('producoes_bpa').delete().eq('id', id);
+                    const { error } = await client.from('producoes_bpa').delete().eq('id', id);
+                    if (error) throw error;
                 }
             }
         } catch (e) {
-            console.warn('Erro ao excluir no Supabase:', e);
+            alert('Não foi possível excluir a produção na nuvem. Tente novamente.');
+            return false;
         }
 
-        // Deletar localmente
+        // Deletar apenas o registro autorizado na base local, mantendo os demais.
+        if (prod._localOnly) {
+            try { this.persistLocalProducao(prod, true); }
+            catch (error) { alert('Não foi possível remover o arquivo local: ' + error.message); return false; }
+        }
         this.producoes.splice(index, 1);
         localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
 
@@ -1040,7 +875,7 @@ const BpaModule = {
        DOWNLOAD DE ARQUIVOS
        ========================================================= */
     downloadFile(id) {
-        const prod = this.producoes.find(p => p.id === id);
+        const prod = this.getAccessibleProducoes().find(p => p.id === id);
         if (!prod) {
             alert('Arquivo não localizado.');
             return;
@@ -1062,7 +897,7 @@ const BpaModule = {
 
     downloadBatchCompetencia() {
         const comp = this.currentCompetenciaFiltro || this.getLatestCompetencia();
-        const filtradas = this.producoes.filter(p => !comp || p.competencia === comp);
+        const filtradas = this.getAccessibleProducoes().filter(p => !comp || p.competencia === comp);
 
         if (filtradas.length === 0) {
             alert(`Nenhum arquivo encontrado para a competência ${comp || 'selecionada'}.`);
@@ -1082,8 +917,7 @@ const BpaModule = {
        ========================================================= */
     canSendEmail(prod, currentUser) {
         if (!currentUser) currentUser = this.getCurrentUser();
-        // Permite envio por qualquer usuário autenticado no ARGOS
-        return true;
+        return this.canAccessProducao(prod);
     },
 
     buildEmailPayload(prod) {
@@ -1166,7 +1000,7 @@ const BpaModule = {
     },
 
     openEmailModal(producaoId) {
-        const prod = this.producoes.find(p => p.id === producaoId);
+        const prod = this.getAccessibleProducoes().find(p => p.id === producaoId);
         if (!prod) {
             alert('Arquivo de produção não localizado.');
             return;
@@ -1304,7 +1138,7 @@ const BpaModule = {
     },
 
     downloadEmlFile() {
-        if (!this.pendingEmailProducao) return;
+        if (!this.canAccessProducao(this.pendingEmailProducao)) return;
         const prod = this.pendingEmailProducao;
         const emailData = this.buildEmailPayload(prod);
 
@@ -1355,7 +1189,7 @@ const BpaModule = {
     },
 
     openGmailWeb() {
-        if (!this.pendingEmailProducao) return;
+        if (!this.canAccessProducao(this.pendingEmailProducao)) return;
         const prod = this.pendingEmailProducao;
         const emailData = this.buildEmailPayload(prod);
 
@@ -1418,7 +1252,7 @@ const BpaModule = {
     },
 
     async confirmEmailSend() {
-        if (!this.pendingEmailProducao) return;
+        if (!this.canAccessProducao(this.pendingEmailProducao)) return;
 
         const prod = this.pendingEmailProducao;
         const btn = document.getElementById('btnConfirmarEnvioEmailBpa');
@@ -1824,12 +1658,13 @@ const BpaModule = {
         const select = document.getElementById('selectBpaCompetencia');
         if (!select) return;
 
-        const competenciasUnicas = [...new Set(this.producoes.map(p => p.competencia))].sort().reverse();
+        const competenciasUnicas = [...new Set(this.getAccessibleProducoes().map(p => p.competencia))].sort().reverse();
         if (!competenciasUnicas.includes('07/2026')) {
             competenciasUnicas.unshift('07/2026');
         }
 
-        const currentVal = select.value || this.currentCompetenciaFiltro || competenciasUnicas[0] || '';
+        const requested = select.value || this.currentCompetenciaFiltro;
+        const currentVal = competenciasUnicas.includes(requested) ? requested : (competenciasUnicas[0] || '');
         select.innerHTML = '<option value="">Todas as Competências</option>';
 
         competenciasUnicas.forEach(c => {
@@ -1844,11 +1679,26 @@ const BpaModule = {
     },
 
     getLatestCompetencia() {
-        const comps = [...new Set(this.producoes.map(p => p.competencia))].sort().reverse();
+        const comps = [...new Set(this.getAccessibleProducoes().map(p => p.competencia))].sort().reverse();
         return comps[0] || '07/2026';
     },
 
     renderAll() {
+        if (this.loadedUsername !== this.getCurrentUser().username) {
+            this.loadProducoes();
+            return;
+        }
+        const privileged = this.isAdminOrFrancileide();
+        const units = this.accessLoadError ? [] : this.getUnidadesSistema();
+        const scope = document.getElementById('bpaAccessScope');
+        if (scope) scope.textContent = this.accessLoadError || (privileged ? 'Visão geral • Todas as unidades' : units.length ? 'Minhas unidades • ' + units.length + ' atribuída(s) a você' : 'Nenhuma unidade atribuída. Solicite o vínculo ao ADM ou à Francileide.');
+        if (scope && !this.accessLoadError && this.persistenceMode === 'local') scope.textContent += ' • Arquivos salvos neste navegador';
+        const upload = document.getElementById('btnNovoEnvioBpa');
+        if (upload) upload.disabled = !!this.accessLoadError || (!privileged && !units.length);
+        const respSelect = document.getElementById('selectBpaResponsavel');
+        if (respSelect) respSelect.disabled = !privileged;
+        const chips = document.getElementById('bpaSmartChipsContainer');
+        if (chips) chips.style.display = privileged ? '' : 'none';
         // Controlar visibilidade do botão de atribuição de responsáveis
         const btnResp = document.getElementById('btnGerenciarResponsaveisBpa');
         if (btnResp) {
@@ -1871,7 +1721,7 @@ const BpaModule = {
 
         const comp = this.currentCompetenciaFiltro || this.getLatestCompetencia();
         const unidades = this.getUnidadesSistema();
-        const enviadosComp = this.producoes.filter(p => !comp || p.competencia === comp);
+        const enviadosComp = this.getAccessibleProducoes().filter(p => !comp || p.competencia === comp);
 
         // Mapear estatísticas de cada responsável
         const statsByResp = {};
@@ -1989,27 +1839,33 @@ const BpaModule = {
         this.renderAll();
     },
 
-    setUnitModalidade(nome, cnes, novaModalidade) {
-        if (!nome && !cnes) return;
+    async setUnitModalidade(nome, cnes, novaModalidade) {
+        if (!this.isAdminOrFrancileide() || (!nome && !cnes)) return;
 
         const map = this.getModalidadesMap();
         if (nome) map[nome] = novaModalidade;
         if (cnes) map[cnes] = novaModalidade;
-        localStorage.setItem(this.modalidadesKey, JSON.stringify(map));
 
         // Sincronizar com Supabase se conectado
         try {
             if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
                 const client = window.SupabaseConfig.getClient();
+                if (!client) throw new Error('Conexão indisponível.');
                 if (client) {
-                    client.from('configuracoes').upsert({
+                    const { error } = await client.from('configuracoes').upsert({
                         chave: 'bpa_modalidades',
                         valor: map,
                         atualizado_em: new Date().toISOString()
-                    }, { onConflict: 'chave' }).then();
+                    }, { onConflict: 'chave' });
+                    if (error) throw error;
                 }
             }
-        } catch(e) {}
+        } catch(e) {
+            alert('Não foi possível salvar a modalidade. Tente novamente.');
+            this.renderAll();
+            return;
+        }
+        localStorage.setItem(this.modalidadesKey, JSON.stringify(map));
 
         const labelMap = {
             'AMBOS': 'Ambas (BPA-C + BPA-I)',
@@ -2120,15 +1976,10 @@ const BpaModule = {
         const modalidade = estab.modalidade || 'AMBOS';
 
         // Encontrar todos os arquivos enviados que correspondem a este estabelecimento
-        const prods = enviadosComp.filter(p => {
-            const cnesP = (p.cnes || '').trim().replace(/\D/g, '');
-            const nomeP = (p.estabelecimento_nome || '').toUpperCase().trim();
-            if (cnesE && cnesP && cnesE === cnesP) return true;
-            if (nomeE && nomeP && (nomeP.includes(nomeE) || nomeE.includes(nomeP))) return true;
-            return false;
-        });
+        const prods = enviadosComp.filter(p => this.matchesUnit(p, estab));
 
         const isBpaC = (p) => {
+            if (p.tipo_bpa === 'AMBOS') return true;
             if (p.tipo_bpa === 'BPA-C') return true;
             if (p.tipo_bpa === 'BPA-I') return false;
             if (p.count02 > 0 && (!p.count03 || p.count03 === 0)) return true;
@@ -2138,6 +1989,7 @@ const BpaModule = {
         };
 
         const isBpaI = (p) => {
+            if (p.tipo_bpa === 'AMBOS') return true;
             if (p.tipo_bpa === 'BPA-I') return true;
             if (p.tipo_bpa === 'BPA-C') return false;
             if (p.count03 > 0) return true;
@@ -2229,7 +2081,7 @@ const BpaModule = {
         const totalEsperado = unidades.length;
 
         // Arquivos enviados na competência
-        const enviadosComp = this.producoes.filter(p => !comp || p.competencia === comp);
+        const enviadosComp = this.getAccessibleProducoes().filter(p => !comp || p.competencia === comp);
         
         let countCompletas = 0;
         let countParciais = 0;
@@ -2311,7 +2163,7 @@ const BpaModule = {
 
         const comp = this.currentCompetenciaFiltro || this.getLatestCompetencia();
         const unidades = this.getUnidadesSistema();
-        const enviadosComp = this.producoes.filter(p => !comp || p.competencia === comp);
+        const enviadosComp = this.getAccessibleProducoes().filter(p => !comp || p.competencia === comp);
         const currentUser = this.getCurrentUser();
         const isPrivileged = this.isAdminOrFrancileide(currentUser);
         const search = (this.currentSearchTerm || '').toLowerCase().trim();
@@ -2578,7 +2430,7 @@ const BpaModule = {
 
         // CASO 1: SE O FILTRO DE STATUS FOR 'pending' (FALTAM ENVIAR / PENDÊNCIAS)
         if (this.currentStatusFilter === 'pending') {
-            const enviadosComp = this.producoes.filter(p => !comp || p.competencia === comp);
+            const enviadosComp = this.getAccessibleProducoes().filter(p => !comp || p.competencia === comp);
             
             // Avaliar unidades com pendências (totais ou parciais)
             const pendingList = [];
@@ -2719,7 +2571,7 @@ const BpaModule = {
         }
 
         // CASO 2: SE O FILTRO DE STATUS FOR 'delivered' OU '' (ARQUIVOS ENVIADOS)
-        const filtered = this.producoes.filter(p => {
+        const filtered = this.getAccessibleProducoes().filter(p => {
             const matchComp = !comp || p.competencia === comp;
             const matchSearch = !search || 
                 (p.nome_arquivo && p.nome_arquivo.toLowerCase().includes(search)) ||
@@ -2753,7 +2605,7 @@ const BpaModule = {
                 else if (tipoFilter === 'PARTIAL') {
                     if (!u) matchTipo = false;
                     else {
-                        const evalU = this.evaluateUnitDeliveries(u, this.producoes.filter(pr => !comp || pr.competencia === comp));
+                        const evalU = this.evaluateUnitDeliveries(u, this.getAccessibleProducoes().filter(pr => !comp || pr.competencia === comp));
                         matchTipo = evalU.isPartial;
                     }
                 }
@@ -2890,10 +2742,18 @@ const BpaModule = {
        MODAL DE UPLOAD COM AUTO-IDENTIFICAÇÃO E RAIO-X
        ========================================================= */
     openUploadModal(prefillEstab = '', prefillCnes = '', prefillTipo = '') {
+        const units = this.getUnidadesSistema();
+        if (this.accessLoadError || !this.getCurrentUser().username || (!this.isAdminOrFrancileide() && !units.length)) {
+            alert('Você ainda não tem unidades disponíveis para envio. Solicite a atribuição ao ADM ou à Francileide.');
+            return;
+        }
+        if (prefillEstab && !this.isAdminOrFrancileide() && !units.some(u => this.matchesUnit({ cnes: prefillCnes, estabelecimento_nome: prefillEstab }, u))) return;
+        this.uploadTarget = prefillEstab ? { nome: prefillEstab, cnes: prefillCnes } : null;
         const modal = document.getElementById('modalUploadBpa');
         if (!modal) return;
 
         this.filePendingUpload = null;
+        this.fileSelectionId = (this.fileSelectionId || 0) + 1;
         document.getElementById('bpaFileInput').value = '';
         document.getElementById('bpaDropzone').classList.remove('has-file');
         document.getElementById('bpaFileInfoCard').style.display = 'none';
@@ -2924,6 +2784,7 @@ const BpaModule = {
     },
 
     closeUploadModal() {
+        this.fileSelectionId = (this.fileSelectionId || 0) + 1;
         const modal = document.getElementById('modalUploadBpa');
         if (modal) modal.classList.add('hidden');
         this.filePendingUpload = null;
@@ -2931,12 +2792,37 @@ const BpaModule = {
 
     handleFileSelect(file) {
         if (!file) return;
+        this.filePendingUpload = null;
+        document.getElementById('btnConfirmarUploadBpa').disabled = true;
+        const selectionId = this.fileSelectionId = (this.fileSelectionId || 0) + 1;
 
+        const extension = String(file.name || '').split('.').pop().toUpperCase();
+        if (!['TXT', ...Object.keys(this.siglasMeses)].includes(extension)) {
+            alert('Selecione um arquivo BPA exportado: .TXT ou uma extensão de mês, de .JAN a .DEZ.');
+            return;
+        }
+        if (!file.size) {
+            alert('O arquivo está vazio. Exporte a produção novamente.');
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => {
+            if (selectionId !== this.fileSelectionId) return;
             const textContent = e.target.result;
             const parsed = this.parseBpaFile(file, textContent);
 
+            if (this.uploadTarget) {
+                if (parsed.cnes && String(parsed.cnes) !== String(this.uploadTarget.cnes)) {
+                    alert('Este arquivo pertence a outra unidade. Confira o CNES antes de anexar.');
+                    return;
+                }
+                parsed.estabelecimentoNome = this.uploadTarget.nome;
+                if (!parsed.cnes) parsed.cnes = this.uploadTarget.cnes;
+            }
+            if (parsed.cnes && !this.isAdminOrFrancileide() && !this.canAccessProducao({ cnes: parsed.cnes, estabelecimento_nome: parsed.estabelecimentoNome })) {
+                alert('O arquivo pertence a uma unidade que não está atribuída a você.');
+                return;
+            }
             this.filePendingUpload = parsed;
 
             // Preencher cabeçalho do arquivo
@@ -2950,7 +2836,7 @@ const BpaModule = {
             // Badge do tipo (BPA-C ou BPA-I)
             const badgeTipo = document.getElementById('badgeDetectedTipo');
             if (badgeTipo) {
-                badgeTipo.innerHTML = `<i class="fas fa-check-circle"></i> ${parsed.tipoBpa === 'BPA-I' ? 'BPA-I (Individualizado)' : 'BPA-C (Consolidado)'}`;
+                badgeTipo.innerHTML = `<i class="fas fa-check-circle"></i> ${parsed.tipoBpa === 'AMBOS' ? 'BPA-C + BPA-I' : parsed.tipoBpa === 'BPA-I' ? 'BPA-I (Individualizado)' : 'BPA-C (Consolidado)'}`;
                 badgeTipo.style.background = parsed.tipoBpa === 'BPA-I' ? '#0284c7' : '#10b981';
             }
 
@@ -2978,6 +2864,7 @@ const BpaModule = {
             document.getElementById('btnConfirmarUploadBpa').disabled = false;
         };
 
+        reader.onerror = () => alert('Não foi possível ler o arquivo. Selecione-o novamente.');
         reader.readAsText(file, 'ISO-8859-1');
     },
 
@@ -3003,7 +2890,7 @@ const BpaModule = {
             const shouldSendEmail = document.getElementById('checkEnviarEmailAposUpload') && document.getElementById('checkEnviarEmailAposUpload').checked;
             const newRecord = await this.saveProducao(finalData);
             this.closeUploadModal();
-            this.showToast(`Produção "${finalData.nomeArquivo}" salva com sucesso!`, 'success');
+            this.showToast(newRecord._localOnly ? `Produção "${finalData.nomeArquivo}" salva neste navegador. Ainda não enviada à nuvem.` : `Produção "${finalData.nomeArquivo}" salva com sucesso!`, 'success');
 
             if (shouldSendEmail && newRecord && newRecord.id) {
                 setTimeout(() => {

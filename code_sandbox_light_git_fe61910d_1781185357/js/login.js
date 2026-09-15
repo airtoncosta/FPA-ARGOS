@@ -229,12 +229,16 @@ const LoginModule = {
             togglePassword.addEventListener('click', () => {
                 if (passwordInput.type === 'password') {
                     passwordInput.type = 'text';
-                    togglePassword.classList.remove('fa-eye');
-                    togglePassword.classList.add('fa-eye-slash');
+
+
+                    togglePassword.setAttribute('aria-label', 'Ocultar senha');
+                    togglePassword.setAttribute('aria-pressed', 'true');
                 } else {
                     passwordInput.type = 'password';
-                    togglePassword.classList.remove('fa-eye-slash');
-                    togglePassword.classList.add('fa-eye');
+
+
+                    togglePassword.setAttribute('aria-label', 'Mostrar senha');
+                    togglePassword.setAttribute('aria-pressed', 'false');
                 }
             });
         }
@@ -292,6 +296,25 @@ const LoginModule = {
     },
 
     async handleLogin() {
+        if (this._loginPending) return;
+        this._loginPending = true;
+        const button = document.getElementById('btn-login-submit');
+        if (button) button.disabled = true;
+        try {
+            await this.authenticateLogin();
+        } finally {
+            this._loginPending = false;
+            if (button) button.disabled = false;
+        }
+    },
+
+    async completeLogin(user) {
+        if (window.ArgosLoginTransition) await window.ArgosLoginTransition.play();
+        // A restauração de sessões continua usando loginUI diretamente, sem repetir o vídeo.
+        this.loginUI(user).catch(error => console.error('Erro ao preparar painel:', error));
+    },
+
+    async authenticateLogin() {
         const usernameInput = document.getElementById('login-username');
         const passwordInput = document.getElementById('login-password');
         const rememberCheckbox = document.getElementById('login-remember');
@@ -368,7 +391,7 @@ const LoginModule = {
                 // Registrar a auditoria no Supabase
                 await this.logAction(user.username, 'LOGIN');
                 this.showToast(`🔑 Acesso concedido via Nuvem! Bem-vindo(a), ${user.name}.`, 'success');
-                this.loginUI(sessionUser);
+                await this.completeLogin(sessionUser);
                 return;
             } catch (err) {
                 console.error("Erro no login via Supabase:", err);
@@ -443,7 +466,7 @@ const LoginModule = {
 
         await this.logAction(user.username, 'LOGIN');
         this.showToast(`🔑 Acesso concedido localmente! Bem-vindo(a), ${user.name}.`, 'success');
-        this.loginUI(sessionUser);
+        await this.completeLogin(sessionUser);
     },
 
     async loginUI(user) {
@@ -540,7 +563,7 @@ const LoginModule = {
                 window.MunicipioContext.setAtivo('local', nomeMun, ufMun);
             }
         }
-        
+
         // Garante que o modal de importar seja fechado caso tenha aberto no background
         if (typeof hideModal === 'function') {
             hideModal('modalImportar');

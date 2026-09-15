@@ -1,0 +1,72 @@
+{
+  "duration": 3022.899999999907,
+  "samples": [
+    {
+      "ms": 272,
+      "time": 0.164809,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 523,
+      "time": 0.374495,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 774,
+      "time": 0.564071,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 1031,
+      "time": 0.760202,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 1282,
+      "time": 0.985515,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 1534,
+      "time": 1.183051,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 1776,
+      "time": 1.349043,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 2033,
+      "time": 1.600268,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 2273,
+      "time": 1.844242,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 2523,
+      "time": 2.094749,
+      "paused": false,
+      "visible": true
+    },
+    {
+      "ms": 2772,
+      "time": 2.334477,
+      "paused": false,
+      "visible": true
+    }
+  ],
+  "playing": 0.013641
+}

@@ -5777,7 +5777,7 @@ html {
     .login-card {
         margin: 2rem auto;
         width: 100%;
-        max-width: 100%;
+        max-width: 460px;
         padding: 2rem 1.5rem 1.5rem;
     }
 

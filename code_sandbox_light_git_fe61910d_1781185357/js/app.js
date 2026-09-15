@@ -578,8 +578,8 @@ function navigateTo(section) {
         }
     }
 
-    if (section === 'producoes-bpa' && window.BpaModule && typeof window.BpaModule.renderAll === 'function') {
-        setTimeout(() => window.BpaModule.renderAll(), 50);
+    if (section === 'producoes-bpa' && window.BpaModule && typeof window.BpaModule.loadProducoes === 'function') {
+        window.BpaModule.loadProducoes();
     }
 
     if (section === 'cnes' && window.CnesModule && typeof window.CnesModule.init === 'function') {
@@ -2976,7 +2976,7 @@ function processContent(content, fileName = 'arquivo') {
                         showToast(`✅ ${parsed.competencia} — ${parsed.municipio}-${parsed.uf} importado com sucesso!`, 'success');
 
                         // Aciona a Malha Fina Anti-Glosa com o Radar Cyber ARGOS
-                        if (window.MalhaFinaEngine && typeof window.MalhaFinaEngine.executar === 'function') {
+                        if (typeof parsed.conteudo === 'string' && window.MalhaFinaEngine && typeof window.MalhaFinaEngine.executar === 'function') {
                             setTimeout(() => {
                                 window.MalhaFinaEngine.executar(parsed);
                             }, 400);
