@@ -1,0 +1,572 @@
+/**
+ * FPA ARGOS — download-sistema.css
+ * Estilos modernos e limpos (Light/Enterprise Theme) para o módulo Download Sistema
+ */
+
+.ds-wrapper {
+    padding: 1.5rem 2rem;
+    max-width: 1440px;
+    margin: 0 auto;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+}
+
+/* Header Card */
+.ds-header-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+}
+
+.ds-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ds-header-icon {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 0.85rem;
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+    flex-shrink: 0;
+}
+
+.ds-header-title {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+.ds-header-sub {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.ds-header-badges {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 0.6rem;
+}
+
+.ds-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.ds-badge-success {
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
+}
+
+.ds-badge-neutral {
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+.ds-badge-info {
+    background: #f0f9ff;
+    color: #0284c7;
+    border: 1px solid #bae6fd;
+}
+
+.ds-badge-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: #10b981;
+    display: inline-block;
+}
+
+/* Botão de Sincronização Principal */
+.btn-ds-sync {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.65rem;
+    padding: 0.7rem 1.4rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.28);
+    transition: all 0.2s ease;
+}
+
+.btn-ds-sync:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(2, 132, 199, 0.38);
+}
+
+.btn-ds-sync:active {
+    transform: translateY(0);
+}
+
+.btn-ds-sync:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Grid de KPIs */
+.ds-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.75rem;
+}
+
+.ds-kpi-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.95rem;
+    padding: 1.25rem 1.4rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.ds-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px -2px rgba(0, 0, 0, 0.06);
+}
+
+.ds-kpi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+}
+
+.ds-kpi-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #64748b;
+}
+
+.ds-kpi-icon-wrap {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+}
+
+.ds-icon-blue {
+    background: #e0f2fe;
+    color: #0284c7;
+}
+
+.ds-icon-green {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.ds-icon-purple {
+    background: #f3e8ff;
+    color: #7e22ce;
+}
+
+.ds-icon-amber {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.ds-kpi-value {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.01em;
+}
+
+.ds-kpi-sub {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* Painéis de Tabela */
+.ds-table-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 1.75rem;
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+}
+
+.ds-table-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.15rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid #f1f5f9;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.ds-table-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.ds-table-title-icon {
+    font-size: 1.25rem;
+}
+
+.ds-table-title {
+    margin: 0;
+    font-size: 1.15rem;
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.ds-table-subtitle {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 0.15rem;
+}
+
+/* Input de busca */
+.ds-search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.ds-search-icon {
+    position: absolute;
+    left: 0.85rem;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    pointer-events: none;
+}
+
+.ds-search-input {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.85rem 0.45rem 2.2rem;
+    color: #0f172a;
+    font-size: 0.825rem;
+    width: 240px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.ds-search-input:focus {
+    background: #ffffff;
+    border-color: #0284c7;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+}
+
+/* Tabelas */
+.ds-table-responsive {
+    overflow-x: auto;
+}
+
+.ds-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.875rem;
+}
+
+.ds-table thead tr {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.ds-table th {
+    padding: 0.85rem 1.1rem;
+}
+
+.ds-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s ease;
+}
+
+.ds-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.ds-table td {
+    padding: 0.95rem 1.1rem;
+    vertical-align: middle;
+}
+
+/* Código do arquivo */
+.ds-file-code {
+    background: #f1f5f9;
+    color: #0369a1;
+    border: 1px solid #e2e8f0;
+    padding: 0.3rem 0.65rem;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 700;
+    font-size: 0.88rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.ds-file-title {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.9rem;
+}
+
+.ds-file-desc {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 0.15rem;
+}
+
+.ds-size-badge {
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.825rem;
+}
+
+/* Badges de Versão */
+.ds-badge-vigente {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ds-badge-anterior {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ds-badge-competencia {
+    background: #f0f9ff;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border-radius: 9999px;
+    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ds-badge-revisao {
+    background: #f8fafc;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+/* Botões de Download */
+.btn-ds-download-vigente {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1.15rem;
+    font-size: 0.825rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+    transition: all 0.2s ease;
+}
+
+.btn-ds-download-vigente:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+.btn-ds-download {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1.15rem;
+    font-size: 0.825rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.2);
+    transition: all 0.2s ease;
+}
+
+.btn-ds-download:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.32);
+}
+
+/* Estilos de Notas Técnicas (PDF / SIGTAP) */
+.ds-icon-rose {
+    background: #ffe4e6;
+    color: #e11d48;
+}
+
+.ds-file-pdf {
+    color: #be123c !important;
+    border-color: #fecdd3 !important;
+    background: #fff1f2 !important;
+}
+
+.ds-badge-recente-mini {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.ds-badge-emissor {
+    background: #f8fafc;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.4rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.btn-ds-download-pdf {
+    background: linear-gradient(135deg, #e11d48, #be123c);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.45rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow: 0 2px 6px rgba(225, 29, 72, 0.22);
+    transition: all 0.2s ease;
+}
+
+.btn-ds-download-pdf:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.35);
+    background: linear-gradient(135deg, #be123c, #9f1239);
+}
+
+.btn-ds-download-pdf-destaque {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.45rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+    transition: all 0.2s ease;
+}
+
+.btn-ds-download-pdf-destaque:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.42);
+    background: linear-gradient(135deg, #b91c1c, #991b1b);
+}
+
+.btn-ds-view-pdf {
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.btn-ds-view-pdf:hover {
+    background: #ffffff;
+    color: #0284c7;
+    border-color: #0284c7;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.15);
+    text-decoration: none;
+}
+

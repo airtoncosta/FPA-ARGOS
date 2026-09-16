@@ -15,6 +15,7 @@ const { JobQueue } = require('./lib/job-queue');
 const { Logger, generateCorrelationId } = require('./lib/logger');
 const { AuditLogger } = require('./lib/audit-logger');
 const { shouldCompress, compressBuffer, createCompressionStream } = require('./lib/compression');
+const { SiasusSyncService } = require('./lib/siasus-sync-service');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'code_sandbox_light_git_fe61910d_1781185357');
@@ -24,6 +25,10 @@ const globalRateLimiter = new SlidingWindowRateLimiter({ windowMs: 60000 });
 const globalJobQueue = new JobQueue({ concurrency: 2, retentionMs: 3600000 });
 const globalLogger = new Logger({ service: 'fpa-argos' });
 const globalAuditLogger = new AuditLogger();
+const globalSiasusSyncService = new SiasusSyncService({
+    baseDir: path.join(PUBLIC_DIR, 'siasus_data'),
+    retentionBdsia: 6
+});
 
 function getRateLimitPolicy(pathname, method) {
     // Tier 1: E-mail & Ações Críticas (5 req / 60s)
@@ -31,11 +36,11 @@ function getRateLimitPolicy(pathname, method) {
         return { category: 'email', limit: 5, windowMs: 60000 };
     }
     // Tier 2: Persistência & Escrita (15 req / 60s)
-    if (pathname === '/api/cnes/salvar' || (pathname === '/api/bpa/email-config' && method === 'POST')) {
+    if (pathname === '/api/cnes/salvar' || (pathname === '/api/bpa/email-config' && method === 'POST') || pathname === '/api/siasus/sincronizar') {
         return { category: 'write', limit: 15, windowMs: 60000 };
     }
     // Tier 3: Proxies Governamentais Federais (60 req / 60s)
-    if (pathname.startsWith('/api/fns/') || pathname.startsWith('/api/cnes/estabelecimentos') || pathname.startsWith('/api/cnes/municipio')) {
+    if (pathname.startsWith('/api/fns/') || pathname.startsWith('/api/cnes/estabelecimentos') || pathname.startsWith('/api/cnes/municipio') || pathname.startsWith('/api/siasus/')) {
         return { category: 'proxy', limit: 60, windowMs: 60000 };
     }
     // Tier 4: Assets Estáticos e Leituras Gerais (300 req / 60s)
@@ -1262,6 +1267,125 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 1.7. Rotas do Módulo Download Sistema (SIA/SUS - BPA & BDSIA)
+    if (pathname === '/api/siasus/versoes' && req.method === 'GET') {
+        handleCors(res);
+        const catalogo = globalSiasusSyncService.getCatalogo();
+        sendJsonResponse(req, res, 200, { success: true, catalogo });
+        return;
+    }
+
+    if (pathname === '/api/siasus/sincronizar' && req.method === 'POST') {
+        handleCors(res);
+        // Dispara varredura assíncrona no DATASUS
+        globalSiasusSyncService.sync().then(resultado => {
+            globalLogger.info('siasus_sync_completed', resultado);
+        }).catch(err => {
+            globalLogger.error('siasus_sync_failed', { erro: err.message });
+        });
+
+        sendJsonResponse(req, res, 202, {
+            success: true,
+            message: 'Sincronização com os servidores do DATASUS iniciada em segundo plano.',
+            timestamp: new Date().toISOString()
+        });
+        return;
+    }
+
+    if (pathname.startsWith('/api/siasus/download/')) {
+        handleCors(res);
+        const rawFileName = pathname.replace('/api/siasus/download/', '').trim();
+        const fileName = decodeURIComponent(rawFileName);
+        const localPath = globalSiasusSyncService.getArquivoLocal(fileName);
+
+        if (localPath && fs.existsSync(localPath)) {
+            const stats = fs.statSync(localPath);
+            const isPdf = fileName.toLowerCase().endsWith('.pdf');
+            res.setHeader('Content-Type', isPdf ? 'application/pdf' : 'application/x-msdownload');
+            res.setHeader('Content-Disposition', `attachment; filename="${path.basename(localPath)}"`);
+            res.setHeader('Content-Length', stats.size);
+            res.writeHead(200);
+            fs.createReadStream(localPath).pipe(res);
+            return;
+        }
+
+        // Se ainda não estiver baixado localmente no cache, redireciona para a URL do DATASUS ou espelho
+        const catalogo = globalSiasusSyncService.getCatalogo();
+        let targetItem = null;
+        if (catalogo.bpa) targetItem = catalogo.bpa.find(b => b.arquivo === fileName);
+        if (!targetItem && catalogo.bdsia) targetItem = catalogo.bdsia.find(s => s.arquivo === fileName);
+        if (!targetItem && catalogo.notasTecnicas) targetItem = catalogo.notasTecnicas.find(n => n.arquivo === fileName);
+
+        if (targetItem && (targetItem.urlDownload || targetItem.urlDatasus || targetItem.urlEspelho)) {
+            const redirectUrl = targetItem.urlDownload || targetItem.urlDatasus || targetItem.urlEspelho;
+            res.writeHead(302, { Location: redirectUrl });
+            res.end();
+            return;
+        }
+
+        sendJsonResponse(req, res, 404, { success: false, error: `Arquivo ${fileName} não encontrado no catálogo.` });
+        return;
+    }
+
+    if (pathname.startsWith('/api/siasus/visualizar/')) {
+        handleCors(res);
+        const rawFileName = pathname.replace('/api/siasus/visualizar/', '').trim();
+        const fileName = decodeURIComponent(rawFileName);
+        const localPath = globalSiasusSyncService.getArquivoLocal(fileName);
+
+        if (localPath && fs.existsSync(localPath)) {
+            const stats = fs.statSync(localPath);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename="${path.basename(localPath)}"`);
+            res.setHeader('Content-Length', stats.size);
+            res.writeHead(200);
+            fs.createReadStream(localPath).pipe(res);
+            return;
+        }
+
+        // Se ainda não estiver localmente em cache, faz proxy com follow redirect garantindo Content-Disposition: inline
+        const streamPdf = (targetUrl, maxHops = 3) => {
+            if (maxHops <= 0) {
+                res.writeHead(302, { Location: targetUrl });
+                res.end();
+                return;
+            }
+            const client = targetUrl.startsWith('https:') ? https : http;
+            const reqUpstream = client.get(targetUrl, { headers: { 'User-Agent': 'FPA-ARGOS' } }, (upRes) => {
+                if (upRes.statusCode >= 300 && upRes.statusCode < 400 && upRes.headers.location) {
+                    let nextUrl = upRes.headers.location;
+                    if (!nextUrl.startsWith('http')) {
+                        nextUrl = new URL(nextUrl, targetUrl).href;
+                    }
+                    streamPdf(nextUrl, maxHops - 1);
+                    return;
+                }
+
+                if (upRes.statusCode === 200) {
+                    res.setHeader('Content-Type', 'application/pdf');
+                    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+                    if (upRes.headers['content-length']) {
+                        res.setHeader('Content-Length', upRes.headers['content-length']);
+                    }
+                    res.writeHead(200);
+                    upRes.pipe(res);
+                } else {
+                    res.writeHead(302, { Location: `https://github.com/RenatoKR/SIGTAP/blob/main/notastecnicas/${encodeURIComponent(fileName)}` });
+                    res.end();
+                }
+            });
+
+            reqUpstream.on('error', () => {
+                res.writeHead(302, { Location: `https://github.com/RenatoKR/SIGTAP/blob/main/notastecnicas/${encodeURIComponent(fileName)}` });
+                res.end();
+            });
+        };
+
+        const remoteSource = `https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/${fileName}`;
+        streamPdf(remoteSource);
+        return;
+    }
+
     // 2. Servir arquivos estáticos da aplicação
     let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
 
@@ -1323,7 +1447,11 @@ server.listen(PORT, () => {
     console.log(`\n=============================================================`);
     console.log(`🚀 ARGOS SERVER & FNS PROXY ativo em: http://localhost:${PORT}`);
     console.log(`📡 Proxy FNS disponível em:           http://localhost:${PORT}/api/fns/...`);
+    console.log(`📦 Sincronizador SIA/SUS ativo em:    http://localhost:${PORT}/api/siasus/versoes`);
     console.log(`=============================================================\n`);
+
+    // Inicia agendador automático do SIA/SUS (a cada 6 horas)
+    globalSiasusSyncService.startAutoSync();
 });
 
-module.exports = { server, globalRateLimiter, globalJobQueue, globalLogger, globalAuditLogger, getRateLimitPolicy };
+module.exports = { server, globalRateLimiter, globalJobQueue, globalLogger, globalAuditLogger, globalSiasusSyncService, getRateLimitPolicy };
