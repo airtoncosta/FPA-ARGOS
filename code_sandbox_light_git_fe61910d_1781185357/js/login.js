@@ -38,35 +38,40 @@ const ARGOS_USERS = [
         email: 'jessica@fpa.gov.br',
         name: 'Jessica',
         password: ARGOS_USERS_HASHES['jessica'],
-        role: 'GERENTE'
+        role: 'GERENTE',
+        municipio_vinculado: 'Bacabal-MA'
     },
     {
         username: 'aline',
         email: 'aline@fpa.gov.br',
         name: 'Aline',
         password: ARGOS_USERS_HASHES['aline'],
-        role: 'GERENTE'
+        role: 'GERENTE',
+        municipio_vinculado: 'Bacabal-MA'
     },
     {
         username: 'ewerton',
         email: 'ewerton@fpa.gov.br',
         name: 'Ewerton',
         password: ARGOS_USERS_HASHES['ewerton'],
-        role: 'GERENTE'
+        role: 'GERENTE',
+        municipio_vinculado: 'Bacabal-MA'
     },
     {
         username: 'marilene',
         email: 'marilene@fpa.gov.br',
         name: 'Marilene',
         password: ARGOS_USERS_HASHES['marilene'],
-        role: 'GERENTE'
+        role: 'GERENTE',
+        municipio_vinculado: 'Bacabal-MA'
     },
     {
         username: 'flavia',
         email: 'flavia@fpa.gov.br',
         name: 'Flavia',
         password: ARGOS_USERS_HASHES['flavia'],
-        role: 'GERENTE'
+        role: 'GERENTE',
+        municipio_vinculado: 'Bacabal-MA'
     },
     {
         username: 'mateus',
@@ -180,7 +185,7 @@ const LoginModule = {
             let users = [];
             try { users = JSON.parse(dbStr); } catch(e) {}
 
-            // Migrar senhas em texto puro para hash SHA-256
+            // Migrar senhas em texto puro para hash SHA-256 e garantir município Bacabal-MA para usuários restritos
             users = users.map(u => {
                 const hashLookup = ARGOS_USERS_HASHES[u.username];
                 if (hashLookup && u.password !== hashLookup && u.password.length !== 64) {
@@ -189,10 +194,15 @@ const LoginModule = {
                         needsUpdate = true;
                     }
                 }
+                const isAdmOrFran = (u.role === 'ADM') || (u.username === 'airton') || (u.username === 'francileide');
+                if (!isAdmOrFran && (!u.municipio_vinculado || u.municipio_vinculado !== 'Bacabal-MA')) {
+                    u.municipio_vinculado = 'Bacabal-MA';
+                    needsUpdate = true;
+                }
                 return u;
             });
 
-            // Migrar se não tiver o hash (senha ainda em texto puro)
+            // Migrar se não tiver o hash (senha ainda em texto puro) ou se dados foram atualizados
             if (!dbStr.includes('francileide') || needsUpdate) {
                 localStorage.setItem('argos_users_db', JSON.stringify(users));
             }
@@ -378,7 +388,7 @@ const LoginModule = {
                     perm_importar: user.perm_importar,
                     perm_limpar_db: user.perm_limpar_db,
                     perm_config_supabase: user.perm_config_supabase,
-                    municipio_vinculado: user.municipio_vinculado,
+                    municipio_vinculado: user.municipio_vinculado || 'Bacabal-MA',
                     acesso_multi_municipio: user.acesso_multi_municipio
                 };
 
@@ -455,7 +465,7 @@ const LoginModule = {
             perm_importar: user.perm_importar,
             perm_limpar_db: user.perm_limpar_db,
             perm_config_supabase: user.perm_config_supabase,
-            municipio_vinculado: user.municipio_vinculado
+            municipio_vinculado: user.municipio_vinculado || 'Bacabal-MA'
         };
 
         if (rememberMe) {
@@ -549,25 +559,100 @@ const LoginModule = {
             await window.MunicipioContext.initUI();
         }
 
-        // v4.0: Auto-load do município vinculado para usuários restritos
-        if ((user.username === 'yvanna' || user.username === 'mateus') && user.municipio_vinculado) {
-            const parts = user.municipio_vinculado.split('-');
-            const nomeMun = parts[0].trim();
-            const ufMun = parts.length > 1 ? parts[1].trim() : '';
-            if (window.MunicipioContext && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
-                const idMun = await window.MunicipioContext.registrarOuObterMunicipio(nomeMun, ufMun);
-                if (idMun) {
-                    await window.MunicipioContext.carregarMunicipio(idMun);
-                }
-            } else if (window.MunicipioContext) {
-                window.MunicipioContext.setAtivo('local', nomeMun, ufMun);
-            }
+        // Auto-load do município de Bacabal-MA para todos os usuários, EXCETO ADM e Francileide
+        const uRole = (user.role || '').toUpperCase().trim();
+        const uName = (user.username || '').toLowerCase().trim();
+        const isAdmOrFrancileide = uRole === 'ADM' || uName === 'airton' || uName === 'francileide';
+
+        if (!isAdmOrFrancileide) {
+            await this.carregarBasePadraoBacabal();
         }
 
         // Garante que o modal de importar seja fechado caso tenha aberto no background
         if (typeof hideModal === 'function') {
             hideModal('modalImportar');
         }
+    },
+
+    /**
+     * Carrega automaticamente a base de dados oficial e a logomarca do município de Bacabal-MA
+     */
+    async carregarBasePadraoBacabal() {
+        if (!window.MunicipioContext) return false;
+
+        let bacabalId = null;
+        if (window.SupabaseConfig && window.SupabaseConfig.isConnected() && window.SupabaseService) {
+            try {
+                const bases = await window.SupabaseService.listarResumoBasesNuvem();
+                const found = bases && bases.find(b =>
+                    (b.nome && b.nome.toUpperCase().includes('BACABAL')) &&
+                    (!b.uf || b.uf.toUpperCase() === 'MA')
+                );
+                if (found) {
+                    bacabalId = found.id;
+                }
+            } catch (e) {
+                console.warn('Erro ao buscar resumo das bases para Bacabal:', e);
+            }
+
+            if (!bacabalId) {
+                try {
+                    bacabalId = await window.MunicipioContext.registrarOuObterMunicipio('Bacabal', 'MA');
+                } catch (e) {
+                    console.warn('Erro ao registrar/obter Bacabal:', e);
+                }
+            }
+        }
+
+        let ok = false;
+        if (bacabalId) {
+            ok = await window.MunicipioContext.carregarMunicipio(bacabalId);
+        }
+
+        // Fallback local se não conseguiu carregar da nuvem
+        if (!ok && window.MunicipioContext) {
+            window.MunicipioContext.setAtivo('local', 'Bacabal', 'MA');
+            if (window.AppDB) {
+                const saved = (await window.AppDB.getItem('datasets_local')) || (await window.AppDB.getItem('datasets'));
+                if (saved && saved.length > 0) {
+                    window.datasets = saved;
+                    if (typeof buildAggregatedData === 'function' && typeof loadData === 'function') {
+                        const agg = buildAggregatedData(window.datasets);
+                        if (agg && window.PortariaModule) {
+                            await window.PortariaModule.loadPortariaForMunicipio(agg.municipio, agg.uf);
+                        }
+                        if (agg) loadData(agg);
+                        ok = true;
+                    }
+                }
+            }
+        }
+
+        // Assegurar que a logomarca de Bacabal esteja selecionada e exibida
+        try {
+            let activeLogo = localStorage.getItem('argos_custom_logo');
+            if (!activeLogo && window.SupabaseConfig && window.SupabaseConfig.isConnected() && window.SupabaseService) {
+                activeLogo = await window.SupabaseService.loadLogo();
+            }
+            if (!activeLogo && window.AppDB) {
+                const hist = await window.AppDB.getItem('logos_history') || [];
+                if (hist.length > 0) activeLogo = hist[0];
+            }
+            if (activeLogo) {
+                localStorage.setItem('argos_custom_logo', activeLogo);
+                if (typeof updateLogoPreview === 'function') updateLogoPreview();
+                if (typeof renderLogoHistory === 'function') renderLogoHistory();
+            }
+        } catch (e) {
+            console.warn('Erro ao garantir logo de Bacabal:', e);
+        }
+
+        // Re-render da central de arquivos caso esteja visível
+        if (window.renderArquivosManager) {
+            await window.renderArquivosManager();
+        }
+
+        return ok;
     },
 
     applyPermissions(role) {

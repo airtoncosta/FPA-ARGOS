@@ -1,0 +1,10 @@
+{
+  "entries": [
+    {
+      "path": ".agents/plugins/superpowers/skills"
+    },
+    {
+      "path": ".agents/plugins/graphify/skills"
+    }
+  ]
+}

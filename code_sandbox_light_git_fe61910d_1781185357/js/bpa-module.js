@@ -3264,10 +3264,11 @@ const BpaModule = {
 
         const searchInput = document.getElementById('searchBpaInput');
         if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
+            const debouncedSearch = (typeof debounce === 'function' ? debounce : (fn) => fn)((e) => {
                 this.currentSearchTerm = e.target.value;
                 this.renderAll();
-            });
+            }, 300);
+            searchInput.addEventListener('input', debouncedSearch);
         }
 
         const btnClearFilters = document.getElementById('btnClearBpaFilters');
@@ -3341,16 +3342,26 @@ const BpaModule = {
 
     renderLoadingState(isLoading) {
         const tbody = document.getElementById('tbodyBpaArquivos');
-        if (!tbody) return;
+        const container = document.getElementById('bpaChecklistContainer');
+        if (!tbody && !container) return;
+
         if (isLoading) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center" style="padding: 2rem; color: #94a3b8;">
-                        <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i><br>
-                        <span>Carregando produções da nuvem...</span>
-                    </td>
-                </tr>
-            `;
+            if (typeof renderSkeletonTable === 'function') {
+                renderSkeletonTable(tbody, 5, 6);
+            } else if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 2rem; color: #94a3b8;">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem;"></i><br>
+                            <span>Carregando produções da nuvem...</span>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            if (typeof renderSkeletonCards === 'function') {
+                renderSkeletonCards(container, 4);
+            }
         }
     },
 

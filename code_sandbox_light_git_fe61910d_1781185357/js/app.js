@@ -103,11 +103,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // CARREGAR DADOS: tentar município ativo do Supabase, senão fallback local
         let dadosCarregados = false;
+        const uRole = (userSession && userSession.role ? userSession.role : '').toUpperCase().trim();
+        const uName = (userSession && userSession.username ? userSession.username : '').toLowerCase().trim();
+        const isAdmOrFrancileide = uRole === 'ADM' || uName === 'airton' || uName === 'francileide';
+
         const municipioAtivo = window.MunicipioContext ? MunicipioContext.getAtivo() : null;
         let autoLoadId = municipioAtivo ? municipioAtivo.id : null;
 
-        // Auto-carregar o município vinculado para GERENTE se não houver contexto ativo
-        if (!autoLoadId && userSession && userSession.role === 'GERENTE' && userSession.municipio_vinculado && SupabaseConfig.isConnected()) {
+        // Para usuários não-isentos (todos exceto ADM e Francileide), auto-carregar sempre Bacabal-MA
+        if (!isAdmOrFrancileide && userSession) {
+            if (SupabaseConfig.isConnected()) {
+                try {
+                    const bases = await SupabaseService.listarResumoBasesNuvem();
+                    const bacabal = bases && bases.find(b => 
+                        (b.nome && b.nome.toUpperCase().includes('BACABAL')) &&
+                        (!b.uf || b.uf.toUpperCase() === 'MA')
+                    );
+                    if (bacabal) {
+                        autoLoadId = bacabal.id;
+                    } else {
+                        autoLoadId = await SupabaseService.registrarMunicipio('Bacabal', 'MA');
+                    }
+                } catch(e) {
+                    console.error('Erro ao obter id do município Bacabal:', e);
+                }
+            }
+        } else if (!autoLoadId && userSession && userSession.role === 'GERENTE' && userSession.municipio_vinculado && SupabaseConfig.isConnected()) {
              const parts = userSession.municipio_vinculado.split('-');
              const nomeMun = parts[0].trim();
              const ufMun = parts.length > 1 ? parts[1].trim() : '';
@@ -119,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (autoLoadId && SupabaseConfig.isConnected()) {
-            // Tentar carregar do município ativo previamente salvo
+            // Tentar carregar do município ativo previamente salvo ou de Bacabal
             try {
                 dadosCarregados = await MunicipioContext.carregarMunicipio(autoLoadId);
             } catch (ctxErr) {
@@ -1667,7 +1688,7 @@ function renderDashboardUnidades(d) {
         const newSearch = search.cloneNode(true);
         search.parentNode.replaceChild(newSearch, search);
 
-        newSearch.addEventListener('input', () => {
+        const debouncedUnidadeSearch = (typeof debounce === 'function' ? debounce : (fn) => fn)(() => {
             const q = newSearch.value.toLowerCase();
             document.querySelectorAll('.unidade-card').forEach(card => {
                 card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
@@ -1675,7 +1696,8 @@ function renderDashboardUnidades(d) {
             document.querySelectorAll('#tbodyUnidadesMenu tr').forEach(row => {
                 row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
             });
-        });
+        }, 250);
+        newSearch.addEventListener('input', debouncedUnidadeSearch);
     }
 }
 
@@ -3423,12 +3445,13 @@ function bindSearch(inputId, tableId) {
     const newInput = input.cloneNode(true);
     input.parentNode.replaceChild(newInput, input);
 
-    newInput.addEventListener('input', () => {
+    const debouncedTableFilter = (typeof debounce === 'function' ? debounce : (fn) => fn)(() => {
         const q = newInput.value.toLowerCase();
         table.querySelectorAll('tbody tr').forEach(row => {
             row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
         });
-    });
+    }, 250);
+    newInput.addEventListener('input', debouncedTableFilter);
 }
 
 /* =========================================================

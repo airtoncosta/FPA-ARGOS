@@ -133,9 +133,34 @@ const MunicipioContext = {
 
             // 5. Carregar logomarca do município
             try {
-                const logo = await SupabaseService.loadLogoPorMunicipio(municipioId);
-                if (logo && logo.logo_base64) {
-                    localStorage.setItem('argos_custom_logo', logo.logo_base64);
+                let logo = await SupabaseService.loadLogoPorMunicipio(municipioId);
+                let base64Logo = logo && logo.logo_base64;
+
+                // Fallback inteligente: buscar logo global da nuvem, do histórico ou do localStorage
+                if (!base64Logo) {
+                    base64Logo = await SupabaseService.loadLogo();
+                }
+                if (!base64Logo) {
+                    const cloudHist = await SupabaseService.loadLogoHistory();
+                    if (cloudHist && Array.isArray(cloudHist) && cloudHist.length > 0) {
+                        base64Logo = cloudHist[0];
+                    }
+                }
+                if (!base64Logo && window.AppDB) {
+                    const localHist = await AppDB.getItem('logos_history');
+                    if (localHist && Array.isArray(localHist) && localHist.length > 0) {
+                        base64Logo = localHist[0];
+                    }
+                }
+                if (!base64Logo) {
+                    base64Logo = localStorage.getItem('argos_custom_logo');
+                }
+
+                if (base64Logo) {
+                    localStorage.setItem('argos_custom_logo', base64Logo);
+                    if (SupabaseConfig.isConnected()) {
+                        SupabaseService.saveLogoPorMunicipio(municipioId, base64Logo).catch(() => {});
+                    }
                 } else {
                     localStorage.removeItem('argos_custom_logo');
                 }
@@ -147,8 +172,14 @@ const MunicipioContext = {
             // 6. Carregar histórico global de logos (para o usuário poder reaproveitar em qualquer município)
             try {
                 const cloudHistory = await SupabaseService.loadLogoHistory();
-                if (cloudHistory && Array.isArray(cloudHistory) && cloudHistory.length > 0) {
-                    await AppDB.setItem('logos_history', cloudHistory);
+                let localHistory = (await AppDB.getItem('logos_history')) || [];
+                let merged = [...new Set([...(cloudHistory || []), ...localHistory])];
+                const activeLogo = localStorage.getItem('argos_custom_logo');
+                if (activeLogo && !merged.includes(activeLogo)) {
+                    merged.unshift(activeLogo);
+                }
+                if (merged.length > 0) {
+                    await AppDB.setItem('logos_history', merged);
                 }
                 if (typeof renderLogoHistory === 'function') renderLogoHistory();
             } catch (histErr) {

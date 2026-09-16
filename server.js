@@ -10,10 +10,37 @@ const path = require('path');
 const url = require('url');
 const tls = require('tls');
 const net = require('net');
+const { SlidingWindowRateLimiter } = require('./lib/rate-limiter');
+const { JobQueue } = require('./lib/job-queue');
+const { Logger, generateCorrelationId } = require('./lib/logger');
+const { AuditLogger } = require('./lib/audit-logger');
+const { shouldCompress, compressBuffer, createCompressionStream } = require('./lib/compression');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'code_sandbox_light_git_fe61910d_1781185357');
 const EMAIL_CONFIG_FILE = path.join(__dirname, 'email_config.json');
+
+const globalRateLimiter = new SlidingWindowRateLimiter({ windowMs: 60000 });
+const globalJobQueue = new JobQueue({ concurrency: 2, retentionMs: 3600000 });
+const globalLogger = new Logger({ service: 'fpa-argos' });
+const globalAuditLogger = new AuditLogger();
+
+function getRateLimitPolicy(pathname, method) {
+    // Tier 1: E-mail & Ações Críticas (5 req / 60s)
+    if (pathname === '/api/bpa/enviar-email' || pathname === '/api/bpa/testar-conexao-email' || pathname === '/api/jobs/enviar-email') {
+        return { category: 'email', limit: 5, windowMs: 60000 };
+    }
+    // Tier 2: Persistência & Escrita (15 req / 60s)
+    if (pathname === '/api/cnes/salvar' || (pathname === '/api/bpa/email-config' && method === 'POST')) {
+        return { category: 'write', limit: 15, windowMs: 60000 };
+    }
+    // Tier 3: Proxies Governamentais Federais (60 req / 60s)
+    if (pathname.startsWith('/api/fns/') || pathname.startsWith('/api/cnes/estabelecimentos') || pathname.startsWith('/api/cnes/municipio')) {
+        return { category: 'proxy', limit: 60, windowMs: 60000 };
+    }
+    // Tier 4: Assets Estáticos e Leituras Gerais (300 req / 60s)
+    return { category: 'general', limit: 300, windowMs: 60000 };
+}
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -36,7 +63,34 @@ const MIME_TYPES = {
 function handleCors(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-request-id');
+}
+
+function sendJsonResponse(req, res, statusCode, data) {
+    handleCors(res);
+    const raw = typeof data === 'string' ? data : JSON.stringify(data);
+    const buf = Buffer.from(raw, 'utf8');
+    const acceptEncoding = (req.headers && req.headers['accept-encoding']) || '';
+
+    if (shouldCompress('application/json', buf.length)) {
+        const { encoding, data: compressed } = compressBuffer(buf, acceptEncoding);
+        if (encoding) {
+            res.setHeader('Content-Encoding', encoding);
+            res.setHeader('Vary', 'Accept-Encoding');
+            res.setHeader('Content-Length', String(compressed.length));
+            res.writeHead(statusCode, {
+                'Content-Type': 'application/json; charset=utf-8'
+            });
+            res.end(compressed);
+            return;
+        }
+    }
+
+    res.setHeader('Content-Length', String(buf.length));
+    res.writeHead(statusCode, {
+        'Content-Type': 'application/json; charset=utf-8'
+    });
+    res.end(buf);
 }
 
 /* =========================================================
@@ -692,9 +746,146 @@ function enviarFallbackLocal(ibge, munName, uf, res, cacheFilePath) {
     }
 }
 
+// Registra o handler para processamento assíncrono de envio de e-mails em segundo plano
+globalJobQueue.registerHandler('enviar_email_bpa', async (job, updateProgress) => {
+    updateProgress(10);
+    const payload = job.payload || {};
+    const stored = getStoredEmailConfig();
+    const config = { ...stored, ...(payload.emailConfig || {}) };
+    if (payload.emailConfig && (payload.emailConfig.smtp_pass === '••••••••' || !payload.emailConfig.smtp_pass)) {
+        config.smtp_pass = stored.smtp_pass;
+    }
+    if (payload.emailConfig && (payload.emailConfig.resend_api_key === '••••••••' || !payload.emailConfig.resend_api_key)) {
+        config.resend_api_key = stored.resend_api_key;
+    }
+
+    const destinatario = payload.destinatario || config.default_destinatario || 'auditoriabacabal@gmail.com';
+    const copia = payload.copia || '';
+    const assunto = payload.assunto || `[PRODUÇÃO BPA] Envio oficial de arquivo`;
+    const corpoHtml = payload.corpoHtml || payload.corpoTexto;
+    const corpoTexto = payload.corpoTexto || '';
+    const nomeArquivo = payload.nomeArquivo || 'PRODUCAO.BPA';
+    const conteudoBase64 = payload.conteudoBase64 || '';
+
+    const attachments = [];
+    if (nomeArquivo && conteudoBase64) {
+        attachments.push({
+            filename: nomeArquivo,
+            content: conteudoBase64
+        });
+    }
+
+    const hasSmtp = !!(config.smtp_host && config.smtp_user && config.smtp_pass);
+    const hasResend = !!config.resend_api_key;
+
+    if (!hasSmtp && !hasResend) {
+        throw new Error('Nenhum servidor de e-mail (SMTP ou Resend) configurado no ARGOS.');
+    }
+
+    updateProgress(35);
+    let result;
+    if (config.provider === 'resend' || (!hasSmtp && hasResend)) {
+        result = await sendEmailViaResend({
+            apiKey: config.resend_api_key,
+            from: config.from_email || 'onboarding@resend.dev',
+            from_name: config.from_name || 'ARGOS Produções',
+            to: destinatario,
+            cc: copia,
+            subject: assunto,
+            html: corpoHtml,
+            text: corpoTexto,
+            attachments: attachments
+        });
+    } else {
+        result = await sendEmailViaSmtp({
+            host: config.smtp_host,
+            port: config.smtp_port,
+            secure: config.smtp_secure,
+            user: config.smtp_user,
+            pass: config.smtp_pass,
+            from: config.from_email || config.smtp_user,
+            from_name: config.from_name || 'ARGOS Produções',
+            to: destinatario,
+            cc: copia,
+            subject: assunto,
+            html: corpoHtml,
+            text: corpoTexto,
+            attachments: attachments
+        });
+    }
+
+    updateProgress(100);
+    const successRes = {
+        delivered: true,
+        method: result.method,
+        destinatario: destinatario,
+        nomeArquivo: nomeArquivo,
+        timestamp: new Date().toISOString()
+    };
+
+    await globalAuditLogger.logAction({
+        usuarioLogin: payload.usuario || 'admin',
+        modulo: 'BPA',
+        acao: 'ENVIO_EMAIL_BPA',
+        detalhes: { destinatario, nomeArquivo, method: result.method, status: 'ENTREGUE' },
+        status: 'SUCESSO',
+        correlationId: payload.correlationId || null,
+        ip: payload.clientIp || null
+    });
+
+    return successRes;
+});
+
 const server = http.createServer((req, res) => {
+    const reqStartTime = Date.now();
+    const correlationId = (req.headers['x-request-id'] && String(req.headers['x-request-id']).trim())
+        || generateCorrelationId();
+    res.setHeader('x-request-id', correlationId);
+
     const parsedUrl = url.parse(req.url);
     const pathname = decodeURIComponent(parsedUrl.pathname);
+
+    // Logging estruturado na finalização da resposta HTTP
+    const originalEnd = res.end;
+    res.end = function(...args) {
+        const durationMs = Date.now() - reqStartTime;
+        globalLogger.info('http_request_completed', {
+            method: req.method,
+            path: pathname,
+            statusCode: res.statusCode,
+            durationMs
+        }, correlationId);
+        return originalEnd.apply(this, args);
+    };
+
+    // Rate Limiting & Proteção de Tráfego
+    const clientIp = globalRateLimiter.getClientIp(req);
+    const policy = getRateLimitPolicy(pathname, req.method);
+    const rateKey = `${policy.category}:${clientIp}`;
+    const rateResult = globalRateLimiter.check(rateKey, policy.limit, policy.windowMs);
+
+    // Injeta cabeçalhos padrão informativos RFC 6585
+    const rlHeaders = globalRateLimiter.getHeaders(rateResult, policy.limit);
+    for (const [hName, hVal] of Object.entries(rlHeaders)) {
+        res.setHeader(hName, String(hVal));
+    }
+
+    if (!rateResult.allowed) {
+        handleCors(res);
+        res.writeHead(429, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Retry-After': String(rateResult.retryAfterSeconds)
+        });
+        res.end(JSON.stringify({
+            success: false,
+            error: 'Too Many Requests',
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: `Limite de requisições excedido para esta operação. Aguarde ${rateResult.retryAfterSeconds} segundos antes de tentar novamente.`,
+            category: policy.category,
+            retryAfterSeconds: rateResult.retryAfterSeconds
+        }));
+        return;
+    }
 
     // 1. Rota de Proxy para a API oficial do FNS
     if (pathname.startsWith('/api/fns/')) {
@@ -1022,6 +1213,55 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 1.5. Endpoints de Fila de Background Jobs (Processamento Assíncrono)
+    if (pathname === '/api/jobs/enviar-email' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const payload = JSON.parse(body || '{}');
+                payload.correlationId = correlationId;
+                payload.clientIp = clientIp;
+                const job = globalJobQueue.enqueue('enviar_email_bpa', payload);
+
+                sendJsonResponse(req, res, 202, {
+                    success: true,
+                    status: 'QUEUED',
+                    jobId: job.id,
+                    message: 'Disparo de e-mail enfileirado para processamento em segundo plano.',
+                    checkUrl: `/api/jobs/${job.id}`
+                });
+            } catch (err) {
+                sendJsonResponse(req, res, 400, { success: false, error: 'JSON inválido no corpo da requisição.' });
+            }
+        });
+        return;
+    }
+
+    if (pathname === '/api/jobs' && req.method === 'GET') {
+        const jobs = globalJobQueue.listJobs(50);
+        sendJsonResponse(req, res, 200, { success: true, count: jobs.length, jobs });
+        return;
+    }
+
+    if (pathname.startsWith('/api/jobs/') && req.method === 'GET') {
+        const jobId = pathname.replace('/api/jobs/', '').trim();
+        const job = globalJobQueue.getJob(jobId);
+        if (!job) {
+            sendJsonResponse(req, res, 404, { success: false, error: 'Job não encontrado ou expirado.' });
+            return;
+        }
+        sendJsonResponse(req, res, 200, { success: true, job });
+        return;
+    }
+
+    // 1.6. Endpoint de Consulta de Trilha de Auditoria (Audit Trail)
+    if (pathname === '/api/audit/recent' && req.method === 'GET') {
+        const events = globalAuditLogger.getRecentEvents(50);
+        sendJsonResponse(req, res, 200, { success: true, count: events.length, events });
+        return;
+    }
+
     // 2. Servir arquivos estáticos da aplicação
     let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
 
@@ -1053,14 +1293,29 @@ const server = http.createServer((req, res) => {
 
         const ext = path.extname(filePath).toLowerCase();
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+        const acceptEncoding = (req.headers && req.headers['accept-encoding']) || '';
 
-        res.writeHead(200, {
-            'Content-Type': contentType,
-            'Cache-Control': 'no-cache'
-        });
+        const compStream = shouldCompress(contentType, stats.size)
+            ? createCompressionStream(acceptEncoding)
+            : null;
 
-        const readStream = fs.createReadStream(filePath);
-        readStream.pipe(res);
+        if (compStream) {
+            res.setHeader('Content-Encoding', compStream.encoding);
+            res.setHeader('Vary', 'Accept-Encoding');
+            res.writeHead(200, {
+                'Content-Type': contentType,
+                'Cache-Control': 'no-cache'
+            });
+            const readStream = fs.createReadStream(filePath);
+            readStream.pipe(compStream.stream).pipe(res);
+        } else {
+            res.writeHead(200, {
+                'Content-Type': contentType,
+                'Cache-Control': 'no-cache'
+            });
+            const readStream = fs.createReadStream(filePath);
+            readStream.pipe(res);
+        }
     });
 });
 
@@ -1070,3 +1325,5 @@ server.listen(PORT, () => {
     console.log(`📡 Proxy FNS disponível em:           http://localhost:${PORT}/api/fns/...`);
     console.log(`=============================================================\n`);
 });
+
+module.exports = { server, globalRateLimiter, globalJobQueue, globalLogger, globalAuditLogger, getRateLimitPolicy };

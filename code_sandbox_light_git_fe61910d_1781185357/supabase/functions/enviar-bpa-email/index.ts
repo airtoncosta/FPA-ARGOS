@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkEdgeRateLimit } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,12 @@ serve(async (req) => {
   // Tratar preflight CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  // Rate Limiting: 5 disparos por minuto por IP
+  const rateLimit = checkEdgeRateLimit(req, "enviar-bpa-email", 5, 60000, corsHeaders);
+  if (!rateLimit.allowed && rateLimit.response) {
+    return rateLimit.response;
   }
 
   try {
