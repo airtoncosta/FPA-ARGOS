@@ -22,7 +22,10 @@
             const compAnt = options.competenciaAnterior || 'ANTERIOR';
             const compAtu = options.competenciaAtual || 'ATUAL';
 
-            // Indexar profissionais da competência anterior: Chave composta CNES_CNS_CBO
+            // The published ST/PF worker supplies a stable identity for each
+            // employment link. CNS + CBO alone can represent several links.
+            const identity = (cnes, cns, cbo, p) => p.linkIdentity ||
+                [cnes, cns, cbo, p.codigoVinculacao || '', p.codigoVinculo || '', p.codigoSubVinculo || ''].join('_');
             const mapaAnterior = new Map();
             const profsPorCnsAnt = new Map(); // Para rastrear trocas de unidade
 
@@ -32,7 +35,7 @@
                 (estab.profissionais || []).forEach(p => {
                     const cns = String(p.cns || p.cnsMaster || '').trim();
                     const cbo = String(p.cbo || '').trim();
-                    const key = `${cnes}_${cns}_${cbo}`;
+                    const key = identity(cnes, cns, cbo, p);
                     const item = {
                         ...p,
                         cnes,
@@ -58,7 +61,7 @@
                 (estab.profissionais || []).forEach(p => {
                     const cns = String(p.cns || p.cnsMaster || '').trim();
                     const cbo = String(p.cbo || '').trim();
-                    const key = `${cnes}_${cns}_${cbo}`;
+                    const key = identity(cnes, cns, cbo, p);
                     const item = {
                         ...p,
                         cnes,
@@ -87,7 +90,7 @@
                     entradas.push({
                         tipo: 'ENTRADA',
                         tipoBadge: 'badge-entrada',
-                        descricaoTipo: 'Novo Vínculo / Admissão',
+                        descricaoTipo: 'Vínculo presente apenas no mês atual',
                         cnes: pAtual.cnes,
                         estabNome: pAtual.estabNome,
                         cns: pAtual.cns,
@@ -100,8 +103,8 @@
                         chAtual: pAtual.chTotal,
                         chAnterior: null,
                         diferencaCh: pAtual.chTotal,
-                        vinculacao: pAtual.vinculacao || 'CONTRATADO TEMPORÁRIO',
-                        observacao: transferidoDe ? `Possui outro vínculo na rede (${transferidoDe[0].estabNome})` : 'Novo cadastro municipal',
+                        vinculacao: pAtual.vinculacao || '',
+                        observacao: transferidoDe ? `Constava em outra unidade no mês anterior (${transferidoDe[0].estabNome})` : 'Não constava na competência anterior',
                         competencia: compAtu
                     });
                 } else {
@@ -112,7 +115,7 @@
                     const difHosp = (pAtual.chHosp || 0) - (pAnt.chHosp || 0);
 
                     if (difTotal !== 0 || difAmb !== 0 || difHosp !== 0) {
-                        const portariaAlerta = pAtual.chTotal > 60 ? 'SOBREPOSIÇÃO (>60h)' : (pAtual.chTotal > 40 ? 'ALERTA (>40h)' : 'REGULAR');
+                        const portariaAlerta = pAtual.chTotal > 60 ? 'REVISAR CH (>60h)' : (pAtual.chTotal > 40 ? 'REVISAR CH (>40h)' : 'SEM ALERTA CH');
                         alteracoesCargaHoraria.push({
                             tipo: 'ALTERACAO_CH',
                             tipoBadge: difTotal > 0 ? 'badge-ch-aumento' : 'badge-ch-reducao',
@@ -133,7 +136,8 @@
                     }
                 }
 
-                // Checagem consolidada Portaria 134 no município inteiro para este CNS
+                // Hours are a triage signal. Legal/financing conclusions need
+                // team and service context that ST/PF alone does not provide.
                 const vinculosAtuaisCns = profsPorCnsAtu.get(pAtual.cns) || [];
                 const somaHorasMunicipio = vinculosAtuaisCns.reduce((acc, v) => acc + (v.chTotal || 0), 0);
                 if (somaHorasMunicipio > 60 && vinculosAtuaisCns.length > 1) {
@@ -145,8 +149,8 @@
                             ocupacao: pAtual.ocupacao,
                             totalHoras: somaHorasMunicipio,
                             vinculos: vinculosAtuaisCns.map(v => `${v.estabNome} (${v.chTotal}h)`).join(' + '),
-                            alerta: 'Sobreposição de Vínculos (>60h Semanais Municipais)',
-                            grauRisco: 'ALTO - Risco de Glosa no Faturamento'
+                            alerta: 'Carga horária municipal superior a 60h para o mesmo CNS',
+                            grauRisco: 'REVISAR CONTEXTO DE EQUIPE E SERVIÇO'
                         });
                     }
                 }
@@ -158,7 +162,7 @@
                     saidas.push({
                         tipo: 'SAIDA',
                         tipoBadge: 'badge-saida',
-                        descricaoTipo: 'Desligamento / Exoneração',
+                        descricaoTipo: 'Vínculo ausente no mês atual',
                         cnes: pAnt.cnes,
                         estabNome: pAnt.estabNome,
                         cns: pAnt.cns,
@@ -168,7 +172,7 @@
                         chAnterior: pAnt.chTotal,
                         chAtual: 0,
                         diferencaCh: -pAnt.chTotal,
-                        vinculacao: pAnt.vinculacao || 'DESLIGADO',
+                        vinculacao: pAnt.vinculacao || '',
                         observacao: 'Não consta no CNES da competência atual',
                         competencia: compAtu
                     });

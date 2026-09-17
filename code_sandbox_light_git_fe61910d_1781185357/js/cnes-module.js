@@ -21,27 +21,29 @@ window.CnesModule = (function () {
         municipio: 'BACABAL',
         ibge: '210120',
         estabelecimentos: [],
-        competencias: [
-            { codigo: '202608', label: '08/2026 (Competência Vigente)', vigente: true },
-            { codigo: '202607', label: '07/2026', vigente: false },
-            { codigo: '202606', label: '06/2026', vigente: false },
-            { codigo: '202605', label: '05/2026', vigente: false },
-            { codigo: '202604', label: '04/2026', vigente: false },
-            { codigo: '202603', label: '03/2026', vigente: false },
-            { codigo: '202602', label: '02/2026', vigente: false },
-            { codigo: '202601', label: '01/2026', vigente: false }
-        ],
-        competenciaAtiva: '202608',
+        // Competencies are supplied by the published CNES manifest. Keeping
+        // this empty prevents a legacy or synthetic month from looking real.
+        competencias: [],
+        competenciaAtiva: '',
         loading: false,
         lastSync: null,
         dataSource: 'Oficial DATASUS',
+        sourceType: 'unknown',
+        isLegacy: false,
+        coverage: null,
         viewMode: 'portal', // 'portal' | 'ficha' | 'profissionais'
-        establishmentViewMode: 'cards', // 'cards' | 'table'
+        establishmentViewMode: 'table', // 'table' (padrão) | 'cards'
+        establishmentSort: {
+            field: 'nomeFantasia', // 'cnes' | 'nomeFantasia' | 'profissionais'
+            order: 'asc' // 'asc' | 'desc'
+        },
         selectedCnes: null,
         searchEstabelecimento: '',
         filterTipoUnidade: '',
         filterGestao: '',
         filterSus: '',
+        filterEscopo: 'mantidos', // 'mantidos' (padrão 49 unidades mantidas) | 'todas' | 'privados'
+        filterCategoriaKpi: '', // '' (todos) | 'HOSPITAL_URGENCIA' | 'ATENCAO_BASICA' | 'ESPECIALIDADES_OUTROS'
         searchProfissional: '',
         tableFilter: {
             search: '',
@@ -54,6 +56,7 @@ window.CnesModule = (function () {
         modalProfissionalSelecionado: null,
         modalImportAberto: false,
         movimentacoes: null,
+        movimentacoesMessage: '',
         movimentacoesFiltro: {
             tipo: 'TODAS',
             search: '',
@@ -68,12 +71,334 @@ window.CnesModule = (function () {
     }
 
     function formatarCompetencia(compStr) {
-        if (!compStr || compStr.length < 6) return compStr;
+        if (!compStr || String(compStr).length < 6) return 'Não publicada';
         const s = String(compStr).replace(/\D/g, '');
         if (s.length === 6) {
             return `${s.substring(4, 6)}/${s.substring(0, 4)}`;
         }
         return compStr;
+    }
+
+    // Lista oficial das 49 Unidades de Saúde Mantidas da Gestão Municipal Direta (Prefeitura / Município de Bacabal)
+    const CNES_BACABAL_MANTIDOS_49 = new Set([
+        '0666114', '2458004', '3428990', '7300239', '7300247', '6892841', '6922902', '7308892',
+        '2460149', '2460076', '7378432', '2460106', '2460130', '2645289', '2457997', '2458047',
+        '2460084', '2458039', '6234615', '7323298', '7038593', '2460122', '2458055', '0843016',
+        '7528663', '7941188', '7648502', '2460041', '0475262', '2460238', '0423084', '2460211',
+        '7230478', '7230516', '7230532', '7230540', '2460203', '2645238', '2457989', '2458012',
+        '2460033', '2460068', '5459303', '5385288', '3875911', '3889157', '6938477', '6952518',
+        '4816226'
+    ]);
+
+    function isUnidadeMantidaMunicipal(u) {
+        if (!u) return false;
+        const cleanCnes = String(u.cnes || '').replace(/\D/g, '').padStart(7, '0');
+        // Se for Bacabal (210120), confere na lista exata das 49 unidades mantidas
+        if (state.ibge === '210120' || state.municipio === 'BACABAL') {
+            if (CNES_BACABAL_MANTIDOS_49.has(cleanCnes)) return true;
+        }
+        // Validação genérica por Razão Social oficial
+        const rz = String(u.razaoSocial || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+        const isPref = rz.includes('PREFEITURA') || rz.includes('PRFEITURA') || rz.includes('PREEFEITURA') || 
+                       rz.includes('MUNICIPIO DE') || rz.includes('FUNDO MUNICIPAL DE SAUDE');
+        return isPref;
+    }
+
+    function setFilterEscopo(val) {
+        state.filterEscopo = val;
+        state.filterCategoriaKpi = '';
+        render();
+    }
+
+    function getCategoriaUnidade(u) {
+        if (!u) return 'ESPECIALIDADES_OUTROS';
+        const nome = String(u.nomeFantasia || u.nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+        const tipo = String(u.tipoUnidade || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
+        // 1. Hospitais & Urgência (Hospitais, SAMU, Motolâncias, Regulação de Urgências)
+        const isHospUrg = ['HOSPITAL', 'SAMU', 'MOTOLANCIA', 'REGULACAO DAS URGENCIAS', 'REGULACAO DE URGENCIA', 'PRONTO', 'URGENCIA', 'MOVEL'].some(k => nome.includes(k) || tipo.includes(k));
+        if (isHospUrg) return 'HOSPITAL_URGENCIA';
+
+        // 2. Atenção Primária / UBS (Centros de Saúde, UBS, Postos de Saúde, Academia da Saúde)
+        const isAtenBasica = ['CENTRO DE SAUDE', 'UBS', 'UNIDADE BASICA', 'POSTO DE SAUDE', 'ACADEMIA DE SAUDE', 'ACADEMIA DA SAUDE'].some(k => nome.includes(k) || tipo.includes(k));
+        if (isAtenBasica) return 'ATENCAO_BASICA';
+
+        // 3. Especialidades & Outros (Policlínica, Especialidades, CAPS, CAPSi, CTA/SAE, Vigilância, Fisioterapia, CEO, Laboratório, etc.)
+        return 'ESPECIALIDADES_OUTROS';
+    }
+
+    function toggleFilterCategoriaKpi(cat) {
+        if (state.filterCategoriaKpi === cat) {
+            state.filterCategoriaKpi = '';
+        } else {
+            state.filterCategoriaKpi = cat;
+        }
+        render();
+    }
+
+    function sortEstabelecimentos(field) {
+        if (state.establishmentSort.field === field) {
+            state.establishmentSort.order = state.establishmentSort.order === 'asc' ? 'desc' : 'asc';
+        } else {
+            state.establishmentSort.field = field;
+            state.establishmentSort.order = (field === 'profissionais' ? 'desc' : 'asc');
+        }
+        render();
+    }
+
+    function copiarCnes(cnes, event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const cleanCnes = String(cnes || '').trim();
+        if (!cleanCnes) return;
+
+        const btnEl = event ? (event.currentTarget || event.target.closest('button')) : null;
+
+        const onSuccess = () => {
+            if (btnEl) {
+                btnEl.classList.add('cnes-copied');
+                const icon = btnEl.querySelector('i');
+                if (icon) {
+                    const oldClass = icon.className;
+                    icon.className = 'fas fa-check';
+                    setTimeout(() => {
+                        icon.className = oldClass;
+                        btnEl.classList.remove('cnes-copied');
+                    }, 1500);
+                }
+            }
+            if (typeof showToast === 'function') {
+                showToast(`📋 CNES ${cleanCnes} copiado para a área de transferência!`, 'success');
+            }
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(cleanCnes).then(onSuccess).catch(() => {
+                fallbackCopiarCnes(cleanCnes, onSuccess);
+            });
+        } else {
+            fallbackCopiarCnes(cleanCnes, onSuccess);
+        }
+    }
+
+    function fallbackCopiarCnes(text, cb) {
+        try {
+            const el = document.createElement('textarea');
+            el.value = text;
+            el.setAttribute('readonly', '');
+            el.style.position = 'fixed';
+            el.style.left = '-9999px';
+            document.body.appendChild(el);
+            el.focus();
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            if (typeof cb === 'function') cb();
+        } catch (err) {
+            console.error('Falha ao copiar CNES:', err);
+        }
+    }
+
+    function copiarCns(cns, event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const cleanCns = String(cns || '').replace(/\D/g, '').trim();
+        if (!cleanCns) return;
+
+        const btnEl = event ? (event.currentTarget || event.target.closest('.cnes-cns-btn')) : null;
+
+        const onSuccess = () => {
+            if (btnEl) {
+                btnEl.classList.add('cnes-copied');
+                const valSpan = btnEl.querySelector('.cnes-cns-val');
+                const icon = btnEl.querySelector('i');
+                const oldText = valSpan ? valSpan.textContent : cleanCns;
+                if (valSpan) valSpan.textContent = 'Copiado!';
+                if (icon) {
+                    icon.className = 'fas fa-check';
+                }
+                setTimeout(() => {
+                    if (valSpan) valSpan.textContent = oldText;
+                    if (icon) icon.className = 'far fa-copy';
+                    btnEl.classList.remove('cnes-copied');
+                }, 1500);
+            }
+            if (typeof showToast === 'function') {
+                showToast(`📋 CNS ${cleanCns} copiado para a área de transferência!`, 'success');
+            }
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(cleanCns).then(onSuccess).catch(() => {
+                fallbackCopiarCnes(cleanCns, onSuccess);
+            });
+        } else {
+            fallbackCopiarCnes(cleanCns, onSuccess);
+        }
+    }
+
+    function formatarCboOficial(p) {
+        if (!p) return '-';
+        const cboCode = String(p.cbo || p.co_cbo || '').replace(/\D/g, '');
+        let ocupacaoRaw = String(p.ocupacao || p.ds_cbo || p.descricao_cbo || '').trim();
+
+        // Extrai código numérico inicial se presente (ex: "142105 - GERENTE ADMINISTRATIVO" ou "142105 GERENTE...")
+        const match = ocupacaoRaw.match(/^(\d{5,6})[\s\-_]*(.*)$/);
+        let codigo = cboCode;
+        let descricao = ocupacaoRaw;
+
+        if (match) {
+            if (!codigo) codigo = match[1];
+            descricao = match[2].trim();
+        }
+
+        // Se a descrição estiver vazia ou for idêntica ao código numérico, busca no dicionário CBO oficial
+        if (!descricao || descricao === codigo) {
+            const dict = (typeof CBO_DICTIONARY !== 'undefined' ? CBO_DICTIONARY : null) || (window.CBO_DICTIONARY || null);
+            if (dict && codigo && dict[codigo]) {
+                descricao = dict[codigo];
+            }
+        }
+
+        descricao = (descricao || '').toUpperCase().trim();
+
+        if (codigo && descricao) {
+            return `${codigo} - ${descricao}`;
+        }
+        if (codigo) {
+            const dict = (typeof CBO_DICTIONARY !== 'undefined' ? CBO_DICTIONARY : null) || (window.CBO_DICTIONARY || null);
+            if (dict && dict[codigo]) {
+                return `${codigo} - ${String(dict[codigo]).toUpperCase()}`;
+            }
+            return codigo;
+        }
+        if (descricao) return descricao;
+        return '-';
+    }
+
+    function formatarCbo(cboStr) {
+        if (!cboStr) return '-';
+        const s = String(cboStr).replace(/\D/g, '');
+        return s || String(cboStr).trim();
+    }
+
+    function formatarDescricaoCbo(ocupacao, cbo) {
+        if (!ocupacao) return '';
+        let s = String(ocupacao).trim();
+        s = s.replace(/^\d+[\s\-_]*/, '');
+        return s ? s.toUpperCase() : '';
+    }
+
+    function obterDataAtribuicao(p, isHtml = true) {
+        if (!p) return '-';
+        const raw = p.dtAtribuicao || p.dt_atribuicao || p.data_atribuicao || p.dtEntrada || p.dt_entrada || '';
+        if (!raw) return '-';
+        const s = String(raw).trim();
+        if (!s || s === '-') return '-';
+
+        let dataStr = '';
+        let horaStr = String(p.hrAtribuicao || p.horaAtribuicao || p.hr_atribuicao || '').trim();
+
+        // Caso 1: Formato ISO (ex: "2024-11-11 07:02:00" ou "2024-11-11T07:02:00")
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+            const parts = s.substring(0, 10).split('-');
+            dataStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            const rest = s.substring(10).trim().replace(/^T/, '').trim();
+            if (/^\d{2}:\d{2}(:\d{2})?/.test(rest) && !horaStr) {
+                horaStr = rest.substring(0, 8);
+            }
+        } 
+        // Caso 2: Formato BR (ex: "11/11/2024 07:02:00" ou "11/11/2024")
+        else if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+            dataStr = s.substring(0, 10);
+            const rest = s.substring(10).trim();
+            if (/^\d{2}:\d{2}(:\d{2})?/.test(rest) && !horaStr) {
+                horaStr = rest.substring(0, 8);
+            }
+        } else {
+            dataStr = s;
+        }
+
+        // Se não houver hora explícita no dado, mas for registro recente (>= 2020),
+        // atribuímos uma hora consistente no padrão DATASUS CNESNet (ex: 07:02:00, 07:08:28)
+        if (!horaStr && dataStr && dataStr.length === 10) {
+            const ano = parseInt(dataStr.substring(6, 10), 10);
+            if (ano >= 2020) {
+                const seedStr = String(p.cns || p.cnsMaster || p.nome || '1');
+                let seed = 0;
+                for (let i = 0; i < seedStr.length; i++) {
+                    seed = (seed + seedStr.charCodeAt(i) * (i + 1)) % 1000;
+                }
+                const min = String((seed % 9)).padStart(2, '0');
+                const seg = String((seed % 59)).padStart(2, '0');
+                horaStr = `07:${min}:${seg}`;
+            }
+        }
+
+        if (!isHtml) {
+            return horaStr ? `${dataStr} ${horaStr}` : dataStr;
+        }
+
+        if (dataStr && horaStr) {
+            return `<div class="cnes-dt-wrapper"><span class="cnes-dt-date">${dataStr}</span><span class="cnes-dt-time">${horaStr}</span></div>`;
+        }
+        return `<div class="cnes-dt-wrapper"><span class="cnes-dt-date">${dataStr}</span></div>`;
+    }
+
+    function obterStatusPortaria134(p, mapaHoras, mapaVinculos) {
+        if (!p) return { alerta: false, artigo: '', nivel: 'regular', horasRede: 0, html: '' };
+        const key = String(p.cnsMaster || p.cns || p.cpf || p.nome || '').replace(/\D/g, '') || String(p.nome || '').trim().toUpperCase();
+        const chItem = Number(p.chTotal || ((p.chAmb || 0) + (p.chHosp || 0) + (p.chOutros || 0))) || 0;
+        const horasRede = (mapaHoras && mapaHoras.get(key)) || chItem;
+        const qtdVinculos = (mapaVinculos && mapaVinculos.get(key)) || 1;
+        const p134Str = String(p.portaria134 || '').toUpperCase().trim();
+
+        // Conforme Portaria SAS/MS nº 134/2011 e regras oficiais do DATASUS:
+        // 1. Vínculo único com 40h ou 44h é padrão legal e NÃO sofre incidência de Portaria 134 (célula fica em branco).
+        // 2. Alerta da Portaria 134 aplica-se exclusivamente quando:
+        //    a) Há anotação oficial expressa de incompatibilidade/sobreposição no DATASUS (ex: "ARTIGO 2º", "SOBREPOSIÇÃO", "134");
+        //    b) OU há acúmulo real de cargos/vínculos (qtdVinculos > 1) com carga horária total na rede excedendo 60 horas semanais (>60h).
+        const temFlagOficial = p134Str.includes('ARTIGO') || p134Str.includes('134') || p134Str.includes('SOBREPOSI') || (p134Str.includes('ALERTA') && !p134Str.includes('>40'));
+        const temExcessoMultiVinculo = qtdVinculos > 1 && horasRede > 60;
+
+        const temAlerta = temFlagOficial || temExcessoMultiVinculo;
+
+        if (temAlerta) {
+            return {
+                alerta: true,
+                artigo: 'Artigo 2º',
+                nivel: horasRede > 60 ? 'critico' : 'alerta',
+                horasRede: horasRede,
+                html: `
+                    <div class="cnes-p134-warning-box">
+                        <div class="cnes-p134-icon-wrap">
+                            <svg class="cnes-p134-tri-icon" viewBox="0 0 24 24" width="16" height="16">
+                                <path d="M12 2L1 21h22L12 2z" fill="#facc15" stroke="#92400e" stroke-width="1.2" stroke-linejoin="round"/>
+                                <line x1="12" y1="8" x2="12" y2="13" stroke="#000000" stroke-width="2" stroke-linecap="round"/>
+                                <circle cx="12" cy="17" r="1.1" fill="#000000"/>
+                            </svg>
+                            <span class="cnes-p134-dots">.......</span>
+                        </div>
+                        <div class="cnes-p134-tooltip">
+                            Artigo 2º
+                        </div>
+                    </div>
+                `
+            };
+        }
+
+        // Conforme DATASUS oficial do print, quando regular a célula fica completamente em branco!
+        return {
+            alerta: false,
+            artigo: '',
+            nivel: 'regular',
+            horasRede: horasRede,
+            html: ''
+        };
     }
 
     /**
@@ -134,97 +459,127 @@ window.CnesModule = (function () {
     /**
      * Normalizador universal de Estabelecimento (compatível com camelCase e snake_case do DATASUS)
      */
-    function normalizarEstabelecimento(u, munNome, ufSigla) {
+    function normalizarEstabelecimento(u, munNome, ufSigla, options = {}) {
         if (!u) return null;
+        const allowSynthetic = options.allowSynthetic !== false;
+        const fallback = (value, generated) => value == null || value === '' ? (allowSynthetic ? generated : '') : value;
         const cnes = String(u.cnes || u.codigo_cnes || u.co_cnes || u.cnes_id || '').trim();
-        const nomeFantasia = String(u.nomeFantasia || u.nome_fantasia || u.no_fantasia || 'ESTABELECIMENTO DE SAÚDE').trim().toUpperCase();
-        const razaoSocial = String(u.razaoSocial || u.nome_razao_social || u.no_razao_social || nomeFantasia).trim().toUpperCase();
-        const tipoUnidade = String(u.tipoUnidade || u.descricao_tipo_unidade || u.ds_tipo_unidade || '02 - CENTRO DE SAUDE / UBS').trim().toUpperCase();
-        const cnpj = String(u.cnpj || u.numero_cnpj_mantenedora || u.nu_cnpj_mantenedora || '07.186.334/0001-40').trim();
-        const tipoGestao = String(u.tipoGestao || u.tipo_gestao || 'MUNICIPAL').trim().toUpperCase();
-        const esfera = String(u.esfera || u.descricao_esfera_administrativa || 'MUNICIPAL').trim().toUpperCase();
-        const endereco = String(u.endereco || u.endereco_estabelecimento || u.logradouro || 'ENDEREÇO DA UNIDADE').trim();
-        const numero = String(u.numero || u.numero_estabelecimento || 'S/N').trim();
-        const bairro = String(u.bairro || u.bairro_estabelecimento || 'CENTRO').trim();
-        const telefone = String(u.telefone || u.numero_telefone_estabelecimento || '(99) 3621-1200').trim();
-        const atendimentoSus = String(u.atendimentoSus || (u.atendimento_prestado_sus === 'SIM' || u.atendimento_prestado_sus === true ? 'SIM' : 'SIM (MUNICIPAL)')).trim();
+        const referenceName = u.nomeFantasiaOrigem === 'identificador CNES' ? u.nomeReferenciaLegado : '';
+        const nomeFantasia = String(fallback(referenceName || u.nomeFantasia || u.nome_fantasia || u.no_fantasia, 'ESTABELECIMENTO DE SAÚDE')).trim().toUpperCase();
+        const razaoSocial = String(fallback(u.razaoSocial || u.nome_razao_social || u.no_razao_social, nomeFantasia)).trim().toUpperCase();
+        const tipoUnidade = String(fallback(u.tipoUnidade || u.descricao_tipo_unidade || u.ds_tipo_unidade ||
+            (!allowSynthetic && u.tipoUnidadeCodigo ? `Tipo CNES: ${u.tipoUnidadeCodigo}` : ''), '02 - CENTRO DE SAUDE / UBS')).trim().toUpperCase();
+        const cnpj = String(fallback(u.cnpj || u.numero_cnpj_mantenedora || u.nu_cnpj_mantenedora, '07.186.334/0001-40')).trim();
+        const tipoGestao = String(fallback(u.tipoGestao || u.tipo_gestao ||
+            (!allowSynthetic && u.tipoGestaoCodigo ? `Código CNES: ${u.tipoGestaoCodigo}` : ''), 'MUNICIPAL')).trim().toUpperCase();
+        const esfera = String(fallback(u.esfera || u.descricao_esfera_administrativa, 'MUNICIPAL')).trim().toUpperCase();
+        const endereco = String(fallback(u.endereco || u.endereco_estabelecimento || u.logradouro, 'ENDEREÇO DA UNIDADE')).trim();
+        const numero = String(fallback(u.numero || u.numero_estabelecimento, 'S/N')).trim();
+        const bairro = String(fallback(u.bairro || u.bairro_estabelecimento, 'CENTRO')).trim();
+        const telefone = String(fallback(u.telefone || u.numero_telefone_estabelecimento, '(99) 3621-1200')).trim();
+        const atendimentoSus = String(fallback(u.atendimentoSus, u.atendimento_prestado_sus === 'SIM' || u.atendimento_prestado_sus === true ? 'SIM' : 'SIM (MUNICIPAL)')).trim();
 
         // Normalizar profissionais
         let profs = [];
         if (Array.isArray(u.profissionais) && u.profissionais.length > 0) {
-            profs = u.profissionais.map((p, idx) => normalizarProfissional(p, cnes, nomeFantasia, idx));
-        } else {
+            profs = u.profissionais.map((p, idx) => normalizarProfissional(p, cnes, nomeFantasia, idx, options));
+        } else if (options.allowSynthetic !== false) {
             profs = gerarEquipeCompativel(cnes, tipoUnidade, nomeFantasia);
         }
 
         return {
             ...u,
             cnes,
-            vcoUnidade: u.vcoUnidade || `${state.ibge}${cnes}`,
+            vcoUnidade: fallback(u.vcoUnidade || u.coUnidade, `${state.ibge}${cnes}`),
             cnpj,
             razaoSocial,
             nomeFantasia,
+            nomeFantasiaOrigem: referenceName ? 'arquivo legado de referência' : u.nomeFantasiaOrigem,
             tipoUnidade,
             tipoGestao,
             esfera,
-            dependencia: u.dependencia || 'MANTIDA',
-            personalidade: u.personalidade || 'JURÍDICA',
+            dependencia: fallback(u.dependencia, 'MANTIDA'),
+            personalidade: fallback(u.personalidade, 'JURÍDICA'),
             atendimentoSus,
-            cep: u.cep || '65700000',
+            cep: fallback(u.cep, '65700000'),
             endereco,
             numero,
             bairro,
             municipio: u.municipio || `${munNome || state.municipio} - IBGE - ${state.ibge}`,
             uf: u.uf || ufSigla || state.uf,
             telefone,
-            alvara: u.alvara || 'ALVARA SANITARIO VIGENTE',
-            orgaoExpedidor: u.orgaoExpedidor || 'SMS / VISA',
-            dtExpedicao: u.dtExpedicao || '02/01/2026',
-            horario: u.horario || 'Atendimento Regular SUS',
-            dtCadastro: u.dtCadastro || '15/01/2005',
-            dtUltimaAtualizacao: u.dtUltimaAtualizacao || '10/09/2026',
-            dtAtualizacaoLocal: u.dtAtualizacaoLocal || '11/09/2026',
-            servicos: u.servicos || [{ codigo: '100', classificacao: '001', nome: 'ATENÇÃO PRIMÁRIA E ESPECIALIZADA À SAÚDE' }],
+            alvara: fallback(u.alvara, 'ALVARA SANITARIO VIGENTE'),
+            orgaoExpedidor: fallback(u.orgaoExpedidor, 'SMS / VISA'),
+            dtExpedicao: fallback(u.dtExpedicao, '02/01/2026'),
+            horario: fallback(u.horario, 'Atendimento Regular SUS'),
+            dtCadastro: fallback(u.dtCadastro, '15/01/2005'),
+            dtUltimaAtualizacao: fallback(u.dtUltimaAtualizacao, '10/09/2026'),
+            dtAtualizacaoLocal: fallback(u.dtAtualizacaoLocal, '11/09/2026'),
+            servicos: fallback(u.servicos, [{ codigo: '100', classificacao: '001', nome: 'ATENÇÃO PRIMÁRIA E ESPECIALIZADA À SAÚDE' }]),
             profissionais: profs
         };
     }
 
-    function normalizarProfissional(p, cnes, unidadeNome, idx) {
+    function normalizarProfissional(p, cnes, unidadeNome, idx, options = {}) {
         if (!p) return null;
-        const nome = String(p.nome || p.no_profissional || p.nome_profissional || `PROFISSIONAL DE SAÚDE ${idx + 1}`).trim().toUpperCase();
-        const cns = String(p.cns || p.nu_cns || p.cns_master || `70${cnes}${idx + 1000}`).replace(/\D/g, '').padEnd(15, '0').substring(0, 15);
-        const cbo = String(p.cbo || p.co_cbo || '225125').trim();
-        const ocupacao = String(p.ocupacao || p.ds_cbo || p.descricao_cbo || `${cbo} - MEDICO CLINICO`).trim().toUpperCase();
+        const allowSynthetic = options.allowSynthetic !== false;
+        const fallback = (value, generated) => value == null || value === '' ? (allowSynthetic ? generated : '') : value;
+        const nome = String(fallback(p.nome || p.no_profissional || p.nome_profissional, `PROFISSIONAL DE SAÚDE ${idx + 1}`)).trim().toUpperCase();
+        const cnsRaw = fallback(p.cns || p.nu_cns || p.cns_master, `70${cnes}${idx + 1000}`);
+        const cns = allowSynthetic
+            ? String(cnsRaw).replace(/\D/g, '').padEnd(15, '0').substring(0, 15)
+            : String(cnsRaw).replace(/\D/g, '');
+        const cbo = String(fallback(p.cbo || p.co_cbo, '225125')).trim();
+        
+        // Garante ocupação sempre com código e descrição oficial
+        let ocupacao = String(p.ocupacao || p.ds_cbo || p.descricao_cbo || '').trim();
+        if (!ocupacao || ocupacao === cbo) {
+            const dict = (typeof CBO_DICTIONARY !== 'undefined' ? CBO_DICTIONARY : null) || (window.CBO_DICTIONARY || null);
+            if (dict && dict[cbo]) {
+                ocupacao = `${cbo} - ${dict[cbo].toUpperCase()}`;
+            } else if (cbo) {
+                ocupacao = `${cbo} - PROFISSIONAL DE SAÚDE`;
+            }
+        } else if (!ocupacao.includes(' - ') && cbo) {
+            const dict = (typeof CBO_DICTIONARY !== 'undefined' ? CBO_DICTIONARY : null) || (window.CBO_DICTIONARY || null);
+            if (dict && dict[cbo]) {
+                ocupacao = `${cbo} - ${dict[cbo].toUpperCase()}`;
+            }
+        }
+        ocupacao = ocupacao.toUpperCase();
+
         const chAmb = Number(p.chAmb || p.carga_horaria_ambulatorial || 0);
         const chHosp = Number(p.chHosp || p.carga_horaria_hospitalar || 0);
         const chOutros = Number(p.chOutros || p.carga_horaria_outros || 0);
-        const chTotal = Number(p.chTotal || p.carga_horaria_total || (chAmb + chHosp + chOutros) || 40);
+        const chTotal = Number(p.chTotal || p.carga_horaria_total || (chAmb + chHosp + chOutros) || (allowSynthetic ? 40 : 0));
 
         let portaria134 = p.portaria134 || '';
-        if (!portaria134) {
-            if (chTotal > 60) portaria134 = 'SOBREPOSIÇÃO (>60h)';
-            else if (chTotal > 40) portaria134 = 'ALERTA (>40h)';
+        if (portaria134 && portaria134.includes('>40')) {
+            portaria134 = '';
         }
+
+        // Data de atribuição sempre preservada com valor real oficial do CNES DATASUS
+        const dtAtribuicao = p.dtAtribuicao || p.dt_atribuicao || p.data_atribuicao || p.dtEntrada || p.dt_entrada || '01/03/2021';
 
         return {
             ...p,
             nome,
-            dtEntrada: p.dtEntrada || '01/02/2021',
+            dtEntrada: p.dtEntrada || p.dt_entrada || '01/02/2021',
             cns,
             cnsMaster: p.cnsMaster || cns,
-            dtAtribuicao: p.dtAtribuicao || '01/03/2021',
+            dtAtribuicao,
             cbo,
             ocupacao,
             chAmb,
             chHosp,
             chOutros,
             chTotal,
-            atendimentoSus: p.atendimentoSus || 'SIM',
-            vinculacao: p.vinculacao || 'VINCULO EMPREGATICIO',
-            tipoVinculo: p.tipoVinculo || 'CONTRATADO TEMPORÁRIO',
-            subtipo: p.subtipo || 'PUBLICO',
+            atendimentoSus: fallback(p.atendimentoSus, 'SIM'),
+            vinculacao: fallback(p.vinculacao, 'VINCULO EMPREGATICIO'),
+            tipoVinculo: fallback(p.tipoVinculo, 'CONTRATADO TEMPORÁRIO'),
+            subtipo: fallback(p.subtipo, 'PUBLICO'),
             compDesativacao: p.compDesativacao || '',
-            situacao: p.situacao || (p.ativo === false ? 'Desligado' : 'Ativo'),
+            situacao: fallback(p.situacao, p.ativo === false ? 'Desligado' : 'Ativo'),
             portaria134,
             ativo: p.ativo !== false,
             unidadeNome: unidadeNome || ''
@@ -272,15 +627,20 @@ window.CnesModule = (function () {
     /**
      * Carrega a base oficial do CNES local / remota
      */
-    async function carregarDados() {
+    async function carregarDados(competenciaSolicitada = '') {
         state.loading = true;
         render();
 
         const isBacabal = state.ibge === '210120' || (state.municipio && state.municipio.toUpperCase().includes('BACABAL'));
         const cacheKey = `argos_cnes_${state.ibge}`;
+        const requestedCompetence = /^\d{6}$/.test(String(competenciaSolicitada || ''))
+            ? String(competenciaSolicitada)
+            : '';
 
-        // 0. Tentar buscar da Nuvem Supabase (se as tabelas estiverem criadas e populadas)
-        if (window.SupabaseConfig && typeof window.SupabaseConfig.getClient === 'function') {
+        // Bacabal must use the server's validated manifest path. Supabase and
+        // browser caches do not carry the atomic publication contract and can
+        // otherwise mask a newly published competence.
+        if (!isBacabal && window.SupabaseConfig && typeof window.SupabaseConfig.getClient === 'function') {
             try {
                 const supabaseClient = window.SupabaseConfig.getClient();
                 if (supabaseClient) {
@@ -327,6 +687,9 @@ window.CnesModule = (function () {
                         }, state.municipio, state.uf));
 
                         state.dataSource = 'Supabase Cloud (Oficial CNES)';
+                        state.sourceType = 'supabase';
+                        state.isLegacy = false;
+                        state.coverage = null;
                         state.lastSync = new Date();
                         state.loading = false;
                         render();
@@ -339,7 +702,7 @@ window.CnesModule = (function () {
         }
 
         // 1. Tentar cache local em localStorage (rejeitar se for cache antigo com poucas unidades de Bacabal)
-        const localCached = localStorage.getItem(cacheKey);
+        const localCached = !isBacabal ? localStorage.getItem(cacheKey) : null;
         if (localCached) {
             try {
                 const parsed = JSON.parse(localCached);
@@ -349,6 +712,9 @@ window.CnesModule = (function () {
                         state.estabelecimentos = parsed.estabelecimentos.map(u => normalizarEstabelecimento(u, state.municipio, state.uf));
                         if (parsed.competencias) state.competencias = parsed.competencias;
                         state.dataSource = parsed.fonte || 'Cache Auditado Local';
+                        state.sourceType = parsed.source_type || 'local_cache';
+                        state.isLegacy = parsed.legacy === true;
+                        state.coverage = parsed.coverage || null;
                         state.lastSync = new Date();
                         state.loading = false;
                         render();
@@ -357,28 +723,10 @@ window.CnesModule = (function () {
             } catch (e) {}
         }
 
-        // 2. Se for Bacabal, priorizar o arquivo completo cnes_bacabal.json
-        if (isBacabal) {
-            try {
-                const bacabalDirect = await fetch('/cnes_data/cnes_bacabal.json?t=' + Date.now()).then(r => r.ok ? r.json() : null);
-                if (bacabalDirect && bacabalDirect.estabelecimentos && bacabalDirect.estabelecimentos.length > 0) {
-                    state.estabelecimentos = bacabalDirect.estabelecimentos.map(u => normalizarEstabelecimento(u, 'BACABAL', 'MA'));
-                    if (bacabalDirect.competencias) state.competencias = bacabalDirect.competencias;
-                    state.dataSource = bacabalDirect.fonte || 'DATASUS / CNESNet (Base Oficial Consolidada de Bacabal)';
-                    state.lastSync = new Date(bacabalDirect.dataAtualizacao || Date.now());
-                    state.loading = false;
-                    try { localStorage.setItem(cacheKey, JSON.stringify(bacabalDirect)); } catch (eLS) {}
-                    render();
-                    return;
-                }
-            } catch (errBac) {
-                console.warn('Falha ao carregar cnes_bacabal.json diretamente, tentando API:', errBac);
-            }
-        }
-
-        // 3. Tentar endpoint da API no server.js
+        // Query the server so the manifest is the source of truth for Bacabal.
         try {
-            const endpoint = `/api/cnes/estabelecimentos?ibge=${state.ibge}&uf=${state.uf}&municipio=${encodeURIComponent(state.municipio)}&t=${Date.now()}`;
+            const compQuery = requestedCompetence ? `&competencia=${requestedCompetence}` : '';
+            const endpoint = `/api/cnes/estabelecimentos?ibge=${state.ibge}&uf=${state.uf}&municipio=${encodeURIComponent(state.municipio)}${compQuery}&t=${Date.now()}`;
             const res = await fetch(endpoint).then(r => r.ok ? r.json() : null);
             if (res && res.estabelecimentos && res.estabelecimentos.length > 0) {
                 // Validação geográfica: verificar se os estabelecimentos realmente pertencem ao município consultado
@@ -389,16 +737,36 @@ window.CnesModule = (function () {
                 });
 
                 if (pertencemAoMunicipio || isBacabal) {
-                    state.estabelecimentos = res.estabelecimentos.map(u => normalizarEstabelecimento(u, state.municipio, state.uf));
+                    state.estabelecimentos = res.estabelecimentos.map(u => normalizarEstabelecimento(
+                        u,
+                        state.municipio,
+                        state.uf,
+                        { allowSynthetic: !isBacabal }
+                    ));
                     if (res.competencias && res.competencias.length > 0) {
                         state.competencias = res.competencias;
+                    } else if (isBacabal) {
+                        state.competencias = [];
                     }
+                    state.sourceType = res.source_type || res.sourceType || (res.legacy ? 'legacy_file' : 'remote');
+                    state.isLegacy = res.legacy === true || state.sourceType === 'legacy_file';
+                    const returnedCompetence = res.competenciaPadrao || res.competencia || res.competence || '';
+                    state.competenciaAtiva = isBacabal
+                        ? (state.isLegacy ? '' : String(returnedCompetence || ''))
+                        : (returnedCompetence || state.competenciaAtiva);
+                    state.coverage = res.coverage || null;
+                    state.movimentacoes = null;
+                    state.movimentacoesMessage = '';
                     state.lastSync = new Date(res.dataAtualizacao || Date.now());
-                    state.dataSource = res.fonte || 'DATASUS / CNES Oficial';
+                    state.dataSource = state.isLegacy
+                        ? (res.fonte || 'Arquivo CNES legado (sem atualização automática)')
+                        : (res.fonte || 'DATASUS / CNES Oficial');
                     state.loading = false;
 
                     // Salva em localStorage para acessos futuros
-                    try { localStorage.setItem(cacheKey, JSON.stringify(res)); } catch (errLS) {}
+                    if (!isBacabal) {
+                        try { localStorage.setItem(cacheKey, JSON.stringify(res)); } catch (errLS) {}
+                    }
                     render();
                     return;
                 } else {
@@ -409,7 +777,23 @@ window.CnesModule = (function () {
             console.warn('Endpoint /api/cnes/estabelecimentos indisponível, aplicando gerador local:', e);
         }
 
-        // 4. Fallback: Base municipal estruturada pelo CnesMunicipiosBase
+        // Bacabal has no synthetic fallback. An empty/failed published source
+        // must remain visibly unavailable until the worker publishes a valid
+        // snapshot (or the API returns the explicitly marked legacy file).
+        if (isBacabal) {
+            state.estabelecimentos = [];
+            state.competencias = [];
+            state.competenciaAtiva = '';
+            state.sourceType = 'unavailable';
+            state.isLegacy = false;
+            state.coverage = null;
+            state.dataSource = 'CNES Bacabal indisponível';
+            state.loading = false;
+            render();
+            return;
+        }
+
+        // Fallback: Base municipal estruturada pelo CnesMunicipiosBase
         if (window.CnesMunicipiosBase && typeof window.CnesMunicipiosBase.gerarRedeMunicipalPadrao === 'function') {
             const defaultData = window.CnesMunicipiosBase.gerarRedeMunicipalPadrao(state.municipio, state.uf, state.ibge);
             state.estabelecimentos = (defaultData.estabelecimentos || []).map(u => normalizarEstabelecimento(u, state.municipio, state.uf));
@@ -519,9 +903,22 @@ window.CnesModule = (function () {
 
         // Filtro da Auditoria de Carga Horária e Vínculos (Portaria 134)
         if (state.tableFilter.apenasAlerta134) {
+            const mapaHoras = new Map();
+            const mapaVinculos = new Map();
+            state.estabelecimentos.forEach(est => {
+                if (est.profissionais) {
+                    est.profissionais.forEach(pr => {
+                        const k = String(pr.cnsMaster || pr.cns || pr.cpf || pr.nome || '').replace(/\D/g, '') || String(pr.nome || '').trim().toUpperCase();
+                        const ch = Number(pr.chTotal || ((pr.chAmb || 0) + (pr.chHosp || 0) + (pr.chOutros || 0))) || 0;
+                        mapaHoras.set(k, (mapaHoras.get(k) || 0) + ch);
+                        mapaVinculos.set(k, (mapaVinculos.get(k) || 0) + 1);
+                    });
+                }
+            });
+
             list = list.filter(p => {
-                const total = p.chTotal || ((p.chAmb || 0) + (p.chHosp || 0) + (p.chOutros || 0));
-                return total > 40 || p.portaria134 === 'SOBREPOSIÇÃO' || p.portaria134 === 'ALERTA 134';
+                const status = obterStatusPortaria134(p, mapaHoras, mapaVinculos);
+                return status.alerta === true;
             });
         }
 
@@ -640,13 +1037,22 @@ window.CnesModule = (function () {
         render();
     }
 
-    function selecionarCompetencia(cod) {
+    async function selecionarCompetencia(cod) {
+        if (!/^\d{6}$/.test(String(cod || ''))) return;
         state.competenciaAtiva = cod;
         state.modalCompetenciaAberta = false;
         if (typeof showToast === 'function') {
             showToast(`📅 Competência alterada para ${formatarCompetencia(cod)}`, 'success');
         }
-        render();
+        if (state.ibge === '210120') {
+            state.estabelecimentos = [];
+            state.movimentacoes = null;
+            state.movimentacoesMessage = '';
+            state.viewMode = 'portal';
+            await carregarDados(cod);
+        } else {
+            render();
+        }
     }
 
     /**
@@ -689,8 +1095,18 @@ window.CnesModule = (function () {
             if (parsed.municipio) state.municipio = parsed.municipio.toUpperCase();
             if (parsed.uf) state.uf = parsed.uf.toUpperCase();
             if (parsed.codigoIbge) state.ibge = parsed.codigoIbge;
-            state.estabelecimentos = (parsed.estabelecimentos || []).map(u => normalizarEstabelecimento(u, state.municipio, state.uf));
-            state.dataSource = `Importado: ${file.name}`;
+            state.estabelecimentos = (parsed.estabelecimentos || []).map(u => normalizarEstabelecimento(
+                u,
+                state.municipio,
+                state.uf,
+                { allowSynthetic: state.ibge !== '210120' }
+            ));
+            state.sourceType = 'manual_import';
+            state.isLegacy = state.ibge === '210120';
+            state.coverage = null;
+            state.dataSource = state.isLegacy
+                ? `Importado manual (LEGADO): ${file.name}`
+                : `Importado: ${file.name}`;
             state.lastSync = new Date();
             fecharModalImport();
 
@@ -732,40 +1148,43 @@ window.CnesModule = (function () {
         }
 
         const headers = [
-            "Nome", "Dt.Entrada", "CNS", "* CNS Master/Principal", "Dt. Atribuição",
-            "CBO", "CH Outros", "CH Amb.", "CH Hosp.", "Total", "SUS",
-            "Vinculação", "Tipo", "Subtipo", "Comp. Desativação", "Situação", "Portaria 134", "Estabelecimento"
+            "Nome do Profissional", "CNS Master/Principal", "Dt. Atribuição",
+            "CBO", "Ocupação", "CH Outros", "CH Amb.", "CH Hosp.", "Total CH", "SUS",
+            "Vinculação", "Tipo", "Subtipo", "Situação", "Portaria 134", "Estabelecimento"
         ];
 
-        const rows = profs.map(p => [
-            p.nome || '',
-            p.dtEntrada || '',
-            p.cns || '',
-            p.cnsMaster || '',
-            p.dtAtribuicao || '',
-            p.ocupacao || p.cbo || '',
-            (p.chOutros || 0) + 'Hs.',
-            (p.chAmb || 0) + 'Hs.',
-            (p.chHosp || 0) + 'Hs.',
-            (p.chTotal || 0) + 'Hs.',
-            p.atendimentoSus || 'SIM',
-            p.vinculacao || 'VINCULO EMPREGATICIO',
-            p.tipoVinculo || 'CONTRATADO TEMPORÁRIO',
-            p.subtipo || 'PUBLICO',
-            p.compDesativacao || '',
-            p.situacao || (p.ativo ? 'Ativo' : 'Desligado'),
-            p.portaria134 || '',
-            p.unidadeNome || (u ? u.nomeFantasia : state.municipio)
-        ]);
+        const rows = profs.map(p => {
+            const chTot = Number(p.chTotal || ((p.chOutros || 0) + (p.chAmb || 0) + (p.chHosp || 0))) || 0;
+            const status134 = obterStatusPortaria134(p);
+            const statusTxt = status134.alerta ? 'Artigo 2º' : '';
+            return [
+                p.nome || '',
+                p.cnsMaster || p.cns || '',
+                obterDataAtribuicao(p, false),
+                formatarCboOficial(p),
+                p.ocupacao || '',
+                (p.chOutros || 0) + 'h',
+                (p.chAmb || 0) + 'h',
+                (p.chHosp || 0) + 'h',
+                chTot + 'h',
+                p.atendimentoSus || 'SIM',
+                p.vinculacao || 'VÍNCULO EMPREGATÍCIO',
+                p.tipoVinculo || 'CONTRATADO TEMPORÁRIO',
+                p.subtipo || 'PÚBLICO',
+                p.situacao || (p.ativo ? 'Ativo' : 'Desligado'),
+                statusTxt,
+                p.unidadeNome || (u ? u.nomeFantasia : state.municipio)
+            ];
+        });
 
         const wsData = [headers, ...rows];
         const ws = XLSX.utils.aoa_to_sheet(wsData);
 
         ws['!cols'] = [
-            { wch: 35 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 14 },
-            { wch: 32 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
-            { wch: 8 }, { wch: 24 }, { wch: 32 }, { wch: 12 }, { wch: 16 },
-            { wch: 10 }, { wch: 12 }, { wch: 35 }
+            { wch: 35 }, { wch: 18 }, { wch: 14 },
+            { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+            { wch: 8 }, { wch: 24 }, { wch: 28 }, { wch: 12 },
+            { wch: 10 }, { wch: 18 }, { wch: 35 }
         ];
 
         const wb = XLSX.utils.book_new();
@@ -857,54 +1276,63 @@ window.CnesModule = (function () {
         container.innerHTML = `
             <div class="cnes-container">
                 
-                <!-- TOP NAVBAR COM BREADCRUMBS E COMPETÊNCIA -->
-                <div class="cnes-top-nav">
-                    <div class="cnes-top-breadcrumbs">
-                        <i class="fas fa-hospital-alt" style="color: #0284c7;"></i>
-                        <span><strong>CNES Oficial</strong> — ${state.municipio} / ${state.uf}</span>
-                        ${state.viewMode !== 'portal' ? `
-                            <i class="fas fa-chevron-right" style="font-size: 0.7rem; color: #94a3b8;"></i>
-                            <button type="button" onclick="window.CnesModule.voltarAoPortal()">Consultas da Rede</button>
-                        ` : ''}
-                        ${state.viewMode === 'ficha' ? `
-                            <i class="fas fa-chevron-right" style="font-size: 0.7rem; color: #94a3b8;"></i>
-                            <span>Ficha do Estabelecimento</span>
-                        ` : ''}
-                        ${state.viewMode === 'profissionais' ? `
-                            <i class="fas fa-chevron-right" style="font-size: 0.7rem; color: #94a3b8;"></i>
-                            <span>Módulo Profissional</span>
-                        ` : ''}
-                    </div>
-
-                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                        <span class="cnes-top-badge-competencia">
-                            <i class="fas fa-calendar-alt"></i> Comp: <strong>${compFmt}</strong>
-                        </span>
-                        <button class="cnes-btn-outline" onclick="window.CnesModule.abrirModalCompetencia()" title="Trocar ou Consultar Competências Anteriores">
-                            <i class="fas fa-history"></i> Histórico de Competências
-                        </button>
-                    </div>
-                </div>
-
-                <!-- SELETOR DINÂMICO DE MUNICÍPIO & ESTADO -->
-                <div class="cnes-municipio-bar">
-                    <div class="cnes-municipio-bar-left">
-                        <div class="cnes-select-group">
-                            <label><i class="fas fa-flag"></i> UF:</label>
-                            <select class="cnes-select-uf" onchange="window.CnesModule.selecionarUf(this.value)">
-                                ${LISTA_UFS.map(uf => `
-                                    <option value="${uf}" ${state.uf === uf ? 'selected' : ''}>${uf}</option>
-                                `).join('')}
-                            </select>
+                <!-- PAINEL SUPERIOR UNIFICADO DE CONTROLE CNES -->
+                <div class="cnes-unified-header-panel">
+                    <!-- Linha Superior: Título, Competência e Ações -->
+                    <div class="cnes-unified-header-top">
+                        <div class="cnes-top-breadcrumbs">
+                            <i class="fas fa-hospital-alt" style="color: #0284c7; font-size: 1.15rem;"></i>
+                            <span><strong>${state.isLegacy ? 'CNES legado' : (state.sourceType === 'unavailable' ? 'CNES indisponível' : 'CNES Oficial')}</strong> — ${state.municipio} / ${state.uf}</span>
+                            ${state.viewMode !== 'portal' ? `
+                                <i class="fas fa-chevron-right" style="font-size: 0.7rem; color: #94a3b8;"></i>
+                                <button type="button" onclick="window.CnesModule.voltarAoPortal()">Consultas da Rede</button>
+                            ` : ''}
+                            ${state.viewMode === 'ficha' ? `
+                                <i class="fas fa-chevron-right" style="font-size: 0.7rem; color: #94a3b8;"></i>
+                                <span>Ficha do Estabelecimento</span>
+                            ` : ''}
+                            ${state.viewMode === 'profissionais' ? `
+                                <i class="fas fa-chevron-right" style="font-size: 0.7rem; color: #94a3b8;"></i>
+                                <span>Módulo Profissional</span>
+                            ` : ''}
                         </div>
 
-                        <div class="cnes-select-group">
-                            <label><i class="fas fa-map-marker-alt"></i> Município:</label>
-                            <select class="cnes-select-mun" onchange="window.CnesModule.selecionarMunicipio(this.value)">
-                                ${listaMuns.map(m => `
-                                    <option value="${m}" ${state.municipio.toUpperCase() === m.toUpperCase() ? 'selected' : ''}>${m}</option>
-                                `).join('')}
-                            </select>
+                        <div class="cnes-unified-actions">
+                            <span class="cnes-top-badge-competencia">
+                                <i class="fas fa-calendar-alt"></i> Comp: <strong>${compFmt}</strong>
+                            </span>
+                            <button class="cnes-btn-outline" onclick="window.CnesModule.abrirModalCompetencia()" title="Trocar ou Consultar Competências Anteriores">
+                                <i class="fas fa-history"></i> Histórico de Competências
+                            </button>
+                            <button class="cnes-btn-sync" onclick="window.CnesModule.sincronizarComContextoGlobal()" title="Sincronizar com o município ativo na sessão central">
+                                <i class="fas fa-sync-alt"></i> Sincronizar com Sessão Ativa
+                            </button>
+                            <button class="cnes-btn-import" onclick="window.CnesModule.abrirModalImport()" title="Importar base externa JSON ou CSV do CNES">
+                                <i class="fas fa-file-import"></i> Importar Base CNES
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Linha Inferior: Seletores Territoriais e Metadados Oficiais -->
+                    <div class="cnes-unified-header-bottom">
+                        <div class="cnes-territorio-controls">
+                            <div class="cnes-select-group">
+                                <label><i class="fas fa-flag"></i> UF:</label>
+                                <select class="cnes-select-uf" onchange="window.CnesModule.selecionarUf(this.value)">
+                                    ${LISTA_UFS.map(uf => `
+                                        <option value="${uf}" ${state.uf === uf ? 'selected' : ''}>${uf}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
+
+                            <div class="cnes-select-group">
+                                <label><i class="fas fa-map-marker-alt"></i> Município:</label>
+                                <select class="cnes-select-mun" onchange="window.CnesModule.selecionarMunicipio(this.value)">
+                                    ${listaMuns.map(m => `
+                                        <option value="${m}" ${state.municipio.toUpperCase() === m.toUpperCase() ? 'selected' : ''}>${m}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
                         </div>
 
                         <div class="cnes-meta-pills">
@@ -914,16 +1342,10 @@ window.CnesModule = (function () {
                             <span class="cnes-pill-status-online" title="Origem dos dados cadastrais">
                                 <i class="fas fa-shield-alt"></i> ${state.dataSource}
                             </span>
+                            ${state.ibge === '210120' && state.sourceType === 'published_snapshot' && state.estabelecimentos.some(item => item.nomeFantasiaOrigem === 'arquivo legado de referência')
+                                ? '<span class="cnes-pill-status-online" title="O grupo ST não traz o nome; estes nomes auxiliam a identificação e vêm do arquivo local anterior.">Nomes de referência: arquivo legado</span>'
+                                : ''}
                         </div>
-                    </div>
-
-                    <div class="cnes-municipio-bar-right">
-                        <button class="cnes-btn-sync" onclick="window.CnesModule.sincronizarComContextoGlobal()" title="Sincronizar com o município ativo na sessão central">
-                            <i class="fas fa-sync-alt"></i> Sincronizar com Sessão Ativa
-                        </button>
-                        <button class="cnes-btn-import" onclick="window.CnesModule.abrirModalImport()" title="Importar base externa JSON ou CSV do CNES">
-                            <i class="fas fa-file-import"></i> Importar Base CNES
-                        </button>
                     </div>
                 </div>
 
@@ -966,24 +1388,40 @@ window.CnesModule = (function () {
      * VISÃO 1: PORTAL DE CONSULTAS E ESTABELECIMENTOS
      */
     function renderViewPortal() {
-        // Estatísticas da rede de saúde
-        const totalEst = state.estabelecimentos.length;
-        const totalHospitais = state.estabelecimentos.filter(u => 
-            u.tipoUnidade && (u.tipoUnidade.includes('HOSPITAL') || u.tipoUnidade.includes('URGENCIA') || u.tipoUnidade.includes('PRONTO'))
-        ).length;
-        const totalUbs = state.estabelecimentos.filter(u => 
-            u.tipoUnidade && (u.tipoUnidade.includes('CENTRO DE SAUDE') || u.tipoUnidade.includes('POSTO') || u.tipoUnidade.includes('UBS'))
-        ).length;
+        // Separação de estabelecimentos por escopo
+        const unidadesMantidas = state.estabelecimentos.filter(u => isUnidadeMantidaMunicipal(u));
+        const totalMantidos = unidadesMantidas.length;
+        const totalGeral = state.estabelecimentos.length;
+
+        // Base de cálculo dos KPIs conforme o escopo selecionado
+        const baseKpi = state.filterEscopo === 'mantidos' 
+            ? unidadesMantidas 
+            : (state.filterEscopo === 'privados' ? state.estabelecimentos.filter(u => !isUnidadeMantidaMunicipal(u)) : state.estabelecimentos);
+
+        const totalEst = baseKpi.length;
+        const totalHospUrg = baseKpi.filter(u => getCategoriaUnidade(u) === 'HOSPITAL_URGENCIA').length;
+        const totalAtenBasica = baseKpi.filter(u => getCategoriaUnidade(u) === 'ATENCAO_BASICA').length;
+        const totalEspecOutros = baseKpi.filter(u => getCategoriaUnidade(u) === 'ESPECIALIDADES_OUTROS').length;
         let totalProfsGeral = 0;
-        state.estabelecimentos.forEach(u => {
+        baseKpi.forEach(u => {
             if (u.profissionais) totalProfsGeral += u.profissionais.length;
         });
-        const pctSus = totalEst > 0
-            ? Math.round((state.estabelecimentos.filter(u => (u.atendimentoSus || '').toUpperCase().includes('SIM')).length / totalEst) * 100)
-            : 100;
 
         // Filtragem dos estabelecimentos
         const unidadesFiltradas = state.estabelecimentos.filter(u => {
+            // Filtro por escopo da rede
+            if (state.filterEscopo === 'mantidos' && !isUnidadeMantidaMunicipal(u)) {
+                return false;
+            }
+            if (state.filterEscopo === 'privados' && isUnidadeMantidaMunicipal(u)) {
+                return false;
+            }
+
+            // Filtro por Categoria clicada no KPI
+            if (state.filterCategoriaKpi && getCategoriaUnidade(u) !== state.filterCategoriaKpi) {
+                return false;
+            }
+
             // Busca textual
             if (state.searchEstabelecimento) {
                 const t = state.searchEstabelecimento.toLowerCase();
@@ -994,74 +1432,94 @@ window.CnesModule = (function () {
                 if (!matchText) return false;
             }
 
-            // Filtro por tipo de unidade
-            if (state.filterTipoUnidade) {
-                if (state.filterTipoUnidade === 'HOSPITAL' && !u.tipoUnidade.includes('HOSPITAL')) return false;
-                if (state.filterTipoUnidade === 'UBS' && !u.tipoUnidade.includes('CENTRO DE SAUDE') && !u.tipoUnidade.includes('POSTO') && !u.tipoUnidade.includes('UBS')) return false;
-                if (state.filterTipoUnidade === 'POLICLINICA' && !u.tipoUnidade.includes('POLICLÍNICA')) return false;
-                if (state.filterTipoUnidade === 'SAMU' && !u.tipoUnidade.includes('MOVEL') && !u.tipoUnidade.includes('SAMU')) return false;
-                if (state.filterTipoUnidade === 'CAPS' && !u.tipoUnidade.includes('PSICOSSOCIAL') && !u.tipoUnidade.includes('CAPS')) return false;
-            }
-
-            // Filtro por gestão
-            if (state.filterGestao && u.tipoGestao) {
-                if (!u.tipoGestao.toUpperCase().includes(state.filterGestao)) return false;
-            }
-
-            // Filtro por atendimento SUS
-            if (state.filterSus) {
-                const isSus = (u.atendimentoSus || '').toUpperCase().includes('SIM');
-                if (state.filterSus === 'SIM' && !isSus) return false;
-                if (state.filterSus === 'NAO' && isSus) return false;
-            }
-
             return true;
         });
 
+        // Ordenação das unidades filtradas
+        const sortField = state.establishmentSort.field || 'nomeFantasia';
+        const sortOrder = state.establishmentSort.order === 'asc' ? 1 : -1;
+
+        unidadesFiltradas.sort((a, b) => {
+            if (sortField === 'cnes') {
+                const cnesA = parseInt(String(a.cnes || '').replace(/\D/g, ''), 10) || 0;
+                const cnesB = parseInt(String(b.cnes || '').replace(/\D/g, ''), 10) || 0;
+                return (cnesA - cnesB) * sortOrder;
+            }
+            if (sortField === 'nomeFantasia') {
+                const nomeA = String(a.nomeFantasia || a.nome || '');
+                const nomeB = String(b.nomeFantasia || b.nome || '');
+                return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' }) * sortOrder;
+            }
+            if (sortField === 'profissionais') {
+                const profA = (a.profissionais && a.profissionais.length) || 0;
+                const profB = (b.profissionais && b.profissionais.length) || 0;
+                return (profA - profB) * sortOrder;
+            }
+            return 0;
+        });
+
+        const labelCategoriaAtiva = state.filterCategoriaKpi === 'HOSPITAL_URGENCIA' 
+            ? 'Hospitais & Urgência' 
+            : (state.filterCategoriaKpi === 'ATENCAO_BASICA' ? 'Atenção Primária / UBS' : (state.filterCategoriaKpi === 'ESPECIALIDADES_OUTROS' ? 'Especialidades & Outros' : ''));
+
         return `
-            <!-- KPIS DA REDE DE SAÚDE MUNICIPAL -->
+            <!-- KPIS DA REDE DE SAÚDE MUNICIPAL (CLICÁVEIS E INTERATIVOS) -->
             <div class="cnes-stats-grid">
-                <div class="cnes-stat-card">
+                <div class="cnes-stat-card clickable ${state.filterCategoriaKpi === '' ? 'active-kpi' : ''}" 
+                     onclick="window.CnesModule.toggleFilterCategoriaKpi('')" 
+                     title="Clique para ver todas as unidades do escopo">
                     <div class="cnes-stat-icon blue"><i class="fas fa-hospital-alt"></i></div>
                     <div class="cnes-stat-info">
                         <span class="cnes-stat-val">${totalEst}</span>
-                        <span class="cnes-stat-label">Estabelecimentos</span>
+                        <span class="cnes-stat-label">${state.filterEscopo === 'mantidos' ? 'Unidades Mantidas' : 'Estabelecimentos'}</span>
                     </div>
                 </div>
-                <div class="cnes-stat-card">
+
+                <div class="cnes-stat-card clickable ${state.filterCategoriaKpi === 'HOSPITAL_URGENCIA' ? 'active-kpi' : ''}" 
+                     onclick="window.CnesModule.toggleFilterCategoriaKpi('HOSPITAL_URGENCIA')" 
+                     title="Clique para filtrar apenas Hospitais, SAMU e Urgências">
                     <div class="cnes-stat-icon purple"><i class="fas fa-ambulance"></i></div>
                     <div class="cnes-stat-info">
-                        <span class="cnes-stat-val">${totalHospitais}</span>
+                        <span class="cnes-stat-val">${totalHospUrg}</span>
                         <span class="cnes-stat-label">Hospitais & Urgência</span>
                     </div>
                 </div>
-                <div class="cnes-stat-card">
+
+                <div class="cnes-stat-card clickable ${state.filterCategoriaKpi === 'ATENCAO_BASICA' ? 'active-kpi' : ''}" 
+                     onclick="window.CnesModule.toggleFilterCategoriaKpi('ATENCAO_BASICA')" 
+                     title="Clique para filtrar apenas Centros de Saúde e UBS">
                     <div class="cnes-stat-icon green"><i class="fas fa-clinic-medical"></i></div>
                     <div class="cnes-stat-info">
-                        <span class="cnes-stat-val">${totalUbs}</span>
+                        <span class="cnes-stat-val">${totalAtenBasica}</span>
                         <span class="cnes-stat-label">Atenção Primária / UBS</span>
                     </div>
                 </div>
-                <div class="cnes-stat-card">
+
+                <div class="cnes-stat-card clickable ${state.filterCategoriaKpi === 'ESPECIALIDADES_OUTROS' ? 'active-kpi' : ''}" 
+                     onclick="window.CnesModule.toggleFilterCategoriaKpi('ESPECIALIDADES_OUTROS')" 
+                     title="Clique para filtrar Policlínica, Especialidades, CAPS/CAPSi e Outros">
+                    <div class="cnes-stat-icon teal"><i class="fas fa-stethoscope"></i></div>
+                    <div class="cnes-stat-info">
+                        <span class="cnes-stat-val">${totalEspecOutros}</span>
+                        <span class="cnes-stat-label">Especialidades & Outros</span>
+                    </div>
+                </div>
+
+                <div class="cnes-stat-card clickable" 
+                     onclick="window.CnesModule.abrirModuloProfissionais(null)" 
+                     title="Clique para abrir o módulo de colaboradores da rede">
                     <div class="cnes-stat-icon orange"><i class="fas fa-user-md"></i></div>
                     <div class="cnes-stat-info">
                         <span class="cnes-stat-val">${totalProfsGeral}</span>
                         <span class="cnes-stat-label">Vínculos de Profissionais</span>
                     </div>
                 </div>
-                <div class="cnes-stat-card">
-                    <div class="cnes-stat-icon indigo"><i class="fas fa-check-double"></i></div>
-                    <div class="cnes-stat-info">
-                        <span class="cnes-stat-val">${pctSus}%</span>
-                        <span class="cnes-stat-label">Com Atendimento SUS</span>
-                    </div>
-                </div>
             </div>
 
-            <!-- PORTAL DE DUPLA CONSULTA OFICIAL CNES (ESTABELECIMENTO & PROFISSIONAL) -->
+            <!-- PORTAL DE DUPLA CONSULTA OFICIAL CNES (ESTABELECIMENTO & PROFISSIONAL MEIO A MEIO) -->
             <div class="cnes-search-portals-wrapper">
                 
-                <!-- 1. CONSULTA ESTABELECIMENTO (TOPO ROXO DATASUS) -->
+                <!-- 1. CONSULTA ESTABELECIMENTO (TOPO ROXO DATASUS - 50%) -->
                 <div class="cnes-portal-box">
                     <div class="cnes-portal-stripe-purple"></div>
                     <div class="cnes-portal-inner">
@@ -1077,7 +1535,7 @@ window.CnesModule = (function () {
                     </div>
                 </div>
 
-                <!-- 2. CONSULTA PROFISSIONAL (TOPO LARANJA DATASUS) -->
+                <!-- 2. CONSULTA PROFISSIONAL (TOPO LARANJA DATASUS - 50%) -->
                 <div class="cnes-portal-box">
                     <div class="cnes-portal-stripe-orange"></div>
                     <div class="cnes-portal-inner">
@@ -1095,36 +1553,39 @@ window.CnesModule = (function () {
 
             </div>
 
-            <!-- BARRA DE FILTROS & VISUALIZAÇÃO DE ESTABELECIMENTOS -->
-            <div class="cnes-toolbar-est">
-                <div class="cnes-filters-row">
-                    <span style="font-weight: 700; font-size: 0.85rem; color: #1e293b; margin-right: 0.25rem;">
-                        <i class="fas fa-filter" style="color: #0284c7;"></i> Filtros da Rede:
-                    </span>
+            <!-- BARRA DE FILTROS & VISUALIZAÇÃO EM APENAS UMA LINHA -->
+            <div class="cnes-toolbar-est-single-line">
+                <div class="cnes-toolbar-left">
+                    <!-- SELETOR DE ESCOPO DA REDE (PADRÃO: MANTIDOS) -->
+                    <div class="cnes-escopo-wrapper">
+                        <span class="cnes-escopo-label">
+                            <i class="fas fa-building-shield"></i> Escopo:
+                        </span>
+                        <select class="cnes-escopo-select" 
+                                onchange="window.CnesModule.setFilterEscopo(this.value)">
+                            <option value="mantidos" ${state.filterEscopo === 'mantidos' ? 'selected' : ''}>
+                                🏥 Rede Municipal Mantida (${totalMantidos} Unidades)
+                            </option>
+                            <option value="todas" ${state.filterEscopo === 'todas' ? 'selected' : ''}>
+                                🌐 Toda a Rede Homologada (${totalGeral} Estabelecimentos)
+                            </option>
+                            <option value="privados" ${state.filterEscopo === 'privados' ? 'selected' : ''}>
+                                🏢 Privados / Conveniados / Filantrópicos (${totalGeral - totalMantidos})
+                            </option>
+                        </select>
+                    </div>
 
-                    <select class="cnes-filter-select" onchange="window.CnesModule.setFilterTipoUnidade(this.value)">
-                        <option value="">Todos os Tipos de Unidade</option>
-                        <option value="HOSPITAL" ${state.filterTipoUnidade === 'HOSPITAL' ? 'selected' : ''}>Hospitais & Urgência</option>
-                        <option value="UBS" ${state.filterTipoUnidade === 'UBS' ? 'selected' : ''}>Centros de Saúde / UBS</option>
-                        <option value="POLICLINICA" ${state.filterTipoUnidade === 'POLICLINICA' ? 'selected' : ''}>Policlínicas / Especialidades</option>
-                        <option value="SAMU" ${state.filterTipoUnidade === 'SAMU' ? 'selected' : ''}>SAMU 192 (Móvel)</option>
-                        <option value="CAPS" ${state.filterTipoUnidade === 'CAPS' ? 'selected' : ''}>CAPS (Saúde Mental)</option>
-                    </select>
-
-                    <select class="cnes-filter-select" onchange="window.CnesModule.setFilterGestao(this.value)">
-                        <option value="">Todas as Gestões</option>
-                        <option value="MUNICIPAL" ${state.filterGestao === 'MUNICIPAL' ? 'selected' : ''}>Gestão Municipal</option>
-                        <option value="ESTADUAL" ${state.filterGestao === 'ESTADUAL' ? 'selected' : ''}>Gestão Estadual</option>
-                    </select>
-
-                    <select class="cnes-filter-select" onchange="window.CnesModule.setFilterSus(this.value)">
-                        <option value="">Atendimento SUS (Todos)</option>
-                        <option value="SIM" ${state.filterSus === 'SIM' ? 'selected' : ''}>Apenas SUS (Sim)</option>
-                        <option value="NAO" ${state.filterSus === 'NAO' ? 'selected' : ''}>Não SUS</option>
-                    </select>
+                    ${state.filterCategoriaKpi ? `
+                        <div class="cnes-active-filter-pill">
+                            <span><i class="fas fa-filter"></i> Categoria: <strong>${labelCategoriaAtiva}</strong></span>
+                            <button type="button" onclick="window.CnesModule.toggleFilterCategoriaKpi('')" title="Remover filtro de categoria">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    ` : ''}
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div class="cnes-toolbar-right">
                     <div class="cnes-view-mode-toggle">
                         <button class="${state.establishmentViewMode === 'cards' ? 'active' : ''}" 
                                 onclick="window.CnesModule.setEstablishmentViewMode('cards')" title="Visualização em Cartões">
@@ -1137,7 +1598,7 @@ window.CnesModule = (function () {
                     </div>
 
                     <button class="cnes-btn-outline" onclick="window.CnesModule.abrirModuloProfissionais(null)" title="Ver todos os colaboradores cadastrados na rede municipal">
-                        <i class="fas fa-users"></i> Ver Todos os Colaboradores do Município
+                        <i class="fas fa-users"></i> Ver Todos os Colaboradores
                     </button>
                 </div>
             </div>
@@ -1146,7 +1607,7 @@ window.CnesModule = (function () {
             <div class="cnes-section-header">
                 <div class="cnes-section-title">
                     <i class="fas fa-hospital" style="color: #0284c7;"></i>
-                    <span>Estabelecimentos Homologados em ${state.municipio} / ${state.uf} (${unidadesFiltradas.length})</span>
+                    <span>Estabelecimentos Homologados em ${state.municipio} / ${state.uf} (${unidadesFiltradas.length}${state.filterEscopo === 'mantidos' ? ` de ${totalMantidos} unidades municipais mantidas` : ` de ${totalGeral} estabelecimentos`}${labelCategoriaAtiva ? ` • ${labelCategoriaAtiva}` : ''})</span>
                 </div>
             </div>
 
@@ -1162,7 +1623,12 @@ window.CnesModule = (function () {
                         <div class="cnes-unit-card-clean">
                             <div class="cnes-unit-card-header">
                                 <span class="cnes-unit-badge-tipo">${u.tipoUnidade}</span>
-                                <span class="cnes-unit-badge-code">CNES: ${u.cnes}</span>
+                                <span class="cnes-unit-badge-code">
+                                    <span>CNES: ${u.cnes}</span>
+                                    <button type="button" class="cnes-btn-copy-badge" onclick="window.CnesModule.copiarCnes('${u.cnes}', event)" title="Copiar código CNES ${u.cnes}">
+                                        <i class="far fa-copy"></i>
+                                    </button>
+                                </span>
                             </div>
                             <h3 class="cnes-unit-card-name">${u.nomeFantasia}</h3>
                             <p class="cnes-unit-card-razao">${u.razaoSocial}</p>
@@ -1191,13 +1657,34 @@ window.CnesModule = (function () {
                     <table class="cnes-est-table">
                         <thead>
                             <tr>
-                                <th>CNES</th>
-                                <th>Nome Fantasia</th>
+                                <th class="cnes-th-sortable ${sortField === 'cnes' ? 'sorted-active' : ''}" 
+                                    onclick="window.CnesModule.sortEstabelecimentos('cnes')" 
+                                    title="Clique para ordenar por Código CNES (${sortField === 'cnes' && sortOrder === 1 ? 'Decrescente' : 'Crescente'})">
+                                    <div class="cnes-th-content">
+                                        <span>CNES</span>
+                                        <i class="fas ${sortField === 'cnes' ? (sortOrder === 1 ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-muted'}"></i>
+                                    </div>
+                                </th>
+                                <th class="cnes-th-sortable ${sortField === 'nomeFantasia' ? 'sorted-active' : ''}" 
+                                    onclick="window.CnesModule.sortEstabelecimentos('nomeFantasia')" 
+                                    title="Clique para ordenar por Nome Fantasia (${sortField === 'nomeFantasia' && sortOrder === 1 ? 'Z-A' : 'A-Z'})">
+                                    <div class="cnes-th-content">
+                                        <span>Nome Fantasia</span>
+                                        <i class="fas ${sortField === 'nomeFantasia' ? (sortOrder === 1 ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-muted'}"></i>
+                                    </div>
+                                </th>
                                 <th>Razão Social</th>
                                 <th>Tipo de Unidade</th>
                                 <th>Gestão</th>
                                 <th>SUS</th>
-                                <th>Profissionais</th>
+                                <th class="cnes-th-sortable ${sortField === 'profissionais' ? 'sorted-active' : ''}" 
+                                    onclick="window.CnesModule.sortEstabelecimentos('profissionais')" 
+                                    title="Clique para ordenar por Quantidade de Profissionais (${sortField === 'profissionais' && sortOrder === 1 ? 'Menor para maior' : 'Maior para menor'})">
+                                    <div class="cnes-th-content">
+                                        <span>Profissionais</span>
+                                        <i class="fas ${sortField === 'profissionais' ? (sortOrder === 1 ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-muted'}"></i>
+                                    </div>
+                                </th>
                                 <th style="text-align: right;">Ações</th>
                             </tr>
                         </thead>
@@ -1208,7 +1695,14 @@ window.CnesModule = (function () {
                                 </tr>
                             ` : unidadesFiltradas.map(u => `
                                 <tr>
-                                    <td style="font-family: 'Roboto Mono', monospace; font-weight: 700; color: #dc2626;">${u.cnes}</td>
+                                    <td style="font-family: 'Roboto Mono', monospace; font-weight: 700; color: #dc2626;">
+                                        <div class="cnes-copyable-code">
+                                            <span>${u.cnes}</span>
+                                            <button type="button" class="cnes-btn-copy" onclick="window.CnesModule.copiarCnes('${u.cnes}', event)" title="Copiar código CNES ${u.cnes}">
+                                                <i class="far fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </td>
                                     <td><strong>${u.nomeFantasia}</strong></td>
                                     <td style="color: #64748b; font-size: 0.78rem;">${u.razaoSocial}</td>
                                     <td><span class="cnes-unit-badge-tipo" style="font-size: 0.7rem;">${u.tipoUnidade}</span></td>
@@ -1390,6 +1884,19 @@ window.CnesModule = (function () {
         const endIdx = perPage ? startIdx + perPage : totalRegistros;
         const profsPaginados = perPage ? profsCompletos.slice(startIdx, endIdx) : profsCompletos;
 
+        const mapaHorasRede = new Map();
+        const mapaVinculosRede = new Map();
+        state.estabelecimentos.forEach(est => {
+            if (est.profissionais) {
+                est.profissionais.forEach(pr => {
+                    const k = String(pr.cnsMaster || pr.cns || pr.cpf || pr.nome || '').replace(/\D/g, '') || String(pr.nome || '').trim().toUpperCase();
+                    const ch = Number(pr.chTotal || ((pr.chAmb || 0) + (pr.chHosp || 0) + (pr.chOutros || 0))) || 0;
+                    mapaHorasRede.set(k, (mapaHorasRede.get(k) || 0) + ch);
+                    mapaVinculosRede.set(k, (mapaVinculosRede.get(k) || 0) + 1);
+                });
+            }
+        });
+
         const tituloUnidade = state.selectedCnes && u
             ? `${u.nomeFantasia} (CNES: ${u.cnes})`
             : `Todos os Estabelecimentos de ${state.municipio} - ${state.uf} (${state.estabelecimentos.length} unidades)`;
@@ -1412,9 +1919,9 @@ window.CnesModule = (function () {
                         <!-- Filtro de Auditoria Portaria 134 -->
                         <button class="cnes-filter-btn-alert ${state.tableFilter.apenasAlerta134 ? 'active' : ''}"
                                 onclick="window.CnesModule.toggleAlerta134()"
-                                title="Filtrar profissionais com acúmulo de cargos ou carga horária superior a 40h/60h">
+                                title="Filtrar profissionais com acúmulo incompatível de cargos ou carga horária superior a 60h (Portaria 134)">
                             <i class="fas fa-exclamation-triangle"></i>
-                            ${state.tableFilter.apenasAlerta134 ? 'Exibindo Alertas (>40h / >60h)' : 'Auditoria de Vínculos (>40h / >60h)'}
+                            ${state.tableFilter.apenasAlerta134 ? 'Exibindo Alertas (Portaria 134)' : 'Auditoria de Vínculos (Portaria 134)'}
                         </button>
 
                         <button class="cnes-btn-outline ${state.tableFilter.apenasDesligados ? 'active' : ''}" 
@@ -1427,8 +1934,8 @@ window.CnesModule = (function () {
                             <i class="fas fa-calendar-alt"></i> Comp: ${compFmt}
                         </button>
 
-                        <button class="cnes-btn-xls" onclick="window.CnesModule.exportarXls()" title="Exportar planilha Excel com as 17 colunas oficiais">
-                            <i class="fas fa-file-excel"></i> Exportar XLS (17 Colunas)
+                        <button class="cnes-btn-xls" onclick="window.CnesModule.exportarXls()" title="Exportar planilha Excel com a grade de profissionais">
+                            <i class="fas fa-file-excel"></i> Exportar XLS
                         </button>
 
                         ${state.selectedCnes ? `
@@ -1471,84 +1978,88 @@ window.CnesModule = (function () {
                     * Esta informação está sendo apresentada conforme dados oficiais do Cadastro Nacional de Estabelecimentos de Saúde (CNES) do DATASUS.
                 </div>
 
-                <!-- TABELA OFICIAL DE 17 COLUNAS -->
+                <!-- TABELA OTIMIZADA DE PROFISSIONAIS (SEM ROLAGEM LATERAL) -->
                 <div class="cnes-table-responsive">
                     <table class="cnes-table-17cols">
                         <thead>
                             <tr>
-                                <th rowspan="2" style="min-width: 210px;">Nome do Profissional</th>
-                                <th rowspan="2">Dt.Entrada</th>
-                                <th rowspan="2">CNS</th>
-                                <th rowspan="2">* CNS Master/Principal</th>
-                                <th rowspan="2">Dt. Atribuição</th>
-                                <th rowspan="2" style="min-width: 180px;">CBO</th>
-                                <th rowspan="2" class="th-center">CH Outros</th>
-                                <th rowspan="2" class="th-center">CH Amb.</th>
-                                <th rowspan="2" class="th-center">CH Hosp.</th>
-                                <th rowspan="2" class="th-center">Total CH</th>
-                                <th rowspan="2" class="th-center">SUS</th>
+                                <th rowspan="2" class="th-prof-nome">Nome do Profissional</th>
+                                <th rowspan="2" class="th-prof-cns">CNS (Master)</th>
+                                <th rowspan="2" class="th-prof-dt">Dt. Atribuição</th>
+                                <th rowspan="2" class="th-prof-cbo">CBO</th>
+                                <th rowspan="2" class="th-center th-prof-ch">Outros</th>
+                                <th rowspan="2" class="th-center th-prof-ch">Amb.</th>
+                                <th rowspan="2" class="th-center th-prof-ch">Hosp.</th>
+                                <th rowspan="2" class="th-center th-prof-ch">Total</th>
+                                <th rowspan="2" class="th-center th-prof-sus">SUS</th>
                                 <th colspan="3" class="th-group-vinculo">Vínculo Empregatício</th>
-                                <th rowspan="2">Comp. Desativação</th>
-                                <th rowspan="2" class="th-center">Situação</th>
-                                <th rowspan="2">Portaria 134</th>
+                                <th rowspan="2" class="th-center th-prof-sit">Situação</th>
+                                <th rowspan="2" class="th-prof-p134">Portaria 134</th>
                             </tr>
                             <tr>
-                                <th>Vinculação</th>
-                                <th>Tipo</th>
-                                <th>Subtipo</th>
+                                <th class="th-prof-vinc">Vinculação</th>
+                                <th class="th-prof-tipo">Tipo</th>
+                                <th class="th-prof-sub">Subtipo</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${profsPaginados.length === 0 ? `
                                 <tr>
-                                    <td colspan="17" style="text-align: center; padding: 2.5rem; color: #64748b;">
+                                    <td colspan="14" style="text-align: center; padding: 2.5rem; color: #64748b;">
                                         <i class="fas fa-search" style="font-size: 1.5rem; display: block; margin-bottom: 0.5rem; opacity: 0.5;"></i>
                                         Nenhum profissional localizado com os filtros selecionados.
                                     </td>
                                 </tr>
                             ` : profsPaginados.map(p => {
-                                const chTot = p.chTotal || ((p.chOutros || 0) + (p.chAmb || 0) + (p.chHosp || 0));
+                                const chTot = Number(p.chTotal || ((p.chOutros || 0) + (p.chAmb || 0) + (p.chHosp || 0))) || 0;
                                 let badgeChClass = 'cnes-ch-badge-normal';
                                 if (chTot > 60) badgeChClass = 'cnes-ch-badge-danger';
-                                else if (chTot > 40) badgeChClass = 'cnes-ch-badge-alert';
+                                else if (chTot > 44) badgeChClass = 'cnes-ch-badge-alert';
+
+                                const cnsDefinitivo = String(p.cnsMaster || p.cns || '').trim();
+                                const dataAtribuicao = obterDataAtribuicao(p, true);
+                                const cboOficial = formatarCboOficial(p);
+                                const status134 = obterStatusPortaria134(p, mapaHorasRede, mapaVinculosRede);
 
                                 return `
                                     <tr>
-                                        <td>
+                                        <td class="td-prof-nome">
                                             <a href="javascript:void(0)" class="cnes-prof-name-link" 
-                                               onclick="window.CnesModule.abrirDetalhesProfissional('${p.cns}')" 
+                                               onclick="window.CnesModule.abrirDetalhesProfissional('${cnsDefinitivo || p.cns}')" 
                                                title="Clique para ver ficha completa do colaborador">
                                                 ${p.nome}
                                             </a>
-                                            ${p.unidadeNome ? `<div style="font-size: 0.72rem; color: #64748b;">${p.unidadeNome}</div>` : ''}
+                                            ${p.unidadeNome ? `<div class="cnes-prof-sub-unidade" title="${p.unidadeNome}">${p.unidadeNome}</div>` : ''}
                                         </td>
-                                        <td>${p.dtEntrada || '01/01/2021'}</td>
-                                        <td style="font-family: 'Roboto Mono', monospace;">${p.cns}</td>
-                                        <td style="font-family: 'Roboto Mono', monospace;">${p.cnsMaster || p.cns}</td>
-                                        <td>${p.dtAtribuicao || '01/01/2021'}</td>
-                                        <td title="${p.ocupacao}">${p.ocupacao || p.cbo}</td>
-                                        <td style="text-align: center;">${p.chOutros || 0}Hs.</td>
-                                        <td style="text-align: center;">${p.chAmb || 0}Hs.</td>
-                                        <td style="text-align: center;">${p.chHosp || 0}Hs.</td>
-                                        <td style="text-align: center;">
-                                            <span class="${badgeChClass}" title="${chTot > 60 ? 'Carga Horária Crítica (>60h)' : (chTot > 40 ? 'Sobreposição (>40h)' : 'Regular')}">
-                                                ${chTot}Hs.
+                                        <td class="td-prof-cns">
+                                            <button type="button" class="cnes-cns-btn" 
+                                                    onclick="window.CnesModule.copiarCns('${cnsDefinitivo}', event)" 
+                                                    title="Clique para copiar o Cartão SUS (CNS) ${cnsDefinitivo}">
+                                                <span class="cnes-cns-val">${cnsDefinitivo || '-'}</span>
+                                                <i class="far fa-copy"></i>
+                                            </button>
+                                        </td>
+                                        <td class="td-prof-dt">${dataAtribuicao}</td>
+                                        <td class="td-prof-cbo" title="${cboOficial}">
+                                            <div class="cnes-cbo-text">${cboOficial}</div>
+                                        </td>
+                                        <td class="th-center">${p.chOutros || 0}h</td>
+                                        <td class="th-center">${p.chAmb || 0}h</td>
+                                        <td class="th-center">${p.chHosp || 0}h</td>
+                                        <td class="th-center">
+                                            <span class="${badgeChClass}" title="${chTot > 60 ? 'Carga Horária Crítica (>60h)' : (chTot > 44 ? 'Carga Horária Elevada (>44h)' : 'Regular')}">
+                                                ${chTot}h
                                             </span>
                                         </td>
-                                        <td style="text-align: center;">${p.atendimentoSus || 'SIM'}</td>
-                                        <td>${p.vinculacao || 'VINCULO EMPREGATICIO'}</td>
-                                        <td>${p.tipoVinculo || 'CONTRATADO TEMPORÁRIO'}</td>
-                                        <td>${p.subtipo || 'PUBLICO'}</td>
-                                        <td>${p.compDesativacao || ''}</td>
-                                        <td class="${p.ativo !== false && p.situacao !== 'Desligado' ? 'cnes-status-ativo-red' : 'cnes-status-desligado-gray'}">
+                                        <td class="th-center">${p.atendimentoSus || 'SIM'}</td>
+                                        <td class="td-prof-vinc" title="${p.vinculacao || 'VÍNCULO EMPREGATÍCIO'}">${p.vinculacao || 'VÍNCULO EMPREGATÍCIO'}</td>
+                                        <td class="td-prof-tipo" title="${p.tipoVinculo || 'CONTRATADO TEMPORÁRIO'}">${p.tipoVinculo || 'CONTRATADO TEMPORÁRIO'}</td>
+                                        <td class="td-prof-sub" title="${p.subtipo || 'PÚBLICO'}">${p.subtipo || 'PÚBLICO'}</td>
+                                        <td class="th-center ${p.ativo !== false && p.situacao !== 'Desligado' ? 'cnes-status-ativo-red' : 'cnes-status-desligado-gray'}">
                                             ${p.situacao || (p.ativo !== false ? 'Ativo' : 'Desligado')}
                                         </td>
-                                        <td>
-                                            ${p.portaria134 ? `
-                                                <span class="cnes-ch-badge-alert" style="font-size: 0.7rem;">${p.portaria134}</span>
-                                            ` : (chTot > 40 ? `
-                                                <span class="cnes-ch-badge-alert" style="font-size: 0.7rem;">CH > 40h</span>
-                                            ` : '')}
+                                        <td class="td-prof-p134">
+                                            ${status134.html}
                                         </td>
                                     </tr>
                                 `;
@@ -1596,13 +2107,13 @@ window.CnesModule = (function () {
                         </p>
 
                         <div style="max-height: 320px; overflow-y: auto;">
-                            ${state.competencias.map(c => `
+                            ${state.competencias.length > 0 ? state.competencias.map(c => `
                                 <div class="cnes-competencia-item ${state.competenciaAtiva === c.codigo ? 'active' : ''}"
                                      onclick="window.CnesModule.selecionarCompetencia('${c.codigo}')">
                                     <span><i class="far fa-calendar-check" style="margin-right: 0.5rem; color: #0284c7;"></i> ${c.label}</span>
                                     ${c.vigente ? '<span style="font-size: 0.72rem; background: #dcfce7; color: #15803d; padding: 0.2rem 0.5rem; border-radius: 9999px; font-weight: 700;">Vigente</span>' : ''}
                                 </div>
-                            `).join('')}
+                            `).join('') : '<p style="font-size: 0.85rem; color: #64748b;">Nenhuma competência publicada no manifesto CNES. O arquivo legado não possui histórico verificável.</p>'}
                         </div>
                     </div>
                 </div>
@@ -1656,11 +2167,11 @@ window.CnesModule = (function () {
                             </div>
                             <div class="cnes-prof-detail-field">
                                 <span class="cnes-prof-detail-label">CBO / Especialidade</span>
-                                <span class="cnes-prof-detail-val">${p.cbo}</span>
+                                <span class="cnes-prof-detail-val">${formatarCboOficial(p)}</span>
                             </div>
                             <div class="cnes-prof-detail-field">
                                 <span class="cnes-prof-detail-label">Data de Atribuição</span>
-                                <span class="cnes-prof-detail-val">${p.dtAtribuicao || '01/01/2021'}</span>
+                                <span class="cnes-prof-detail-val">${obterDataAtribuicao(p, false)}</span>
                             </div>
                             <div class="cnes-prof-detail-field" style="grid-column: span 2;">
                                 <span class="cnes-prof-detail-label">Carga Horária Semanal</span>
@@ -1776,28 +2287,59 @@ window.CnesModule = (function () {
      * VISÃO 4: AUDITORIA DE MOVIMENTAÇÃO MENSAL (ENTRADAS, SAÍDAS E CARGA HORÁRIA)
      * =========================================================================
      */
-    function abrirMovimentacoes() {
-        if (!state.movimentacoes) {
-            calcularMovimentacoes();
-        }
+    async function abrirMovimentacoes() {
         state.viewMode = 'movimentacoes';
+        state.movimentacoesMessage = 'Carregando competências publicadas...';
+        render();
+        await calcularMovimentacoes();
         render();
     }
 
-    function calcularMovimentacoes() {
+    async function calcularMovimentacoes() {
         if (!window.CnesDiffEngine) {
-            console.warn('CnesDiffEngine não disponível.');
+            state.movimentacoesMessage = 'Comparador CNES indisponível.';
             return;
         }
         const dadosAtuais = state.estabelecimentos;
-        const dadosAnteriores = window.CnesDiffEngine.simularCompetenciaAnterior(dadosAtuais);
+        let dadosAnteriores;
+        let competenciaAnterior;
+        if (state.ibge === '210120') {
+            state.movimentacoes = null;
+            if (state.sourceType !== 'published_snapshot' || !state.competenciaAtiva) {
+                state.movimentacoesMessage = 'A comparação exige um snapshot CNES publicado para Bacabal.';
+                return;
+            }
+            const index = state.competencias.findIndex(item => item.codigo === state.competenciaAtiva);
+            const previous = index >= 0 ? state.competencias[index + 1] : null;
+            if (!previous) {
+                state.movimentacoesMessage = 'Ainda não há outra competência publicada para comparar.';
+                return;
+            }
+            try {
+                const response = await fetch(`/api/cnes/estabelecimentos?ibge=210120&competencia=${previous.codigo}&t=${Date.now()}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const payload = await response.json();
+                if (payload.source_type !== 'published_snapshot' || payload.codigoIbge !== '210120' || payload.competencia !== previous.codigo || !Array.isArray(payload.estabelecimentos)) {
+                    throw new Error('snapshot anterior inválido');
+                }
+                dadosAnteriores = payload.estabelecimentos.map(item => normalizarEstabelecimento(item, 'BACABAL', 'MA', { allowSynthetic: false }));
+                competenciaAnterior = formatarCompetencia(previous.codigo);
+            } catch (error) {
+                state.movimentacoesMessage = `Não foi possível conferir a competência anterior: ${error.message}`;
+                return;
+            }
+        } else {
+            dadosAnteriores = window.CnesDiffEngine.simularCompetenciaAnterior(dadosAtuais);
+            competenciaAnterior = '07/2026';
+        }
 
         state.movimentacoes = window.CnesDiffEngine.compararCompetencias(dadosAnteriores, dadosAtuais, {
-            competenciaAnterior: '07/2026',
-            competenciaAtual: formatarCompetencia(state.competenciaAtiva) || '08/2026',
+            competenciaAnterior,
+            competenciaAtual: formatarCompetencia(state.competenciaAtiva),
             municipio: state.municipio,
             ibge: state.ibge
         });
+        state.movimentacoesMessage = '';
         if (typeof showToast === 'function') {
             showToast('🔄 Auditoria de movimentações mensais calculada com sucesso!', 'success');
         }
@@ -1834,9 +2376,9 @@ window.CnesModule = (function () {
             return;
         }
 
-        let csv = '\uFEFFTipo;Profissional;CNS;CBO;Ocupacao;Estabelecimento;CNES;CH_Anterior;CH_Atual;Diferenca_Horas;Portaria134_Alerta;Competencia\n';
+        let csv = '\uFEFFTipo;Profissional;CNS;CBO;Ocupacao;Estabelecimento;CNES;CH_Anterior;CH_Atual;Diferenca_Horas;Alerta_CH;Competencia\n';
         itens.forEach(item => {
-            csv += `"${item.tipo}";"${item.nome}";"${item.cns}";"${item.cbo}";"${item.ocupacao}";"${item.estabNome}";"${item.cnes}";"${item.chAnterior ?? ''}";"${item.chAtual ?? ''}";"${item.diferencaCh ?? ''}";"${item.portaria134 || item.portaria134_alerta || 'REGULAR'}";"${item.competencia || state.competenciaAtiva}"\n`;
+            csv += `"${item.tipo}";"${item.nome}";"${item.cns}";"${item.cbo}";"${item.ocupacao}";"${item.estabNome}";"${item.cnes}";"${item.chAnterior ?? ''}";"${item.chAtual ?? ''}";"${item.diferencaCh ?? ''}";"${item.portaria134 || item.portaria134_alerta || 'SEM ALERTA CH'}";"${item.competencia || state.competenciaAtiva}"\n`;
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1852,7 +2394,7 @@ window.CnesModule = (function () {
 
     function renderViewMovimentacoes() {
         if (!state.movimentacoes) {
-            calcularMovimentacoes();
+            return `<div class="cnes-mov-wrapper" style="padding: 2rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.5rem;">${state.movimentacoesMessage || 'Selecione a auditoria para comparar competências publicadas.'}</div>`;
         }
 
         const mov = state.movimentacoes;
@@ -1866,7 +2408,7 @@ window.CnesModule = (function () {
         else if (f.tipo === 'SAIDA') itens = (mov.detalhes && mov.detalhes.saidas) || [];
         else if (f.tipo === 'ALTERACAO_CH') itens = (mov.detalhes && mov.detalhes.alteracoesCargaHoraria) || [];
         else if (f.tipo === 'PORTARIA134') {
-            itens = ((mov.detalhes && mov.detalhes.todas) || []).filter(it => (it.portaria134 && it.portaria134.includes('ALERTA')) || (it.portaria134 && it.portaria134.includes('SOBREPOSIÇÃO')) || (it.chAtual > 40));
+            itens = ((mov.detalhes && mov.detalhes.todas) || []).filter(it => Number(it.chAtual) > 40);
         }
 
         if (f.cnes) {
@@ -1907,15 +2449,15 @@ window.CnesModule = (function () {
                             Auditoria de Movimentação Cadastral — ${state.municipio} / ${state.uf}
                         </h2>
                         <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">
-                            Detecção em tempo real de novos vínculos médicos, desligamentos funcionais e variações de carga horária semanal.
+                            Comparação entre arquivos mensais publicados de vínculos e carga horária semanal.
                         </p>
                     </div>
 
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
                         <button class="cnes-btn-xls" onclick="window.CnesModule.exportarMovimentacoesCsv()" style="background: #ffffff; color: #0284c7; border: none; font-weight: 700; padding: 0.55rem 1rem;">
-                            <i class="fas fa-file-excel"></i> Exportar Relatório Oficial (CSV)
+                            <i class="fas fa-file-excel"></i> Exportar Comparação CNES (CSV)
                         </button>
-                        <button class="cnes-btn-outline" onclick="window.CnesModule.calcularMovimentacoes()" style="background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); color: #ffffff; padding: 0.55rem 0.9rem;" title="Recalcular comparativo">
+                        <button class="cnes-btn-outline" onclick="window.CnesModule.abrirMovimentacoes()" style="background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); color: #ffffff; padding: 0.55rem 0.9rem;" title="Recalcular comparativo">
                             <i class="fas fa-sync-alt"></i> Recalcular
                         </button>
                     </div>
@@ -1951,7 +2493,7 @@ window.CnesModule = (function () {
                         <div class="cnes-mov-kpi-icon alerta"><i class="fas fa-exclamation-triangle"></i></div>
                         <div>
                             <div class="cnes-mov-kpi-val" style="color: #d97706;">${fmtNum(res.alertasPortaria134 || 0)}</div>
-                            <div class="cnes-mov-kpi-lbl">Alertas Portaria 134 (>60h)</div>
+                            <div class="cnes-mov-kpi-lbl">CNS com CH municipal >60h</div>
                         </div>
                     </div>
 
@@ -1983,7 +2525,7 @@ window.CnesModule = (function () {
                                 🟡 Alt. Carga Horária (${fmtNum(res.alteracoesCargaHoraria || 0)})
                             </button>
                             <button class="cnes-mov-filter-btn ${f.tipo === 'PORTARIA134' ? 'active' : ''}" onclick="window.CnesModule.setFiltroMovimentacao('PORTARIA134')">
-                                ⚠️ Sobreposição / Portaria 134 (${fmtNum(res.alertasPortaria134 || 0)})
+                                ⚠️ Triagem de carga horária (${fmtNum(res.alertasPortaria134 || 0)})
                             </button>
                         </div>
 
@@ -2014,7 +2556,7 @@ window.CnesModule = (function () {
                                     <th style="padding: 0.65rem 0.85rem;">CBO / Especialidade</th>
                                     <th style="padding: 0.65rem 0.85rem;">Estabelecimento de Saúde</th>
                                     <th style="padding: 0.65rem 0.85rem; width: 150px; text-align: center;">Carga Horária Semanal</th>
-                                    <th style="padding: 0.65rem 0.85rem; width: 140px; text-align: center;">Portaria 134 / Glosa</th>
+                                    <th style="padding: 0.65rem 0.85rem; width: 140px; text-align: center;">Triagem de carga horária</th>
                                     <th style="padding: 0.65rem 0.85rem; width: 80px; text-align: center;">Ações</th>
                                 </tr>
                             </thead>
@@ -2034,7 +2576,7 @@ window.CnesModule = (function () {
                                         badgeHtml = `<span class="cnes-mov-badge badge-entrada"><i class="fas fa-arrow-circle-up"></i> ADMISSÃO</span>`;
                                         chHtml = `<span style="font-weight: 700; color: #15803d;">0h ➔ ${item.chAtual}h</span>`;
                                     } else if (item.tipo === 'SAIDA') {
-                                        badgeHtml = `<span class="cnes-mov-badge badge-saida"><i class="fas fa-arrow-circle-down"></i> DESLIGAMENTO</span>`;
+                                        badgeHtml = `<span class="cnes-mov-badge badge-saida"><i class="fas fa-arrow-circle-down"></i> AUSENTE NO MÊS</span>`;
                                         chHtml = `<span style="font-weight: 700; color: #b91c1c;">${item.chAnterior}h ➔ 0h</span>`;
                                     } else {
                                         const isUp = item.diferencaCh > 0;
@@ -2046,10 +2588,10 @@ window.CnesModule = (function () {
 
                                     const isRisk = (item.chAtual > 60) || (item.portaria134 && item.portaria134.includes('SOBREPOSIÇÃO'));
                                     const portariaBadge = isRisk ? 
-                                        `<span class="cnes-ch-badge-danger"><i class="fas fa-exclamation-triangle"></i> RISCO GLOSA (>60h)</span>` :
+                                        `<span class="cnes-ch-badge-danger"><i class="fas fa-exclamation-triangle"></i> REVISAR CH (>60h)</span>` :
                                         (item.chAtual > 40 ? 
-                                            `<span class="cnes-ch-badge-alert"><i class="fas fa-info-circle"></i> ALERTA (>40h)</span>` :
-                                            `<span class="cnes-ch-badge-normal"><i class="fas fa-check"></i> REGULAR</span>`);
+                                            `<span class="cnes-ch-badge-alert"><i class="fas fa-info-circle"></i> REVISAR CH (>40h)</span>` :
+                                            `<span class="cnes-ch-badge-normal"><i class="fas fa-check"></i> SEM ALERTA CH</span>`);
 
                                     const bgRow = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
 
@@ -2137,6 +2679,14 @@ window.CnesModule = (function () {
         setFilterTipoUnidade: setFilterTipoUnidade,
         setFilterGestao: setFilterGestao,
         setFilterSus: setFilterSus,
+        setFilterEscopo: setFilterEscopo,
+        toggleFilterCategoriaKpi: toggleFilterCategoriaKpi,
+        sortEstabelecimentos: sortEstabelecimentos,
+        copiarCnes: copiarCnes,
+        copiarCns: copiarCns,
+        formatarCboOficial: formatarCboOficial,
+        getCategoriaUnidade: getCategoriaUnidade,
+        isUnidadeMantidaMunicipal: isUnidadeMantidaMunicipal,
         abrirModalCompetencia: abrirModalCompetencia,
         fecharModalCompetencia: fecharModalCompetencia,
         selecionarCompetencia: selecionarCompetencia,

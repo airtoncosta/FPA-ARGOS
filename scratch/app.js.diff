@@ -1,0 +1,22 @@
+--- old
+
++++ new
+
+@@ -565,5 +565,5 @@
+
+     const filterBar = document.getElementById('filter-bar');
+     if (filterBar) {
+-        if (section === 'minha-conta' || section === 'usuarios' || section === 'relatorios' || section === 'arquivos' || section === 'sigtap' || section === 'producoes-bpa' || section === 'conciliacao-fns' || section === 'cnes') {
++        if (section === 'minha-conta' || section === 'usuarios' || section === 'relatorios' || section === 'arquivos' || section === 'sigtap' || section === 'producoes-bpa' || section === 'conciliacao-fns' || section === 'cnes' || section === 'producao-profissional-cns') {
+             filterBar.style.display = 'none';
+         } else {
+@@ -589,4 +589,8 @@
+
+     if (section === 'conciliacao-fns' && window.FnsModule && typeof window.FnsModule.init === 'function') {
+         setTimeout(() => window.FnsModule.init(), 50);
++    }
++
++    if (section === 'producao-profissional-cns' && window.ProducaoProfissionalModule && typeof window.ProducaoProfissionalModule.init === 'function') {
++        setTimeout(() => window.ProducaoProfissionalModule.init(), 50);
+     }
+ 

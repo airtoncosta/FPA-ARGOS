@@ -38,5 +38,12 @@ node_modules/
 # Build temporário do SIGTAP
 .temp_sigtap/
 
+# Sincronização CNES: arquivos brutos, snapshots e CNS gerados em runtime
+data/cnes/
+code_sandbox_light_git_fe61910d_1781185357/cnes_data/auto/
+__pycache__/
+*.pyc
+.venv/
+
 # GitHub Actions workflows (requer permissão workflow separada)
 .github/

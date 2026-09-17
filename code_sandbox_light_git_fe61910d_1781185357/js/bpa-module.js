@@ -107,7 +107,7 @@ const BpaModule = {
     async loadCnesBase() {
         if (!this.cnesBaseCache && typeof fetch === 'function') {
             try {
-                const res = await fetch('/cnes_data/cnes_bacabal.json').catch(() => null);
+                const res = await fetch('/api/cnes/bacabal').catch(() => null);
                 if (res && res.ok) {
                     const txt = await res.text();
                     this.cnesBaseCache = JSON.parse(txt.replace(/^\uFEFF/, ''));
@@ -533,9 +533,11 @@ const BpaModule = {
         const detalhes = [...procedures].map(([codigo, quantidade]) => ({codigo, quantidade}));
         detalhes.sort((a, b) => b.quantidade - a.quantidade);
 
-        // Agrupamento determinístico por Profissional (CNS para BPA-I / CBO+Unidade para BPA-C)
+        // BPA-C is consolidated and has no individual CNS. Only BPA-I can
+        // contribute to the list of identified professionals.
         const profMap = new Map();
         for (const r of records) {
+            if (r.tipo !== 'BPA-I' || !/^\d{15}$/.test(String(r.cnsProfissional || '').trim())) continue;
             let cns = String(r.cnsProfissional || '').trim();
             const cbo = String(r.cbo || '').trim();
             const qty = /^\d+$/.test(r.quantidade) ? Number(r.quantidade) : 1;
@@ -668,7 +670,7 @@ const BpaModule = {
 
             return '<div style="margin-bottom: 0.45rem; line-height: 1.4; background: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 0.4rem; border: 1px solid #e2e8f0;">' +
                 '• <code style="background: #e0f2fe; color: #0369a1; padding: 1px 5px; border-radius: 3px; font-weight: 700;">' + prof.cns + '</code>' + 
-                nomeStr + cboStr + ' — <strong>' + prof.quantidade + ' atendimentos</strong>' + 
+                nomeStr + cboStr + ' — <strong>quantidade total: ' + prof.quantidade + '</strong>' +
                 procsHtml + equipeHtml + 
                 '</div>';
         });
@@ -757,7 +759,7 @@ const BpaModule = {
 
         try {
             if (!this.cnesBaseCache && typeof fetch === 'function') {
-                const res = await fetch('/cnes_data/cnes_bacabal.json').catch(() => null);
+                const res = await fetch('/api/cnes/bacabal').catch(() => null);
                 if (res && res.ok) {
                     this.cnesBaseCache = await res.json();
                 }

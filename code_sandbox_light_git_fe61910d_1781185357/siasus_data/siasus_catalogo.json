@@ -1,20 +1,31 @@
 {
-  "ultimaSincronizacao": "2026-09-16T12:50:00.000Z",
-  "statusDatasus": "online",
-  "origem": "datasus_oficial",
+  "ultimaSincronizacao": "2026-09-17T13:40:17.467Z",
+  "statusDatasus": "espelho",
+  "origem": "espelho_contingencia",
   "bpa": [
+    {
+      "arquivo": "BPAMAG2601.exe",
+      "tipo": "bpa",
+      "versao": "26.01",
+      "titulo": "BPA Magnético v26.01",
+      "descricao": "Instalador oficial do Boletim de Produção Ambulatorial do SUS (Versão Vigente)",
+      "ordem": 2601,
+      "isVigente": true,
+      "urlDatasus": "http://ftp.datasus.gov.br/siasus/BPA/BPAMAG2601.exe",
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bpa/BPAMAG2601.exe",
+      "disponivelLocal": false
+    },
     {
       "arquivo": "BPAMAG0500.exe",
       "tipo": "bpa",
       "versao": "05.00",
       "titulo": "BPA Magnético v05.00",
-      "descricao": "Instalador oficial do Boletim de Produção Ambulatorial do SUS (Versão Vigente)",
-      "tamanhoBytes": 7864320,
-      "tamanhoFormatado": "7.5 MB",
-      "disponivelLocal": false,
-      "isVigente": true,
+      "descricao": "Instalador oficial do Boletim de Produção Ambulatorial do SUS (Versão Anterior - Arquivo Histórico)",
+      "ordem": 500,
+      "isVigente": false,
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/BPA/BPAMAG0500.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bpa/BPAMAG0500.exe"
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bpa/BPAMAG0500.exe",
+      "disponivelLocal": false
     }
   ],
   "bdsia": [
@@ -27,11 +38,11 @@
       "revisao": "a",
       "competencia": "Agosto/2026 (rev. a)",
       "titulo": "Tabelas BDSIA Agosto/2026 (rev. a)",
-      "tamanhoBytes": 9856614,
-      "tamanhoFormatado": "9.4 MB",
-      "disponivelLocal": false,
+      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Agosto/2026 (rev. a)",
+      "ordem": 20260800,
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202608a.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202608a.exe"
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202608a.exe",
+      "disponivelLocal": false
     },
     {
       "arquivo": "BDSIA202607b.exe",
@@ -42,11 +53,11 @@
       "revisao": "b",
       "competencia": "Julho/2026 (rev. b)",
       "titulo": "Tabelas BDSIA Julho/2026 (rev. b)",
-      "tamanhoBytes": 9856614,
-      "tamanhoFormatado": "9.4 MB",
-      "disponivelLocal": false,
+      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Julho/2026 (rev. b)",
+      "ordem": 20260701,
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202607b.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202607b.exe"
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202607b.exe",
+      "disponivelLocal": false
     },
     {
       "arquivo": "BDSIA202607a.exe",
@@ -57,11 +68,11 @@
       "revisao": "a",
       "competencia": "Julho/2026 (rev. a)",
       "titulo": "Tabelas BDSIA Julho/2026 (rev. a)",
-      "tamanhoBytes": 9542041,
-      "tamanhoFormatado": "9.1 MB",
-      "disponivelLocal": false,
+      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Julho/2026 (rev. a)",
+      "ordem": 20260700,
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202607a.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202607a.exe"
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202607a.exe",
+      "disponivelLocal": false
     },
     {
       "arquivo": "BDSIA202606b.exe",
@@ -72,11 +83,11 @@
       "revisao": "b",
       "competencia": "Junho/2026 (rev. b)",
       "titulo": "Tabelas BDSIA Junho/2026 (rev. b)",
-      "tamanhoBytes": 9646899,
-      "tamanhoFormatado": "9.2 MB",
-      "disponivelLocal": false,
+      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Junho/2026 (rev. b)",
+      "ordem": 20260601,
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202606b.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202606b.exe"
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202606b.exe",
+      "disponivelLocal": false
     },
     {
       "arquivo": "BDSIA202605d.exe",
@@ -87,11 +98,11 @@
       "revisao": "d",
       "competencia": "Maio/2026 (rev. d)",
       "titulo": "Tabelas BDSIA Maio/2026 (rev. d)",
-      "tamanhoBytes": 9437184,
-      "tamanhoFormatado": "9.0 MB",
-      "disponivelLocal": false,
+      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Maio/2026 (rev. d)",
+      "ordem": 20260503,
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202605d.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202605d.exe"
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202605d.exe",
+      "disponivelLocal": false
     },
     {
       "arquivo": "BDSIA202604d.exe",
@@ -102,11 +113,11 @@
       "revisao": "d",
       "competencia": "Abril/2026 (rev. d)",
       "titulo": "Tabelas BDSIA Abril/2026 (rev. d)",
-      "tamanhoBytes": 9332326,
-      "tamanhoFormatado": "8.9 MB",
-      "disponivelLocal": false,
+      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Abril/2026 (rev. d)",
+      "ordem": 20260403,
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202604d.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202604d.exe"
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202604d.exe",
+      "disponivelLocal": false
     }
   ],
   "notasTecnicas": [
@@ -119,13 +130,15 @@
       "numero": "09/2026",
       "competencia": "Setembro/2026",
       "titulo": "Nota Técnica CGSI/SIGTAP nº 09/2026",
-      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS",
+      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS (Setembro/2026)",
       "orgaoEmissor": "CGSI / DRAC / SAES - Ministério da Saúde",
-      "tamanhoBytes": 358400,
-      "tamanhoFormatado": "350 KB",
-      "disponivelLocal": false,
+      "tamanhoFormatado": "340 KB",
+      "ordem": 202609,
+      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_09.pdf",
+      "urlDatasus": "http://ftp.datasus.gov.br/siasus/Documentos/nota_tecnica_cgsi_sigtap_2026_09.pdf",
+      "urlEspelho": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_09.pdf",
       "isMaisRecente": true,
-      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_09.pdf"
+      "disponivelLocal": false
     },
     {
       "arquivo": "nota_tecnica_cgsi_sigtap_2026_08.pdf",
@@ -136,13 +149,15 @@
       "numero": "08/2026",
       "competencia": "Agosto/2026",
       "titulo": "Nota Técnica CGSI/SIGTAP nº 08/2026",
-      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS",
+      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS (Agosto/2026)",
       "orgaoEmissor": "CGSI / DRAC / SAES - Ministério da Saúde",
-      "tamanhoBytes": 348160,
       "tamanhoFormatado": "340 KB",
-      "disponivelLocal": false,
+      "ordem": 202608,
+      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_08.pdf",
+      "urlDatasus": "http://ftp.datasus.gov.br/siasus/Documentos/nota_tecnica_cgsi_sigtap_2026_08.pdf",
+      "urlEspelho": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_08.pdf",
       "isMaisRecente": false,
-      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_08.pdf"
+      "disponivelLocal": false
     },
     {
       "arquivo": "nota_tecnica_cgsi_sigtap_2026_07.pdf",
@@ -153,13 +168,15 @@
       "numero": "07/2026",
       "competencia": "Julho/2026",
       "titulo": "Nota Técnica CGSI/SIGTAP nº 07/2026",
-      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS",
+      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS (Julho/2026)",
       "orgaoEmissor": "CGSI / DRAC / SAES - Ministério da Saúde",
-      "tamanhoBytes": 327680,
-      "tamanhoFormatado": "320 KB",
-      "disponivelLocal": false,
+      "tamanhoFormatado": "340 KB",
+      "ordem": 202607,
+      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_07.pdf",
+      "urlDatasus": "http://ftp.datasus.gov.br/siasus/Documentos/nota_tecnica_cgsi_sigtap_2026_07.pdf",
+      "urlEspelho": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_07.pdf",
       "isMaisRecente": false,
-      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_07.pdf"
+      "disponivelLocal": false
     },
     {
       "arquivo": "nota_tecnica_cgsi_sigtap_2026_06.pdf",
@@ -170,13 +187,15 @@
       "numero": "06/2026",
       "competencia": "Junho/2026",
       "titulo": "Nota Técnica CGSI/SIGTAP nº 06/2026",
-      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS",
+      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS (Junho/2026)",
       "orgaoEmissor": "CGSI / DRAC / SAES - Ministério da Saúde",
-      "tamanhoBytes": 337920,
-      "tamanhoFormatado": "330 KB",
-      "disponivelLocal": false,
+      "tamanhoFormatado": "340 KB",
+      "ordem": 202606,
+      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_06.pdf",
+      "urlDatasus": "http://ftp.datasus.gov.br/siasus/Documentos/nota_tecnica_cgsi_sigtap_2026_06.pdf",
+      "urlEspelho": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_06.pdf",
       "isMaisRecente": false,
-      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_06.pdf"
+      "disponivelLocal": false
     },
     {
       "arquivo": "nota_tecnica_cgsi_sigtap_2026_05.pdf",
@@ -187,13 +206,15 @@
       "numero": "05/2026",
       "competencia": "Maio/2026",
       "titulo": "Nota Técnica CGSI/SIGTAP nº 05/2026",
-      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS",
+      "descricao": "Alterações, inclusões e adequações oficiais da Tabela Unificada de Procedimentos do SUS (Maio/2026)",
       "orgaoEmissor": "CGSI / DRAC / SAES - Ministério da Saúde",
-      "tamanhoBytes": 317440,
-      "tamanhoFormatado": "310 KB",
-      "disponivelLocal": false,
+      "tamanhoFormatado": "340 KB",
+      "ordem": 202605,
+      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_05.pdf",
+      "urlDatasus": "http://ftp.datasus.gov.br/siasus/Documentos/nota_tecnica_cgsi_sigtap_2026_05.pdf",
+      "urlEspelho": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_05.pdf",
       "isMaisRecente": false,
-      "urlDownload": "https://raw.githubusercontent.com/RenatoKR/SIGTAP/main/notastecnicas/nota_tecnica_cgsi_sigtap_2026_05.pdf"
+      "disponivelLocal": false
     },
     {
       "arquivo": "nota_tecnica_cgsi_sigtap_2026_04.pdf",
@@ -214,12 +235,12 @@
     }
   ],
   "resumo": {
-    "totalArquivosLocais": 7,
-    "espacoOcupadoBytes": 67533318,
-    "espacoOcupadoFormatado": "64.4 MB",
-    "versaoVigenteBpa": "BPAMAG0500.exe (v05.00)",
+    "totalArquivosLocais": 0,
+    "espacoOcupadoBytes": 0,
+    "espacoOcupadoFormatado": "0 B",
+    "versaoVigenteBpa": "BPAMAG2601.exe",
     "versaoVigenteBdsia": "Agosto/2026 (rev. a)",
-    "ultimaNotaTecnica": "Setembro/2026 (nº 09/2026)",
+    "ultimaNotaTecnica": "Setembro/2026",
     "totalNotasDisponiveis": 6
   }
 }

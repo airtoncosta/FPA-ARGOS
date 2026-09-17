@@ -16,6 +16,8 @@ const { Logger, generateCorrelationId } = require('./lib/logger');
 const { AuditLogger } = require('./lib/audit-logger');
 const { shouldCompress, compressBuffer, createCompressionStream } = require('./lib/compression');
 const { SiasusSyncService } = require('./lib/siasus-sync-service');
+const { readPublishedSnapshotDetails } = require('./lib/cnes-snapshot-store');
+const { startCnesSyncScheduler, resolveCnesPython } = require('./lib/cnes-sync-scheduler');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'code_sandbox_light_git_fe61910d_1781185357');
@@ -29,6 +31,7 @@ const globalSiasusSyncService = new SiasusSyncService({
     baseDir: path.join(PUBLIC_DIR, 'siasus_data'),
     retentionBdsia: 6
 });
+let globalCnesSyncScheduler = null;
 
 function getRateLimitPolicy(pathname, method) {
     // Tier 1: E-mail & Ações Críticas (5 req / 60s)
@@ -471,14 +474,102 @@ function proxyFnsRequest(req, res, targetPath, queryString) {
 }
 
 // Fallback auditado e gerador de rede municipal resiliente do CNES
+function enviarLegadoCnesBacabal(filePath, res) {
+    try {
+        const legado = JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, ''));
+        // The checked-in file predates the automatic snapshot contract. Keep it
+        // available for continuity, but never expose its fixed month list as a
+        // published historical source.
+        const payload = {
+            ...legado,
+            fonte: `${legado.fonte || 'Arquivo CNES local'} (LEGADO; atualização automática indisponível)`,
+            source_type: 'legacy_file',
+            sourceType: 'legacy_file',
+            legacy: true,
+            auto_updated: false,
+            competenciaPadrao: null,
+            competencias: []
+        };
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify(payload));
+    } catch (error) {
+        res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({
+            error: 'CNES Bacabal indisponível',
+            code: 'CNES_SNAPSHOT_UNAVAILABLE',
+            message: error.message
+        }));
+    }
+}
+
+function adicionarNomesDeReferenciaLegada(snapshot) {
+    const legacyFile = path.join(PUBLIC_DIR, 'cnes_data', 'cnes_bacabal.json');
+    if (!fs.existsSync(legacyFile)) return snapshot;
+    try {
+        const legacy = JSON.parse(fs.readFileSync(legacyFile, 'utf8').replace(/^\uFEFF/, ''));
+        const names = new Map((legacy.estabelecimentos || [])
+            .filter(item => /^\d{7}$/.test(String(item.cnes || '')) && item.nomeFantasia)
+            .map(item => [String(item.cnes), String(item.nomeFantasia)]));
+        return {
+            ...snapshot,
+            estabelecimentos: snapshot.estabelecimentos.map(item =>
+                item.nomeFantasiaOrigem === 'identificador CNES' && names.has(String(item.cnes))
+                    ? { ...item, nomeReferenciaLegado: names.get(String(item.cnes)) }
+                    : item
+            )
+        };
+    } catch (error) {
+        globalLogger.warn('Nomes de referência CNES legados indisponíveis', { error: error.message });
+        return snapshot;
+    }
+}
+
+function enviarSnapshotCnesBacabal(req, res, competencia) {
+    let published = null;
+    try {
+        published = readPublishedSnapshotDetails(__dirname, competencia || undefined);
+    } catch (error) {
+        globalLogger.warn('Falha ao ler manifesto CNES de Bacabal', { error: error.message });
+    }
+    if (!published) return false;
+
+    const activeEntry = published.manifest.competencies?.[published.competence] || {};
+    const snapshot = adicionarNomesDeReferenciaLegada(published.snapshot);
+    sendJsonResponse(req, res, 200, {
+        ...snapshot,
+        codigoIbge: snapshot.codigoIbge || '210120',
+        municipio: snapshot.municipio || 'BACABAL',
+        uf: snapshot.uf || 'MA',
+        competenciaPadrao: published.competence,
+        competencias: published.competencies,
+        dataAtualizacao: activeEntry.published_at || null,
+        coverage: snapshot.coverage || activeEntry.coverage || null,
+        counts: snapshot.counts || activeEntry.counts || null,
+        fonte: snapshot.fonte || 'DATASUS CNES (snapshot publicado)',
+        source_type: 'published_snapshot',
+        sourceType: 'published_snapshot',
+        legacy: false,
+        auto_updated: true
+    });
+    return true;
+}
+
 function enviarFallbackLocal(ibge, munName, uf, res, cacheFilePath) {
     const defaultMun = (munName || 'MUNICÍPIO').toUpperCase().trim();
     const defaultUf = (uf || 'MA').toUpperCase().trim();
     const fileBacabal = path.join(PUBLIC_DIR, 'cnes_data', 'cnes_bacabal.json');
 
-    if ((ibge === '210120' || defaultMun === 'BACABAL') && fs.existsSync(fileBacabal)) {
-        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-        fs.createReadStream(fileBacabal).pipe(res);
+    if (ibge === '210120' || defaultMun === 'BACABAL') {
+        if (fs.existsSync(fileBacabal)) {
+            enviarLegadoCnesBacabal(fileBacabal, res);
+        } else {
+            res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({
+                error: 'CNES Bacabal indisponível',
+                code: 'CNES_SNAPSHOT_UNAVAILABLE',
+                message: 'Nenhum snapshot publicado ou arquivo legado disponível.'
+            }));
+        }
         return;
     }
 
@@ -916,6 +1007,39 @@ const server = http.createServer((req, res) => {
             fs.mkdirSync(cnesDataDir, { recursive: true });
         }
 
+        // Bacabal is served from the immutable snapshot published by the CNES
+        // worker. A requested competence must never be silently replaced by a
+        // different legacy file.
+        const isBacabal = cleanIbge === '210120';
+        if (isBacabal) {
+            if (enviarSnapshotCnesBacabal(req, res, compParam)) {
+                return;
+            }
+
+            if (compParam) {
+                sendJsonResponse(req, res, 404, {
+                    error: 'Competência CNES não publicada para Bacabal',
+                    code: 'CNES_COMPETENCE_UNAVAILABLE',
+                    competencia: compParam,
+                    codigoIbge: '210120'
+                });
+                return;
+            }
+
+            const legacyFile = path.join(cnesDataDir, 'cnes_bacabal.json');
+            if (fs.existsSync(legacyFile)) {
+                enviarLegadoCnesBacabal(legacyFile, res);
+            } else {
+                res.writeHead(503, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({
+                    error: 'CNES Bacabal indisponível',
+                    code: 'CNES_SNAPSHOT_UNAVAILABLE',
+                    message: 'Nenhum snapshot publicado ou arquivo legado disponível.'
+                }));
+            }
+            return;
+        }
+
         // 1.1.1. Verificar se existe cache auditado para este IBGE e competência
         if (compParam) {
             const fileByComp = path.join(cnesDataDir, `cnes_${cleanIbge}_${compParam}.json`);
@@ -1013,8 +1137,24 @@ const server = http.createServer((req, res) => {
     if (pathname === '/api/cnes/bacabal' || pathname === '/api/cnes/dados') {
         handleCors(res);
         const localFile = path.join(PUBLIC_DIR, 'cnes_data', 'cnes_bacabal.json');
-        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-        fs.createReadStream(localFile).pipe(res);
+        const query = parsedUrl.query ? new URLSearchParams(parsedUrl.query) : new URLSearchParams();
+        const compParam = query.get('competencia') || '';
+        if (enviarSnapshotCnesBacabal(req, res, compParam)) return;
+        if (compParam) {
+            sendJsonResponse(req, res, 404, {
+                error: 'Competência CNES não publicada para Bacabal',
+                code: 'CNES_COMPETENCE_UNAVAILABLE',
+                competencia: compParam,
+                codigoIbge: '210120'
+            });
+        } else if (fs.existsSync(localFile)) {
+            enviarLegadoCnesBacabal(localFile, res);
+        } else {
+            sendJsonResponse(req, res, 503, {
+                error: 'CNES Bacabal indisponível',
+                code: 'CNES_SNAPSHOT_UNAVAILABLE'
+            });
+        }
         return;
     }
 
@@ -1452,6 +1592,28 @@ server.listen(PORT, () => {
 
     // Inicia agendador automático do SIA/SUS (a cada 6 horas)
     globalSiasusSyncService.startAutoSync();
+
+    // A project-local Python environment activates the daily Bacabal sync on
+    // persistent Node hosts. CNES_SYNC_ENABLED=0 explicitly disables it.
+    const cnesPython = resolveCnesPython({ rootDir: __dirname });
+    if (process.env.CNES_SYNC_ENABLED !== '0' && cnesPython) {
+        try {
+            globalCnesSyncScheduler = startCnesSyncScheduler({ rootDir: __dirname, python: cnesPython });
+        } catch (error) {
+            globalLogger.error('cnes_sync_scheduler_start_failed', { error: error.message });
+        }
+    } else if (process.env.CNES_SYNC_ENABLED === '1' && !cnesPython) {
+        globalLogger.error('cnes_sync_scheduler_start_failed', { error: 'Python CNES indisponível; configure CNES_PYTHON ou instale .venv' });
+    }
 });
 
-module.exports = { server, globalRateLimiter, globalJobQueue, globalLogger, globalAuditLogger, globalSiasusSyncService, getRateLimitPolicy };
+module.exports = {
+    server,
+    globalRateLimiter,
+    globalJobQueue,
+    globalLogger,
+    globalAuditLogger,
+    globalSiasusSyncService,
+    get globalCnesSyncScheduler() { return globalCnesSyncScheduler; },
+    getRateLimitPolicy
+};

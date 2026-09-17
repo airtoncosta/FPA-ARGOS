@@ -79,7 +79,7 @@ window.ProducaoProfissionalModule = {
         // Carrega base CNES para associar nomes de profissionais e ocupações aos CNS
         if (!this.cnesCache && typeof fetch === 'function') {
             try {
-                const res = await fetch('/cnes_data/cnes_bacabal.json').catch(() => null);
+                const res = await fetch('/api/cnes/bacabal').catch(() => null);
                 if (res && res.ok) {
                     const txt = await res.text();
                     this.cnesCache = JSON.parse(txt.replace(/^\uFEFF/, ''));

@@ -1,0 +1,329 @@
+--- old
+
++++ new
+
+@@ -99,7 +99,22 @@
+
+     },
+ 
+-    init() {
++    async init() {
+         this.bindEvents();
+         this.loadProducoes();
++        await this.loadCnesBase();
++    },
++
++    async loadCnesBase() {
++        if (!this.cnesBaseCache && typeof fetch === 'function') {
++            try {
++                const res = await fetch('/cnes_data/cnes_bacabal.json').catch(() => null);
++                if (res && res.ok) {
++                    const txt = await res.text();
++                    this.cnesBaseCache = JSON.parse(txt.replace(/^\uFEFF/, ''));
++                }
++            } catch (e) {
++                console.warn('CNES data fetch falhou no BpaModule:', e);
++            }
++        }
+     },
+ 
+@@ -517,4 +532,97 @@
+
+         }
+         const detalhes = [...procedures].map(([codigo, quantidade]) => ({codigo, quantidade}));
++        detalhes.sort((a, b) => b.quantidade - a.quantidade);
++
++        // Agrupamento determinístico por Profissional (CNS para BPA-I / CBO+Unidade para BPA-C)
++        const profMap = new Map();
++        for (const r of records) {
++            let cns = String(r.cnsProfissional || '').trim();
++            const cbo = String(r.cbo || '').trim();
++            const qty = /^\d+$/.test(r.quantidade) ? Number(r.quantidade) : 1;
++
++            let key = cns;
++            let resolvedProfs = [];
++            if (!key && cbo) {
++                resolvedProfs = this.lookupProfissionaisByCbo(cbo, cnes, unit?.nome);
++                if (resolvedProfs.length === 1) {
++                    key = resolvedProfs[0].cns || `CBO_${cbo}`;
++                } else if (resolvedProfs.length > 1) {
++                    key = `EQUIPE_${cbo}`;
++                } else {
++                    key = `CBO_${cbo}`;
++                }
++            }
++
++            if (!key && !cbo) continue;
++            if (!key) key = `CBO_${cbo}`;
++
++            if (!profMap.has(key)) {
++                let nome = '';
++                let cboDesc = '';
++                let membrosEquipe = [];
++
++                if (resolvedProfs.length === 1) {
++                    nome = resolvedProfs[0].nome || '';
++                    cboDesc = resolvedProfs[0].ocupacao || (cbo ? `CBO ${cbo}` : '');
++                } else if (resolvedProfs.length > 1) {
++                    const ocupLabel = resolvedProfs[0].ocupacao?.split('-')[1]?.trim() || 'Especializada';
++                    nome = `Equipe de ${ocupLabel} (${resolvedProfs.length} médicos/profissionais)`;
++                    cboDesc = resolvedProfs[0].ocupacao || (`CBO ${cbo}`);
++                    membrosEquipe = resolvedProfs.map(p => ({ nome: p.nome, cns: p.cns, ocupacao: p.ocupacao }));
++                } else if (!key.startsWith('CBO_') && !key.startsWith('EQUIPE_')) {
++                    const info = this.lookupProfissional ? this.lookupProfissional(key, cnes) : null;
++                    nome = info?.nome || '';
++                    cboDesc = info?.ocupacao || (cbo ? `CBO ${cbo}` : '');
++                } else {
++                    nome = `Equipe Especializada (CBO ${cbo})`;
++                    cboDesc = `CBO ${cbo}`;
++                }
++
++                profMap.set(key, {
++                    cns: key.startsWith('EQUIPE_') ? `CBO ${cbo} (${resolvedProfs.length} CNS)` : key.startsWith('CBO_') ? `Consolidado CBO ${cbo}` : key,
++                    cnsReal: (key.startsWith('EQUIPE_') || key.startsWith('CBO_')) ? '' : key,
++                    nome,
++                    cbo,
++                    cboDesc,
++                    membrosEquipe,
++                    totalQuantidade: 0,
++                    totalAtendimentos: 0,
++                    procedimentosMap: new Map(),
++                    isConsolidadoBpaC: !r.cnsProfissional
++                });
++            }
++
++            const prof = profMap.get(key);
++            prof.totalQuantidade += qty;
++            prof.totalAtendimentos += 1;
++            if (r.cbo) prof.cbo = prof.cbo || r.cbo;
++            if (r.procedimento) {
++                const procQty = (prof.procedimentosMap.get(r.procedimento) || 0) + qty;
++                prof.procedimentosMap.set(r.procedimento, procQty);
++            }
++        }
++
++        const profissionaisDetalhados = [...profMap.values()].map(prof => {
++            const info = prof.cnsReal && this.lookupProfissional ? this.lookupProfissional(prof.cnsReal, cnes) : null;
++            const nome = prof.nome || info?.nome || '';
++            const cboDesc = prof.cboDesc || info?.ocupacao || (prof.cbo ? ('CBO ' + prof.cbo) : '');
++            const procedimentos = [...prof.procedimentosMap.entries()]
++                .sort((a, b) => b[1] - a[1])
++                .map(([codigo, quantidade]) => ({ codigo, quantidade }));
++            return {
++                cns: prof.cns,
++                cnsReal: prof.cnsReal,
++                nome,
++                cbo: prof.cbo,
++                cboDesc,
++                membrosEquipe: prof.membrosEquipe || [],
++                quantidade: prof.totalQuantidade,
++                atendimentos: prof.totalAtendimentos,
++                procedimentos,
++                isConsolidadoBpaC: prof.isConsolidadoBpaC
++            };
++        }).sort((a, b) => b.quantidade - a.quantidade);
++
++        const profissionaisAmostra = this.formatProfissionaisAmostra(profissionaisDetalhados);
+         return {
+             nomeArquivo: file?.name || '', estabelecimentoNome: unit?.nome || '', cnes, cnesList,
+@@ -527,7 +635,158 @@
+
+             procedimentosDetalhados: detalhes,
+             procedimentosAmostra: detalhes.slice(0, 5).map(p => '• <code>' + p.codigo + '</code> — quantidade: ' + p.quantidade),
++            profissionaisDetalhados,
++            profissionaisAmostra,
++            totalProfissionais: profissionaisDetalhados.length,
+             tamanhoBytes: file?.size || 0, tamanhoFormatado: this.formatFileSize(file?.size || 0),
+             conteudo: textContent
+         };
++    },
++
++    formatProfissionaisAmostra(profissionaisDetalhados) {
++        if (!Array.isArray(profissionaisDetalhados) || !profissionaisDetalhados.length) return [];
++        return profissionaisDetalhados.map(prof => {
++            const nomeStr = prof.nome ? (' <strong style="color: #0f172a;">' + prof.nome + '</strong>') : '';
++            const cboStr = prof.cboDesc 
++                ? (' <span style="color: #64748b; font-size: 0.76rem;">(' + prof.cboDesc + ')</span>') 
++                : (prof.cbo ? (' <span style="color: #64748b; font-size: 0.76rem;">(CBO: ' + prof.cbo + ')</span>') : '');
++
++            let procsHtml = '';
++            if (prof.procedimentos && prof.procedimentos.length > 0) {
++                const badges = prof.procedimentos.slice(0, 4).map(p => 
++                    '<span style="display: inline-flex; align-items: center; gap: 4px; background: #ffffff; border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; margin: 2px 4px 2px 0; font-size: 0.74rem;">' +
++                    '<code>' + p.codigo + '</code>: <strong style="color: #0284c7;">' + p.quantidade + '</strong>' +
++                    '</span>'
++                ).join(' ');
++                procsHtml = '<div style="margin-top: 3px; padding-left: 1.1rem; color: #475569; font-size: 0.74rem;">↳ ' + badges + '</div>';
++            }
++
++            let equipeHtml = '';
++            if (prof.membrosEquipe && prof.membrosEquipe.length > 0) {
++                const nomesEquipe = prof.membrosEquipe.map(m => m.nome.split(' ')[0] + ' (' + m.cns.slice(-4) + ')').join(' • ');
++                equipeHtml = '<div style="padding-left: 1.1rem; color: #0369a1; font-size: 0.72rem; font-weight: 500;">Médicos vinculados: ' + nomesEquipe + '</div>';
++            }
++
++            return '<div style="margin-bottom: 0.45rem; line-height: 1.4; background: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 0.4rem; border: 1px solid #e2e8f0;">' +
++                '• <code style="background: #e0f2fe; color: #0369a1; padding: 1px 5px; border-radius: 3px; font-weight: 700;">' + prof.cns + '</code>' + 
++                nomeStr + cboStr + ' — <strong>' + prof.quantidade + ' atendimentos</strong>' + 
++                procsHtml + equipeHtml + 
++                '</div>';
++        });
++    },
++
++    lookupProfissional(cns, cnes = '') {
++        const cleanCns = String(cns || '').replace(/\D/g, '');
++        if (!cleanCns) return null;
++
++        try {
++            if (typeof window !== 'undefined' && window.CnesModule && window.CnesModule.state && Array.isArray(window.CnesModule.state.estabelecimentos)) {
++                const estabs = window.CnesModule.state.estabelecimentos;
++                if (cnes) {
++                    const u = estabs.find(est => String(est.cnes || '').replace(/\D/g, '') === String(cnes).replace(/\D/g, ''));
++                    if (u && Array.isArray(u.profissionais)) {
++                        const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
++                        if (found) return found;
++                    }
++                }
++                for (const u of estabs) {
++                    if (Array.isArray(u.profissionais)) {
++                        const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
++                        if (found) return found;
++                    }
++                }
++            }
++            if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
++                for (const u of this.cnesBaseCache.estabelecimentos) {
++                    if (Array.isArray(u.profissionais)) {
++                        const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
++                        if (found) return found;
++                    }
++                }
++            }
++        } catch (e) {}
++
++        return null;
++    },
++
++    lookupProfissionaisByCbo(cbo, cnes = '', unidadeNome = '') {
++        const cleanCbo = String(cbo || '').trim();
++        const cleanCnes = String(cnes || '').replace(/\D/g, '');
++        const normNome = String(unidadeNome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
++        if (!cleanCbo) return [];
++
++        const estabs = [];
++        if (typeof window !== 'undefined' && window.CnesModule && window.CnesModule.state && Array.isArray(window.CnesModule.state.estabelecimentos)) {
++            estabs.push(...window.CnesModule.state.estabelecimentos);
++        }
++        if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
++            estabs.push(...this.cnesBaseCache.estabelecimentos);
++        }
++        if (typeof window !== 'undefined' && window.ProducaoProfissionalModule && window.ProducaoProfissionalModule.cnesCache && Array.isArray(window.ProducaoProfissionalModule.cnesCache.estabelecimentos)) {
++            estabs.push(...window.ProducaoProfissionalModule.cnesCache.estabelecimentos);
++        }
++
++        let matchedUnits = estabs.filter(est => {
++            const estCnes = String(est.cnes || '').replace(/\D/g, '');
++            if (cleanCnes && estCnes && estCnes === cleanCnes) return true;
++            const estNome = String(est.nomeFantasia || est.nome || est.razaoSocial || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
++            if (normNome && estNome && (estNome === normNome || estNome.includes(normNome) || normNome.includes(estNome))) return true;
++            return false;
++        });
++
++        if (matchedUnits.length === 0) matchedUnits = estabs;
++
++        const profsFound = [];
++        for (const est of matchedUnits) {
++            if (Array.isArray(est.profissionais)) {
++                for (const p of est.profissionais) {
++                    if (String(p.cbo || '').trim() === cleanCbo) {
++                        if (!profsFound.some(f => (f.cns || f.nome) === (p.cns || p.nome))) {
++                            profsFound.push(p);
++                        }
++                    }
++                }
++            }
++        }
++        return profsFound;
++    },
++
++    async enrichProfissionaisNames(parsed) {
++        if (!parsed || !parsed.profissionaisDetalhados || !parsed.profissionaisDetalhados.length) return;
++        const hasMissing = parsed.profissionaisDetalhados.some(p => !p.nome);
++        if (!hasMissing) return;
++
++        try {
++            if (!this.cnesBaseCache && typeof fetch === 'function') {
++                const res = await fetch('/cnes_data/cnes_bacabal.json').catch(() => null);
++                if (res && res.ok) {
++                    this.cnesBaseCache = await res.json();
++                }
++            }
++            if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
++                let updated = false;
++                for (const prof of parsed.profissionaisDetalhados) {
++                    if (!prof.nome) {
++                        for (const u of this.cnesBaseCache.estabelecimentos) {
++                            if (Array.isArray(u.profissionais)) {
++                                const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === prof.cns);
++                                if (found) {
++                                    prof.nome = found.nome || '';
++                                    prof.cboDesc = found.ocupacao || prof.cboDesc;
++                                    updated = true;
++                                    break;
++                                }
++                            }
++                        }
++                    }
++                }
++                if (updated && this.filePendingUpload === parsed) {
++                    parsed.profissionaisAmostra = this.formatProfissionaisAmostra(parsed.profissionaisDetalhados);
++                    const elProfs = document.getElementById('bpaProfissionaisAmostra');
++                    if (elProfs) {
++                        elProfs.innerHTML = '<strong style="color: #1e293b; display: block; margin-bottom: 0.35rem;"><i class="fas fa-user-md" style="color: #0284c7;"></i> Profissionais Identificados no Arquivo (CNS):</strong>' + parsed.profissionaisAmostra.join('');
++                    }
++                }
++            }
++        } catch (e) {}
+     },
+ 
+@@ -811,4 +1070,13 @@
+
+             this.persistLocalProducao(newRecord);
+         }
++        // Notificar o modulo de Producao Profissional CNS
++        try {
++            if (window.ProducaoProfissionalModule && typeof window.ProducaoProfissionalModule.recordProducaoProfissionais === 'function') {
++                window.ProducaoProfissionalModule.recordProducaoProfissionais(newRecord, producaoData);
++            }
++        } catch (e) {
++            console.warn('Falha ao sincronizar com ProducaoProfissionalModule:', e);
++        }
++
+         // Salvar localmente
+         this.producoes.unshift(newRecord);
+@@ -2760,4 +3028,6 @@
+
+         document.getElementById('bpaDropPrompt').style.display = 'block';
+         document.getElementById('btnConfirmarUploadBpa').disabled = true;
++        const elProfsInit = document.getElementById('bpaProfissionaisAmostra');
++        if (elProfsInit) elProfsInit.innerHTML = '';
+ 
+         if (prefillEstab) {
+@@ -2852,4 +3122,16 @@
+
+                 }
+             }
++
++            // Exibição da Amostra de Profissionais Identificados (BPA-I e BPA-C)
++            const elProfsAmostra = document.getElementById('bpaProfissionaisAmostra');
++            if (elProfsAmostra) {
++                if (parsed.profissionaisAmostra && parsed.profissionaisAmostra.length > 0) {
++                    elProfsAmostra.style.display = 'block';
++                    elProfsAmostra.innerHTML = '<strong style="color: #0f172a; display: block; margin-bottom: 0.35rem;"><i class="fas fa-user-md" style="color: #0284c7;"></i> Profissionais Identificados (' + parsed.profissionaisDetalhados.length + '):</strong>' + parsed.profissionaisAmostra.slice(0, 5).join('');
++                } else {
++                    elProfsAmostra.style.display = 'none';
++                }
++            }
++            this.enrichProfissionaisNames(parsed);
+ 
+             // Preencher campos do formulário

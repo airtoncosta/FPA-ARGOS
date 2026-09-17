@@ -6,13 +6,36 @@ const label=v=>String(v||'').replace(/_/g,' ').toLowerCase().replace(/^./,c=>c.t
 const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtMoney=v=>{const n=typeof v==='number'?v:Number(v);return Number.isFinite(n)?n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):'—';};
 const fmtTotal=v=>v===null||v===undefined?'Não disponível':fmtMoney(v);
-async function json(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status+' ao carregar '+url);return JSON.parse((await r.text()).replace(/^\uFEFF/,''));}
+async function json(url,expectedSha256){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status+' ao carregar '+url);const body=await r.text();if(expectedSha256){if(!window.crypto?.subtle)throw Error('SHA-256 indisponível para conferir o snapshot CNES.');const digest=await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(body));const actual=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');if(actual!==expectedSha256)throw Error('SHA-256 do snapshot CNES diverge do manifesto.');}return JSON.parse(body.replace(/^\uFEFF/,''));}
+async function cnesPublishedEntries(){
+ const entries={};
+ try{
+  const auto=await json('cnes_data/auto/manifest.json');
+  if(auto?.scope?.municipality_ibge!=='210120'||!auto.competencies||Array.isArray(auto.competencies))return entries;
+  for(const [cm,item] of Object.entries(auto.competencies)){
+   const relative=String(item?.snapshot?.path||'');
+   if(!/^\d{4}(0[1-9]|1[0-2])$/.test(cm)||item?.status!=='published'||!new RegExp('^snapshots/'+cm+'/rev-[0-9]+-[a-f0-9]{64}\\.json$').test(relative))continue;
+   if(!/^[a-f0-9]{64}$/.test(String(item.snapshot.sha256||'')))continue;
+   const valid=item.coverage?.st===true&&item.coverage?.pf===true&&item.counts?.quarantined===0;
+   entries[cm]={
+    url:'cnes_data/auto/'+relative,
+    fonte:'DATASUS CNES ST/PF (PySUS FTP origin)',
+    oficial:true,
+    completo:valid,
+    cobertura:{profissionais:item.coverage?.pf===true&&item.counts?.quarantined===0,servicos:item.coverage?.services===true,habilitacoes:item.coverage?.habilitations===true},
+    sha256:item.snapshot.sha256
+   };
+  }
+ }catch(_error){/* Sem publicação automática; usa somente o manifesto legado. */}
+ return entries;
+}
 async function loadBases(competencias){
- let manifest;try{manifest=await json('audit_data/manifest.json');}catch(e){return {bases:{},sources:[{tipo:'Manifesto',competencia:'',estado:'Indisponível',fonte:e.message}]};}
- const bases={},sources=[];
+ let manifest,sources=[];try{manifest=await json('audit_data/manifest.json');}catch(e){manifest={cnes:{},sigtap:{}};sources.push({tipo:'Manifesto legado',competencia:'',estado:'Indisponível',fonte:e.message});}
+ manifest.cnes={...(manifest.cnes||{}),...await cnesPublishedEntries()};
+ const bases={};
  await Promise.all(competencias.filter(Boolean).map(async cm=>{bases[cm]={};await Promise.all(['cnes','sigtap'].map(async type=>{
  const item=manifest[type]?.[cm];if(!item){sources.push({tipo:type.toUpperCase()+' local',competencia:cm,estado:'Sem base local',fonte:'Base desta competência ausente'});return;}
- try {const data=await json(item.url);const declared=data.competencia||data.versao?.replace(/\D/g,'');if(declared!==cm)throw Error('Competência interna da base diverge da solicitada.');
+ try {const data=await json(item.url,item.sha256);const declared=data.competencia||data.versao?.replace(/\D/g,'');if(declared!==cm)throw Error('Competência interna da base diverge da solicitada.');if(type==='cnes'&&item.url.startsWith('cnes_data/auto/')&&String(data.codigoIbge)!=='210120')throw Error('Snapshot CNES automático fora do escopo Bacabal.');
  bases[cm][type]={...data,competencia:declared,fonte:item.fonte,oficial:item.oficial===true,completo:item.completo===true,cobertura:item.cobertura||{}};
  sources.push({tipo:type.toUpperCase(),competencia:cm,estado:item.oficial?'Carregado':'Origem não validada',fonte:item.fonte||item.url});
  }catch(e){sources.push({tipo:type.toUpperCase(),competencia:cm,estado:'Indisponível',fonte:e.message});}
