@@ -18,6 +18,7 @@ const { shouldCompress, compressBuffer, createCompressionStream } = require('./l
 const { SiasusSyncService } = require('./lib/siasus-sync-service');
 const { readPublishedSnapshotDetails } = require('./lib/cnes-snapshot-store');
 const { startCnesSyncScheduler, resolveCnesPython } = require('./lib/cnes-sync-scheduler');
+const { getRadarScheduler } = require('./lib/radar-scheduler');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'code_sandbox_light_git_fe61910d_1781185357');
@@ -39,11 +40,11 @@ function getRateLimitPolicy(pathname, method) {
         return { category: 'email', limit: 5, windowMs: 60000 };
     }
     // Tier 2: Persistência & Escrita (15 req / 60s)
-    if (pathname === '/api/cnes/salvar' || (pathname === '/api/bpa/email-config' && method === 'POST') || pathname === '/api/siasus/sincronizar') {
+    if (pathname === '/api/cnes/salvar' || (pathname === '/api/bpa/email-config' && method === 'POST') || pathname === '/api/siasus/sincronizar' || pathname === '/api/radar/sweep') {
         return { category: 'write', limit: 15, windowMs: 60000 };
     }
     // Tier 3: Proxies Governamentais Federais (60 req / 60s)
-    if (pathname.startsWith('/api/fns/') || pathname.startsWith('/api/cnes/estabelecimentos') || pathname.startsWith('/api/cnes/municipio') || pathname.startsWith('/api/siasus/')) {
+    if (pathname.startsWith('/api/fns/') || pathname.startsWith('/api/cnes/estabelecimentos') || pathname.startsWith('/api/cnes/municipio') || pathname.startsWith('/api/siasus/') || pathname.startsWith('/api/radar/')) {
         return { category: 'proxy', limit: 60, windowMs: 60000 };
     }
     // Tier 4: Assets Estáticos e Leituras Gerais (300 req / 60s)
@@ -1526,6 +1527,59 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 1.9. Rotas de Inteligência Web — ARGOS Radar & Blog (Opção A)
+    if (pathname === '/api/radar/targets') {
+        handleCors(res);
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        const scheduler = getRadarScheduler({ rootDir: __dirname });
+        const targets = scheduler.getTargets();
+        sendJsonResponse(req, res, 200, {
+            success: true,
+            totalTargets: targets.length,
+            targets
+        });
+        return;
+    }
+
+    if (pathname === '/api/radar/feed') {
+        handleCors(res);
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        const scheduler = getRadarScheduler({ rootDir: __dirname });
+        sendJsonResponse(req, res, 200, {
+            success: true,
+            ...scheduler.getFeed()
+        });
+        return;
+    }
+
+    if (pathname === '/api/radar/status') {
+        handleCors(res);
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        const scheduler = getRadarScheduler({ rootDir: __dirname });
+        sendJsonResponse(req, res, 200, {
+            success: true,
+            status: scheduler.getStatus()
+        });
+        return;
+    }
+
+    if (pathname === '/api/radar/sweep') {
+        handleCors(res);
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        const scheduler = getRadarScheduler({ rootDir: __dirname, logger: globalLogger });
+        scheduler.triggerSweep({ limit: 8, triggerSource: 'manual_ui' })
+            .then(sweepRes => {
+                sendJsonResponse(req, res, sweepRes.success ? 200 : 409, sweepRes);
+            })
+            .catch(err => {
+                sendJsonResponse(req, res, 500, {
+                    success: false,
+                    error: err.message
+                });
+            });
+        return;
+    }
+
     // 2. Servir arquivos estáticos da aplicação
     let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
 
@@ -1593,6 +1647,14 @@ server.listen(PORT, () => {
     // Inicia agendador automático do SIA/SUS (a cada 6 horas)
     globalSiasusSyncService.startAutoSync();
 
+    // Inicia agendador do Radar & Blog de Inteligência Web (Opção A: 24h portais / 6h redes sociais)
+    try {
+        const radarScheduler = getRadarScheduler({ logger: globalLogger, rootDir: __dirname });
+        radarScheduler.start(false);
+    } catch (e) {
+        globalLogger.error('radar_scheduler_start_failed', { error: e.message });
+    }
+
     // A project-local Python environment activates the daily Bacabal sync on
     // persistent Node hosts. CNES_SYNC_ENABLED=0 explicitly disables it.
     const cnesPython = resolveCnesPython({ rootDir: __dirname });
@@ -1615,5 +1677,6 @@ module.exports = {
     globalAuditLogger,
     globalSiasusSyncService,
     get globalCnesSyncScheduler() { return globalCnesSyncScheduler; },
-    getRateLimitPolicy
+    getRateLimitPolicy,
+    getRadarScheduler
 };

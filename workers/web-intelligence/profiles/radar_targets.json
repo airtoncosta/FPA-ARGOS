@@ -1,0 +1,453 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-09-17",
+  "spheres": [
+    {
+      "id": "municipal_bacabal",
+      "name": "Esfera Municipal — Bacabal/MA",
+      "targets": [
+        {
+          "id": "bacabal_pref_insta",
+          "name": "Prefeitura Municipal de Bacabal (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/prefeituradebacabaloficial/",
+          "handle": "@prefeituradebacabaloficial",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "bacabal_pref_fb",
+          "name": "Prefeitura Municipal de Bacabal (Facebook)",
+          "platform": "facebook",
+          "url": "https://www.facebook.com/prefeituradebacabal",
+          "handle": "prefeituradebacabal",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "bacabal_pref_yt",
+          "name": "Prefeitura Municipal de Bacabal (YouTube)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@prefeituradebacabal",
+          "handle": "@prefeituradebacabal",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "bacabal_semus_insta",
+          "name": "Secretaria Municipal de Saúde - SEMUS Bacabal (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/semusbacabal/",
+          "handle": "@semusbacabal",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "bacabal_semus_fb",
+          "name": "Secretaria Municipal de Saúde - SEMUS Bacabal (Facebook)",
+          "platform": "facebook",
+          "url": "https://www.facebook.com/semusbacabal",
+          "handle": "semusbacabal",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "bacabal_prefeito_insta",
+          "name": "Prefeito Municipal de Bacabal (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/prefeito_bacabal/",
+          "handle": "prefeito_bacabal",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "bacabal_sec_saude_insta",
+          "name": "Secretário Municipal de Saúde de Bacabal (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/secretario_saude_bacabal/",
+          "handle": "secretario_saude_bacabal",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "bacabal_camara_yt",
+          "name": "Câmara Municipal de Bacabal - Sessões e Audiências SUS (YouTube)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@camarabacabal",
+          "handle": "@camarabacabal",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "bacabal_camara_insta",
+          "name": "Câmara Municipal de Bacabal (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/camarabacabal/",
+          "handle": "@camarabacabal",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "bacabal_hosp_geral",
+          "name": "Hospital Geral de Bacabal / Laura Vasconcelos (Notícias Oficiais)",
+          "platform": "portal",
+          "url": "https://www.bacabal.ma.gov.br/saude/hospital-geral",
+          "handle": "hospital_geral_bacabal",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "bacabal_upa_samu",
+          "name": "UPA e SAMU 192 Regional Bacabal (Alertas)",
+          "platform": "portal",
+          "url": "https://www.bacabal.ma.gov.br/saude/samu-upa",
+          "handle": "samu_upa_bacabal",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "bacabal_cms",
+          "name": "Conselho Municipal de Saúde de Bacabal (CMS)",
+          "platform": "portal",
+          "url": "https://www.bacabal.ma.gov.br/conselhos/saude",
+          "handle": "cms_bacabal",
+          "priority": "high",
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "estadual_ma",
+      "name": "Esfera Estadual — Maranhão",
+      "targets": [
+        {
+          "id": "governo_ma_insta",
+          "name": "Governo do Estado do Maranhão (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/governodoma/",
+          "handle": "@governodoma",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "governo_ma_x",
+          "name": "Governo do Estado do Maranhão (Twitter/X)",
+          "platform": "twitter",
+          "url": "https://x.com/governodoma",
+          "handle": "@governodoma",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "ses_ma_insta",
+          "name": "Secretaria de Estado da Saúde do Maranhão - SES-MA (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/saudema/",
+          "handle": "@saudema",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "ses_ma_x",
+          "name": "Secretaria de Estado da Saúde do Maranhão - SES-MA (Twitter/X)",
+          "platform": "twitter",
+          "url": "https://x.com/saudema",
+          "handle": "@saudema",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "ses_ma_yt",
+          "name": "SES-MA Oficial (YouTube)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@sesmaranhao",
+          "handle": "@sesmaranhao",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "sec_estadual_saude_ma",
+          "name": "Secretário(a) de Estado da Saúde do Maranhão",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/secretariosaudema/",
+          "handle": "@secretariosaudema",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "cosems_ma_insta",
+          "name": "COSEMS-MA (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/cosemsma/",
+          "handle": "@cosemsma",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "cosems_ma_yt",
+          "name": "COSEMS-MA (YouTube - Capacitações e Faturamento SUS)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@cosemsma",
+          "handle": "@cosemsma",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "famem_ma_insta",
+          "name": "Federação dos Municípios do Maranhão - FAMEM (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/famem_ma/",
+          "handle": "@famem_ma",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "policlinica_bacabal",
+          "name": "Policlínica Regional de Bacabal (SES-MA)",
+          "platform": "portal",
+          "url": "https://saude.ma.gov.br/policlinica-bacabal",
+          "handle": "policlinica_bacabal",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "hosp_macrorregional_bacabal",
+          "name": "Hospital Macrorregional da Região de Bacabal/Santa Inês",
+          "platform": "portal",
+          "url": "https://saude.ma.gov.br/unidades-hospitalares",
+          "handle": "hosp_macro_bacabal",
+          "priority": "high",
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "federal_sus",
+      "name": "Esfera Federal — SUS e Entidades Reguladoras",
+      "targets": [
+        {
+          "id": "ms_insta",
+          "name": "Ministério da Saúde (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/minsaude/",
+          "handle": "@minsaude",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "ms_x",
+          "name": "Ministério da Saúde (Twitter/X)",
+          "platform": "twitter",
+          "url": "https://x.com/minsaude",
+          "handle": "@minsaude",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "ms_yt",
+          "name": "Ministério da Saúde (YouTube)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@minsaudebr",
+          "handle": "@minsaudebr",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "ms_fb",
+          "name": "Ministério da Saúde (Facebook)",
+          "platform": "facebook",
+          "url": "https://www.facebook.com/minsaude",
+          "handle": "minsaude",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "ministra_saude",
+          "name": "Ministra da Saúde (X/Instagram)",
+          "platform": "twitter",
+          "url": "https://x.com/nisia_trindade",
+          "handle": "@nisia_trindade",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "datasus_x",
+          "name": "DATASUS (Twitter/X e Informes)",
+          "platform": "twitter",
+          "url": "https://x.com/datasus",
+          "handle": "@datasus",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "fns_insta",
+          "name": "Fundo Nacional de Saúde - FNS (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/fundonacionaldesaude/",
+          "handle": "@fundonacionaldesaude",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "fns_yt",
+          "name": "FNS Oficial - Repasses e Emendas (YouTube)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@fundonacionaldesaude",
+          "handle": "@fundonacionaldesaude",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "anvisa_insta",
+          "name": "ANVISA (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/anvisaoficial/",
+          "handle": "@anvisaoficial",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "anvisa_x",
+          "name": "ANVISA (Twitter/X - Alertas Sanitários e RDCs)",
+          "platform": "twitter",
+          "url": "https://x.com/anvisa_oficial",
+          "handle": "@anvisa_oficial",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "ans_social",
+          "name": "Agência Nacional de Saúde Suplementar - ANS",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/ans_reguladora/",
+          "handle": "@ans_reguladora",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "fiocruz_insta",
+          "name": "FIOCRUZ (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/fiocruz/",
+          "handle": "@fiocruz",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "butantan_insta",
+          "name": "Instituto Butantan (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/butantanoficial/",
+          "handle": "@butantanoficial",
+          "priority": "medium",
+          "active": true
+        },
+        {
+          "id": "ebserh_social",
+          "name": "EBSERH Hospitais Universitários Federais",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/ebserh/",
+          "handle": "@ebserh",
+          "priority": "medium",
+          "active": true
+        }
+      ]
+    },
+    {
+      "id": "controle_fiscalizacao",
+      "name": "Órgãos de Controle, Fiscalização e Gestão Interfederativa",
+      "targets": [
+        {
+          "id": "conass_insta",
+          "name": "CONASS - Conselho Nacional de Secretários de Saúde (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/conassoficial/",
+          "handle": "@conassoficial",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "conass_x",
+          "name": "CONASS (Twitter/X - Deliberações CIT)",
+          "platform": "twitter",
+          "url": "https://x.com/conassoficial",
+          "handle": "@conassoficial",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "conasems_insta",
+          "name": "CONASEMS (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/conasems/",
+          "handle": "@conasems",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "conasems_yt",
+          "name": "Mais CONASEMS (YouTube - Orientações Faturamento e SIA/SIH)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@MaisConasems",
+          "handle": "@MaisConasems",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "cns_social",
+          "name": "Conselho Nacional de Saúde (CNS)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/conselhonacionaldesaude/",
+          "handle": "@conselhonacionaldesaude",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "tce_ma_insta",
+          "name": "TCE-MA - Tribunal de Contas do Estado do Maranhão (Instagram)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/tce_ma/",
+          "handle": "@tce_ma",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "tce_ma_yt",
+          "name": "TCE-MA (YouTube - Sessões Plenárias e Julgamento de Contas Saúde)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@tcemaranhao",
+          "handle": "@tcemaranhao",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "mpma_insta",
+          "name": "Ministério Público do Maranhão - MPMA (Promotoria da Saúde)",
+          "platform": "instagram",
+          "url": "https://www.instagram.com/mpmaoficial/",
+          "handle": "@mpmaoficial",
+          "priority": "critical",
+          "active": true
+        },
+        {
+          "id": "cgu_x",
+          "name": "CGU - Controladoria-Geral da União (Twitter/X - Auditorias SUS)",
+          "platform": "twitter",
+          "url": "https://x.com/cguonline",
+          "handle": "@cguonline",
+          "priority": "high",
+          "active": true
+        },
+        {
+          "id": "tcu_yt",
+          "name": "TCU - Tribunal de Contas da União (YouTube / Acórdãos FNS)",
+          "platform": "youtube",
+          "url": "https://www.youtube.com/@tcuoficial",
+          "handle": "@tcuoficial",
+          "priority": "high",
+          "active": true
+        }
+      ]
+    }
+  ]
+}

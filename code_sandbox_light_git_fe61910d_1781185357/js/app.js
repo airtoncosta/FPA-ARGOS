@@ -585,7 +585,7 @@ function navigateTo(section) {
     // Ocultar ou Mostrar a barra de filtros dependendo da seção
     const filterBar = document.getElementById('filter-bar');
     if (filterBar) {
-        if (section === 'minha-conta' || section === 'usuarios' || section === 'relatorios' || section === 'arquivos' || section === 'sigtap' || section === 'producoes-bpa' || section === 'conciliacao-fns' || section === 'cnes' || section === 'producao-profissional-cns' || section === 'download-sistema') {
+        if (section === 'minha-conta' || section === 'usuarios' || section === 'relatorios' || section === 'arquivos' || section === 'sigtap' || section === 'producoes-bpa' || section === 'conciliacao-fns' || section === 'cnes' || section === 'producao-profissional-cns' || section === 'download-sistema' || section === 'radar-blog') {
             filterBar.style.display = 'none';
         } else {
             filterBar.style.display = 'flex';
@@ -617,6 +617,10 @@ function navigateTo(section) {
 
     if (section === 'download-sistema' && window.DownloadSistemaModule && typeof window.DownloadSistemaModule.init === 'function') {
         setTimeout(() => window.DownloadSistemaModule.init(), 50);
+    }
+
+    if (section === 'radar-blog' && window.RadarBlogModule && typeof window.RadarBlogModule.init === 'function') {
+        setTimeout(() => window.RadarBlogModule.init(), 50);
     }
 
     // Re-renderizar gráficos se necessário

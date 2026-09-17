@@ -1,0 +1,522 @@
+/**
+ * FPA ARGOS — radar-blog.css
+ * Design System Editorial de Saúde & Inteligência Regulatória
+ * Inspirado nos padrões visuais de Cleveland Clinic (Health Essentials) e Healthline:
+ * - Fundo clínico limpo, azul hospitalar e toques em verde menta/calmante
+ * - Proporção 16:9 panorâmica nas imagens com zoom suave no hover
+ * - Títulos H2 proeminentes com formulação jornalística e resolutiva
+ * - Metadados no padrão "CATEGORIA | DATA" e selo de revisão de auditoria
+ * - Mecânica de clique fluida com botão explícito "Ler mais"
+ */
+
+:root {
+    --cc-blue-primary: #0284c7;
+    --cc-blue-dark: #0369a1;
+    --cc-blue-deep: #0f172a;
+    --cc-teal: #0f766e;
+    --cc-mint: #10b981;
+    --cc-bg-page: #f8fafc;
+    --cc-card-bg: #ffffff;
+    --cc-border: #e2e8f0;
+    --cc-border-hover: #cbd5e1;
+    --cc-text-title: #0f172a;
+    --cc-text-body: #334155;
+    --cc-text-muted: #64748b;
+}
+
+.radar-wrapper {
+    animation: fadeInRadar 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    color: var(--cc-text-body);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@keyframes fadeInRadar {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==========================================================================
+   HERO FEATURED ARTICLE (Artigo Destaque - Padrão Cleveland Clinic)
+   ========================================================================== */
+.radar-hero-card {
+    background: var(--cc-card-bg);
+    border: 1px solid var(--cc-border);
+    border-radius: 1.25rem;
+    overflow: hidden;
+    margin-bottom: 2.25rem;
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.radar-hero-card:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(-3px);
+    border-color: #93c5fd;
+}
+
+.radar-hero-media {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #0f172a;
+}
+
+.radar-hero-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.radar-hero-card:hover .radar-hero-media img {
+    transform: scale(1.05);
+}
+
+.radar-hero-content {
+    padding: 2.25rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.radar-meta-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+}
+
+.radar-cat-badge {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--cc-blue-primary);
+}
+
+.radar-meta-divider {
+    color: #cbd5e1;
+    font-weight: 300;
+}
+
+.radar-date-text {
+    font-size: 0.8rem;
+    color: var(--cc-text-muted);
+    font-weight: 600;
+}
+
+.radar-review-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #059669;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+}
+
+.radar-hero-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--cc-text-title);
+    line-height: 1.3;
+    margin: 0 0 1rem 0;
+    letter-spacing: -0.02em;
+    transition: color 0.2s;
+}
+
+.radar-hero-card:hover .radar-hero-title {
+    color: var(--cc-blue-primary);
+}
+
+.radar-hero-summary {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--cc-text-body);
+    margin: 0 0 1.5rem 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.radar-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--cc-border);
+}
+
+.radar-source-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--cc-text-muted);
+}
+
+.radar-source-icon {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 9999px;
+    background: #e0f2fe;
+    color: var(--cc-blue-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+}
+
+.radar-cta-link {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--cc-blue-primary);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+}
+
+.radar-cta-link i {
+    transition: transform 0.2s ease-in-out;
+}
+
+.radar-hero-card:hover .radar-cta-link i,
+.radar-article-card:hover .radar-cta-link i {
+    transform: translateX(4px);
+}
+
+/* ==========================================================================
+   FILTROS RÁPIDOS EM PÍLULAS (Topic Filter Pills)
+   ========================================================================== */
+.radar-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    margin-bottom: 2rem;
+    scrollbar-width: thin;
+}
+
+.radar-filter-pill {
+    white-space: nowrap;
+    background: var(--cc-card-bg);
+    color: var(--cc-text-muted);
+    border: 1px solid var(--cc-border);
+    padding: 0.55rem 1.1rem;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.radar-filter-pill:hover {
+    border-color: #93c5fd;
+    color: var(--cc-blue-primary);
+    background: #f0f9ff;
+}
+
+.radar-filter-pill.active {
+    background: var(--cc-blue-deep);
+    color: #ffffff;
+    border-color: var(--cc-blue-deep);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
+}
+
+/* ==========================================================================
+   GRADE DE ARTIGOS 16:9 (Cleveland Clinic Essentials Magazine Grid)
+   ========================================================================== */
+.radar-magazine-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.radar-article-card {
+    background: var(--cc-card-bg);
+    border: 1px solid var(--cc-border);
+    border-radius: 1.15rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.radar-article-card:hover {
+    box-shadow: 0 16px 25px -4px rgba(0, 0, 0, 0.08), 0 8px 10px -4px rgba(0, 0, 0, 0.03);
+    transform: translateY(-4px);
+    border-color: #93c5fd;
+}
+
+.radar-thumbnail-wrapper {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #0f172a;
+}
+
+.radar-thumbnail-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.radar-article-card:hover .radar-thumbnail-wrapper img {
+    transform: scale(1.06);
+}
+
+.radar-article-body {
+    padding: 1.5rem 1.6rem 1rem 1.6rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.radar-article-title {
+    font-size: 1.22rem;
+    font-weight: 800;
+    color: var(--cc-text-title);
+    line-height: 1.38;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: -0.015em;
+    transition: color 0.2s;
+}
+
+.radar-article-card:hover .radar-article-title {
+    color: var(--cc-blue-primary);
+}
+
+.radar-article-summary {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--cc-text-body);
+    margin: 0 0 1.25rem 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   MODAL LEITOR EDITORIAL IMERSIVO (Health Reader Modal)
+   ========================================================================== */
+.radar-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    box-sizing: border-box;
+    animation: fadeInModal 0.2s ease-out;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.radar-reader-box {
+    background: #ffffff;
+    width: 100%;
+    max-width: 860px;
+    max-height: 92vh;
+    border-radius: 1.25rem;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+    position: relative;
+    animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpModal {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.radar-reader-close {
+    position: absolute;
+    top: 1.2rem;
+    right: 1.2rem;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.6);
+    color: #ffffff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 10;
+    transition: background 0.2s;
+}
+
+.radar-reader-close:hover {
+    background: rgba(15, 23, 42, 0.9);
+}
+
+.radar-reader-hero {
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    position: relative;
+    background: #0f172a;
+}
+
+.radar-reader-hero img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.radar-reader-content {
+    padding: 2.5rem 3rem;
+}
+
+.radar-reader-h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+    margin: 0 0 1.25rem 0;
+    letter-spacing: -0.02em;
+}
+
+.radar-reader-body {
+    font-size: 1.05rem;
+    line-height: 1.75;
+    color: #334155;
+    margin-bottom: 2rem;
+}
+
+.radar-reader-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+}
+
+.radar-tag-pill {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 0.3rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+/* Badges sobrepostas nas miniaturas 16:9 */
+.radar-thumb-overlay-badge {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    z-index: 2;
+}
+
+.radar-thumb-badge-instagram {
+    background: rgba(219, 39, 119, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.radar-thumb-badge-youtube {
+    background: rgba(220, 38, 38, 0.92);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.radar-thumb-badge-facebook {
+    background: rgba(29, 78, 216, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.radar-thumb-badge-twitter,
+.radar-thumb-badge-x {
+    background: rgba(15, 23, 42, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.radar-thumb-badge-reddit {
+    background: rgba(255, 69, 0, 0.92);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.radar-thumb-badge-linkedin {
+    background: rgba(10, 102, 194, 0.92);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.radar-thumb-badge-web {
+    background: rgba(2, 132, 199, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Responsividade Mobile */
+@media (max-width: 900px) {
+    .radar-hero-card {
+        grid-template-columns: 1fr;
+    }
+    .radar-hero-content {
+        padding: 1.5rem;
+    }
+    .radar-hero-title {
+        font-size: 1.4rem;
+    }
+    .radar-magazine-grid {
+        grid-template-columns: 1fr;
+    }
+    .radar-reader-content {
+        padding: 1.5rem;
+    }
+    .radar-reader-h1 {
+        font-size: 1.4rem;
+    }
+}

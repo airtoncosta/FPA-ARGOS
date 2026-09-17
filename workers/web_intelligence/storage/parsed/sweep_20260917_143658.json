@@ -1,0 +1,43 @@
+{
+  "sweep_id": "sweep_20260917_143658",
+  "generated_at": "2026-09-17T14:37:01.614594",
+  "total_targets_swept": 3,
+  "results": [
+    {
+      "target_id": "bacabal_pref_insta",
+      "name": "Prefeitura Municipal de Bacabal (Instagram)",
+      "sphere": "Esfera Municipal — Bacabal/MA",
+      "platform": "instagram",
+      "url": "https://www.instagram.com/prefeituradebacabaloficial/",
+      "collected_at": "2026-09-17T14:36:59.802219",
+      "success": true,
+      "status_code": 200,
+      "raw_file": "raw_20260917_143658_bacabal_pref_insta.json",
+      "preview": "Instagram"
+    },
+    {
+      "target_id": "bacabal_pref_fb",
+      "name": "Prefeitura Municipal de Bacabal (Facebook)",
+      "sphere": "Esfera Municipal — Bacabal/MA",
+      "platform": "facebook",
+      "url": "https://www.facebook.com/prefeituradebacabal",
+      "collected_at": "2026-09-17T14:37:00.620979",
+      "success": false,
+      "status_code": 400,
+      "raw_file": "raw_20260917_143658_bacabal_pref_fb.json",
+      "preview": "Error\nSorry, something went wrong.\nWe're working on getting this fixed as soon as we can.\nGo back\nMeta © 2026 ·\nHelp"
+    },
+    {
+      "target_id": "bacabal_pref_yt",
+      "name": "Prefeitura Municipal de Bacabal (YouTube)",
+      "sphere": "Esfera Municipal — Bacabal/MA",
+      "platform": "youtube",
+      "url": "https://www.youtube.com/@prefeituradebacabal",
+      "collected_at": "2026-09-17T14:37:01.614594",
+      "success": true,
+      "status_code": 200,
+      "raw_file": "raw_20260917_143658_bacabal_pref_yt.json",
+      "preview": "Sobre\nImprensa\nDireitos autorais\nEntre em contato\nCriadores de conteúdo\nPublicidade\nDesenvolvedores\nTermos\nPrivacidade\nPolítica e segurança\nComo funciona o YouTube\nTestar os novos recursos\n© 2026 Google LLC\nPrefeitura de Bacabal MA - YouTube"
+    }
+  ]
+}
