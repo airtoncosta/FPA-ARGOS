@@ -276,9 +276,8 @@ foreach ($u in $estabMap.Values) {
         $chTotal = $v.chAmb + $v.chHosp + $v.chOutr
         if ($chTotal -eq 0) { $chTotal = 40 }
 
+        # Portaria 134 inicializada vazia — será calculada no pós-processamento multi-vínculo
         $portaria134 = ''
-        if ($chTotal -gt 60) { $portaria134 = 'SOBREPOSICAO (>60h)' }
-        elseif ($chTotal -gt 40) { $portaria134 = 'ALERTA (>40h)' }
 
         $u.profissionais.Add([PSCustomObject]@{
             nome = $nomeProf
@@ -307,6 +306,45 @@ foreach ($u in $estabMap.Values) {
     $u.PSObject.Properties.Remove('vinculosRaw')
     $estabelecimentosFinais.Add($u)
 }
+
+# 6b. Pós-processamento: Portaria SAS/MS 134/2011 — Acúmulo de Cargos (multi-vínculo)
+# Agora que TODOS os profissionais de TODOS os estabelecimentos foram montados, calcular
+# a carga horária total na rede por CNS e identificar acúmulo real de vínculos.
+Write-Host '6b. Calculando alertas reais da Portaria 134 (multi-vinculo na rede)...'
+
+$cnsHorasRede = [System.Collections.Generic.Dictionary[string, int]]::new()
+$cnsVinculosRede = [System.Collections.Generic.Dictionary[string, int]]::new()
+
+foreach ($u in $estabelecimentosFinais) {
+    foreach ($p in $u.profissionais) {
+        $cnsk = $p.cns
+        if (-not $cnsk -or $cnsk -eq '700000000000000') { continue }
+        $ch = [int]$p.chTotal
+        if ($cnsHorasRede.ContainsKey($cnsk)) {
+            $cnsHorasRede[$cnsk] += $ch
+            $cnsVinculosRede[$cnsk] += 1
+        } else {
+            $cnsHorasRede[$cnsk] = $ch
+            $cnsVinculosRede[$cnsk] = 1
+        }
+    }
+}
+
+$totalAlertas134 = 0
+foreach ($u in $estabelecimentosFinais) {
+    foreach ($p in $u.profissionais) {
+        $cnsk = $p.cns
+        if (-not $cnsk -or $cnsk -eq '700000000000000') { continue }
+        $qtdVinculos = if ($cnsVinculosRede.ContainsKey($cnsk)) { $cnsVinculosRede[$cnsk] } else { 1 }
+        $horasRede = if ($cnsHorasRede.ContainsKey($cnsk)) { $cnsHorasRede[$cnsk] } else { [int]$p.chTotal }
+
+        if ($qtdVinculos -gt 1 -and $horasRede -gt 60) {
+            $p.portaria134 = "SOBREPOSICAO (Art. 2 - ${qtdVinculos} vinculos / ${horasRede}h)"
+            $totalAlertas134++
+        }
+    }
+}
+Write-Host "-> Alertas reais Portaria 134 (multi-vinculo >60h): $totalAlertas134"
 
 $competencias = @(
     [PSCustomObject]@{ codigo = '202608'; label = '08/2026 (Competencia Vigente Oficial)'; vigente = $true }

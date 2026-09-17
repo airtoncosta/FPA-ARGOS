@@ -78,7 +78,7 @@ const listaUnidadesBacabal = [
             { codigo: '114', classificacao: '001', nome: 'CIRURGIA GERAL E TRAUMATO-ORTOPÉDICA' }
         ],
         profissionaisPadrao: [
-            { nome: 'DR. MARCELO NUNES FERREIRA', cbo: '225225', ocupacao: '225225 - MEDICO CIRURGIAO GERAL', chAmb: 20, chHosp: 24, chTotal: 44, situacao: 'Ativo', portaria134: 'SOBREPOSIÇÃO' },
+            { nome: 'DR. MARCELO NUNES FERREIRA', cbo: '225225', ocupacao: '225225 - MEDICO CIRURGIAO GERAL', chAmb: 20, chHosp: 24, chTotal: 44, situacao: 'Ativo', portaria134: '' },
             { nome: 'DRA. BEATRIZ CARVALHO DIAS', cbo: '225270', ocupacao: '225270 - MEDICO ORTOPEDISTA', chAmb: 20, chHosp: 20, chTotal: 40, situacao: 'Ativo', portaria134: '' },
             { nome: 'DR. FERNANDO AUGUSTO BRITO', cbo: '225125', ocupacao: '225125 - MEDICO CLINICO GERAL', chAmb: 20, chHosp: 24, chTotal: 44, situacao: 'Ativo', portaria134: '' },
             { nome: 'DRA. JULIANA BARROS PEIXOTO', cbo: '225151', ocupacao: '225151 - MEDICO ANESTESIOLOGISTA', chAmb: 0, chHosp: 40, chTotal: 40, situacao: 'Ativo', portaria134: '' },
@@ -128,7 +128,7 @@ const listaUnidadesBacabal = [
             { codigo: '122', classificacao: '002', nome: 'ULTRASSONOGRAFIA OBSTÉTRICA' }
         ],
         profissionaisPadrao: [
-            { nome: 'DRA. PATRÍCIA LIMA VASCONCELOS', cbo: '225135', ocupacao: '225135 - MEDICO GINECOLOGISTA E OBSTETRA', chAmb: 20, chHosp: 24, chTotal: 44, situacao: 'Ativo', portaria134: 'SOBREPOSIÇÃO' },
+            { nome: 'DRA. PATRÍCIA LIMA VASCONCELOS', cbo: '225135', ocupacao: '225135 - MEDICO GINECOLOGISTA E OBSTETRA', chAmb: 20, chHosp: 24, chTotal: 44, situacao: 'Ativo', portaria134: '' },
             { nome: 'DR. CARLOS ALBERTO MENDONÇA', cbo: '225124', ocupacao: '225124 - MEDICO PEDIATRA (NEONATOLOGISTA)', chAmb: 20, chHosp: 24, chTotal: 44, situacao: 'Ativo', portaria134: '' },
             { nome: 'DRA. RACHEL ALMEIDA TEIXEIRA', cbo: '225135', ocupacao: '225135 - MEDICO GINECOLOGISTA E OBSTETRA', chAmb: 20, chHosp: 20, chTotal: 40, situacao: 'Ativo', portaria134: '' },
             { nome: 'ENF. VANESSA CARDOSO FREITAS', cbo: '223525', ocupacao: '223525 - ENFERMEIRO OBSTÉTRICO', chAmb: 0, chHosp: 40, chTotal: 40, situacao: 'Ativo', portaria134: '' },
@@ -171,7 +171,7 @@ const listaUnidadesBacabal = [
             { codigo: '120', classificacao: '001', nome: 'EXAMES LABORATORIAIS DE URGÊNCIA' }
         ],
         profissionaisPadrao: [
-            { nome: 'DR. EDUARDO HENRIQUE COSTA', cbo: '225125', ocupacao: '225125 - MEDICO CLINICO DE PLANTAO', chAmb: 0, chHosp: 48, chTotal: 48, situacao: 'Ativo', portaria134: 'SOBREPOSIÇÃO' },
+            { nome: 'DR. EDUARDO HENRIQUE COSTA', cbo: '225125', ocupacao: '225125 - MEDICO CLINICO DE PLANTAO', chAmb: 0, chHosp: 48, chTotal: 48, situacao: 'Ativo', portaria134: '' },
             { nome: 'DRA. CAMILA FARIAS SOARES', cbo: '225124', ocupacao: '225124 - MEDICO PEDIATRA DE PLANTAO', chAmb: 0, chHosp: 24, chTotal: 24, situacao: 'Ativo', portaria134: '' },
             { nome: 'DR. BRUNO CESAR MARTINS', cbo: '225125', ocupacao: '225125 - MEDICO CLINICO DE PLANTAO', chAmb: 0, chHosp: 36, chTotal: 36, situacao: 'Ativo', portaria134: '' },
             { nome: 'ENF. DANIELA GOMES FONSECA', cbo: '223505', ocupacao: '223505 - ENFERMEIRO PLANTONISTA', chAmb: 0, chHosp: 40, chTotal: 40, situacao: 'Ativo', portaria134: '' },

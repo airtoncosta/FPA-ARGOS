@@ -554,9 +554,6 @@ window.CnesModule = (function () {
         const chTotal = Number(p.chTotal || p.carga_horaria_total || (chAmb + chHosp + chOutros) || (allowSynthetic ? 40 : 0));
 
         let portaria134 = p.portaria134 || '';
-        if (portaria134 && portaria134.includes('>40')) {
-            portaria134 = '';
-        }
 
         // Data de atribuição sempre preservada com valor real oficial do CNES DATASUS
         const dtAtribuicao = p.dtAtribuicao || p.dt_atribuicao || p.data_atribuicao || p.dtEntrada || p.dt_entrada || '01/03/2021';
@@ -609,7 +606,7 @@ window.CnesModule = (function () {
 
         if (isHosp) {
             return [
-                normalizarProfissional({ nome: `DR(A). CIRURGIÃO(Ã) GERAL`, cbo: '225225', ocupacao: '225225 - MEDICO CIRURGIAO GERAL', chAmb: 20, chHosp: 24, chTotal: 44, situacao: 'Ativo', portaria134: 'SOBREPOSIÇÃO' }, cnes, unidadeNome, 1),
+                normalizarProfissional({ nome: `DR(A). CIRURGIÃO(Ã) GERAL`, cbo: '225225', ocupacao: '225225 - MEDICO CIRURGIAO GERAL', chAmb: 20, chHosp: 24, chTotal: 44, situacao: 'Ativo' }, cnes, unidadeNome, 1),
                 normalizarProfissional({ nome: `DR(A). CLÍNICO(A) PLANTONISTA`, cbo: '225125', ocupacao: '225125 - MEDICO CLINICO DE PLANTAO', chAmb: 0, chHosp: 40, chTotal: 40, situacao: 'Ativo' }, cnes, unidadeNome, 2),
                 normalizarProfissional({ nome: `ENF. COORDENADOR(A) DE ENFERMAGEM`, cbo: '223505', ocupacao: '223505 - ENFERMEIRO HOSPITALAR', chAmb: 0, chHosp: 40, chTotal: 40, situacao: 'Ativo' }, cnes, unidadeNome, 3),
                 normalizarProfissional({ nome: `TEC. ENFERMAGEM PLANTONISTA`, cbo: '322205', ocupacao: '322205 - TECNICO DE ENFERMAGEM', chAmb: 0, chHosp: 40, chTotal: 40, situacao: 'Ativo' }, cnes, unidadeNome, 4)

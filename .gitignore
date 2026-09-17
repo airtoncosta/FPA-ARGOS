@@ -47,3 +47,6 @@ __pycache__/
 
 # GitHub Actions workflows (requer permissão workflow separada)
 .github/
+
+# Plugins instalados localmente
+.agents/plugins/

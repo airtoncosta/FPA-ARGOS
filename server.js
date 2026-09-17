@@ -636,7 +636,7 @@ function enviarFallbackLocal(ibge, munName, uf, res, cacheFilePath) {
                             tipoVinculo: 'CONTRATADO TEMPORÁRIO',
                             subtipo: 'PUBLICO',
                             situacao: 'Ativo',
-                            portaria134: 'SOBREPOSIÇÃO',
+                            portaria134: '',
                             ativo: true
                         },
                         {
