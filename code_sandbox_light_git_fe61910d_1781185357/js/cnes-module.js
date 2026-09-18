@@ -516,20 +516,37 @@ window.CnesModule = (function () {
         const allowSynthetic = options.allowSynthetic !== false;
         const fallback = (value, generated) => value == null || value === '' ? (allowSynthetic ? generated : '') : value;
         const cnes = String(u.cnes || u.codigo_cnes || u.co_cnes || u.cnes_id || '').trim();
+        
+        // Consulta metadados oficiais de Bacabal se disponíveis
+        const metaBacabal = (typeof window !== 'undefined' && window.CNES_METADATA_BACABAL && window.CNES_METADATA_BACABAL[cnes]) || null;
         const referenceName = u.nomeFantasiaOrigem === 'identificador CNES' ? u.nomeReferenciaLegado : '';
-        const nomeFantasia = String(fallback(referenceName || u.nomeFantasia || u.nome_fantasia || u.no_fantasia, 'ESTABELECIMENTO DE SAÚDE')).trim().toUpperCase();
-        const razaoSocial = String(fallback(u.razaoSocial || u.nome_razao_social || u.no_razao_social, nomeFantasia)).trim().toUpperCase();
-        const tipoUnidade = String(fallback(u.tipoUnidade || u.descricao_tipo_unidade || u.ds_tipo_unidade ||
-            (!allowSynthetic && u.tipoUnidadeCodigo ? `Tipo CNES: ${u.tipoUnidadeCodigo}` : ''), '02 - CENTRO DE SAUDE / UBS')).trim().toUpperCase();
-        const cnpj = String(fallback(u.cnpj || u.numero_cnpj_mantenedora || u.nu_cnpj_mantenedora, '07.186.334/0001-40')).trim();
-        const tipoGestao = String(fallback(u.tipoGestao || u.tipo_gestao ||
-            (!allowSynthetic && u.tipoGestaoCodigo ? `Código CNES: ${u.tipoGestaoCodigo}` : ''), 'MUNICIPAL')).trim().toUpperCase();
-        const esfera = String(fallback(u.esfera || u.descricao_esfera_administrativa, 'MUNICIPAL')).trim().toUpperCase();
-        const endereco = String(fallback(u.endereco || u.endereco_estabelecimento || u.logradouro, 'ENDEREÇO DA UNIDADE')).trim();
+
+        let nfCandidate = referenceName || u.nomeFantasia || u.nome_fantasia || u.no_fantasia;
+        if ((!nfCandidate || /^CNES\s+\d+$/i.test(String(nfCandidate).trim())) && metaBacabal && metaBacabal.nomeFantasia) {
+            nfCandidate = metaBacabal.nomeFantasia;
+        }
+        const nomeFantasia = String(fallback(nfCandidate, 'ESTABELECIMENTO DE SAÚDE')).trim().toUpperCase();
+
+        let rzCandidate = u.razaoSocial || u.razao_social || u.nome_razao_social || u.no_razao_social;
+        if (!rzCandidate && metaBacabal && metaBacabal.razaoSocial) {
+            rzCandidate = metaBacabal.razaoSocial;
+        }
+        const razaoSocial = String(fallback(rzCandidate, nomeFantasia)).trim().toUpperCase();
+
+        let tpCandidate = u.tipoUnidade || u.tipo_unidade || u.descricao_tipo_unidade || u.ds_tipo_unidade;
+        if (!tpCandidate && metaBacabal && metaBacabal.tipoUnidade) {
+            tpCandidate = metaBacabal.tipoUnidade;
+        }
+        const tipoUnidade = String(fallback(tpCandidate || (!allowSynthetic && u.tipoUnidadeCodigo ? `Tipo CNES: ${u.tipoUnidadeCodigo}` : ''), '02 - CENTRO DE SAUDE / UBS')).trim().toUpperCase();
+
+        const cnpj = String(fallback(u.cnpj || u.numero_cnpj_mantenedora || u.nu_cnpj_mantenedora || (metaBacabal && metaBacabal.cnpj), '06014351000138')).trim();
+        const tipoGestao = String(fallback(u.tipoGestao || u.tipo_gestao || (metaBacabal && metaBacabal.tipoGestao) || (!allowSynthetic && u.tipoGestaoCodigo ? `Código CNES: ${u.tipoGestaoCodigo}` : ''), 'MUNICIPAL')).trim().toUpperCase();
+        const esfera = String(fallback(u.esfera || u.descricao_esfera_administrativa || (metaBacabal && metaBacabal.esfera), 'MUNICIPAL')).trim().toUpperCase();
+        const endereco = String(fallback(u.endereco || u.endereco_estabelecimento || u.logradouro || (metaBacabal && metaBacabal.endereco), 'ENDEREÇO DA UNIDADE')).trim();
         const numero = String(fallback(u.numero || u.numero_estabelecimento, 'S/N')).trim();
-        const bairro = String(fallback(u.bairro || u.bairro_estabelecimento, 'CENTRO')).trim();
-        const telefone = String(fallback(u.telefone || u.numero_telefone_estabelecimento, '(99) 3621-1200')).trim();
-        const atendimentoSus = String(fallback(u.atendimentoSus, u.atendimento_prestado_sus === 'SIM' || u.atendimento_prestado_sus === true ? 'SIM' : 'SIM (MUNICIPAL)')).trim();
+        const bairro = String(fallback(u.bairro || u.bairro_estabelecimento || (metaBacabal && metaBacabal.bairro), 'CENTRO')).trim();
+        const telefone = String(fallback(u.telefone || u.numero_telefone_estabelecimento || (metaBacabal && metaBacabal.telefone), '(99) 3621-1200')).trim();
+        const atendimentoSus = String(fallback(u.atendimentoSus || u.atendimento_sus || (metaBacabal && metaBacabal.atendimentoSus), u.atendimento_prestado_sus === 'SIM' || u.atendimento_prestado_sus === true ? 'SIM' : 'SIM (MUNICIPAL)')).trim();
 
         // Normalizar profissionais
         let profs = [];
