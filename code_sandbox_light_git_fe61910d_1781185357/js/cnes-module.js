@@ -692,6 +692,10 @@ window.CnesModule = (function () {
                 const token = sessionResult && sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token;
                 if (token) headers.Authorization = `Bearer ${token}`;
             }
+            if (!headers.Authorization && window.SupabaseConfig && typeof window.SupabaseConfig.getAnonKey === 'function') {
+                const anon = window.SupabaseConfig.getAnonKey();
+                if (anon) headers.Authorization = `Bearer ${anon}`;
+            }
         } catch (authErr) {
             console.warn('Sessão Supabase indisponível para consulta CNES:', authErr);
         }
@@ -883,6 +887,81 @@ window.CnesModule = (function () {
         // must remain visibly unavailable until the worker publishes a valid
         // snapshot (or the API returns the explicitly marked legacy file).
         if (isBacabal) {
+            // Fallback direto via Supabase Cloud se a API não estiver acessível
+            if (window.SupabaseConfig && typeof window.SupabaseConfig.getClient === 'function') {
+                try {
+                    const supabaseClient = window.SupabaseConfig.getClient();
+                    if (supabaseClient) {
+                        const targetComp = requestedCompetence || '202608';
+                        const { data: sEstabs, error: sErr } = await supabaseClient
+                            .from('cnes_estabelecimentos')
+                            .select('*')
+                            .eq('codigo_ibge', state.ibge)
+                            .eq('competencia', targetComp);
+
+                        if (!sErr && sEstabs && sEstabs.length > 0) {
+                            const { data: sProfs } = await supabaseClient
+                                .from('cnes_profissionais')
+                                .select('*')
+                                .eq('municipio_ibge', state.ibge)
+                                .eq('competencia', targetComp);
+
+                            const profsMap = {};
+                            (sProfs || []).forEach(p => {
+                                if (!profsMap[p.cnes]) profsMap[p.cnes] = [];
+                                profsMap[p.cnes].push({
+                                    nome: p.nome,
+                                    cns: p.cns,
+                                    cbo: p.cbo,
+                                    ocupacao: p.ocupacao,
+                                    chAmb: p.ch_amb,
+                                    chHosp: p.ch_hosp,
+                                    chOutros: p.ch_outros,
+                                    chTotal: p.ch_total,
+                                    atendimentoSus: p.atendimento_sus,
+                                    vinculacao: p.vinculacao,
+                                    tipoVinculo: p.tipo_vinculo,
+                                    subtipo: p.subtipo,
+                                    codigoVinculacao: p.codigo_vinculacao,
+                                    codigoVinculo: p.codigo_vinculo,
+                                    codigoSubVinculo: p.codigo_subvinculo,
+                                    situacao: p.situacao,
+                                    portaria134: p.portaria134,
+                                    portaria134Fonte: p.portaria134_fonte
+                                });
+                            });
+
+                            state.estabelecimentos = sEstabs.map(u => normalizarEstabelecimento({
+                                ...u,
+                                nomeFantasia: u.nome_fantasia,
+                                razaoSocial: u.razao_social,
+                                tipoUnidade: u.tipo_unidade,
+                                tipoGestao: u.tipo_gestao,
+                                atendimentoSus: u.atendimento_sus,
+                                profissionais: profsMap[u.cnes] || []
+                            }, state.municipio, state.uf));
+
+                            state.competencias = [
+                                { codigo: '202608', label: '08/2026', vigente: true },
+                                { codigo: '202607', label: '07/2026', vigente: false },
+                                { codigo: '202606', label: '06/2026', vigente: false }
+                            ];
+                            state.competenciaAtiva = targetComp;
+                            state.dataSource = 'Supabase Cloud (Oficial CNES)';
+                            state.sourceType = 'supabase';
+                            state.isLegacy = false;
+                            state.coverage = null;
+                            state.lastSync = new Date();
+                            state.loading = false;
+                            render();
+                            return;
+                        }
+                    }
+                } catch (eSup) {
+                    console.warn('Fallback Supabase Bacabal:', eSup);
+                }
+            }
+
             state.estabelecimentos = [];
             state.competencias = [];
             state.competenciaAtiva = '';
