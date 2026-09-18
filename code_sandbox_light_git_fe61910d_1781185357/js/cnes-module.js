@@ -900,14 +900,33 @@ window.CnesModule = (function () {
                             .eq('competencia', targetComp);
 
                         if (!sErr && sEstabs && sEstabs.length > 0) {
-                            const { data: sProfs } = await supabaseClient
-                                .from('cnes_profissionais')
-                                .select('*')
-                                .eq('municipio_ibge', state.ibge)
-                                .eq('competencia', targetComp);
+                            let allProfs = [];
+                            let page = 0;
+                            const pageSize = 1000;
+                            let hasMore = true;
+                            while (hasMore) {
+                                const from = page * pageSize;
+                                const to = from + pageSize - 1;
+                                const { data: chunk, error: chunkErr } = await supabaseClient
+                                    .from('cnes_profissionais')
+                                    .select('*')
+                                    .eq('municipio_ibge', state.ibge)
+                                    .eq('competencia', targetComp)
+                                    .range(from, to);
+                                if (chunkErr || !chunk || chunk.length === 0) {
+                                    hasMore = false;
+                                } else {
+                                    allProfs.push(...chunk);
+                                    if (chunk.length < pageSize) {
+                                        hasMore = false;
+                                    } else {
+                                        page++;
+                                    }
+                                }
+                            }
 
                             const profsMap = {};
-                            (sProfs || []).forEach(p => {
+                            allProfs.forEach(p => {
                                 if (!profsMap[p.cnes]) profsMap[p.cnes] = [];
                                 profsMap[p.cnes].push({
                                     nome: p.nome,
@@ -939,7 +958,7 @@ window.CnesModule = (function () {
                                 tipoGestao: u.tipo_gestao,
                                 atendimentoSus: u.atendimento_sus,
                                 profissionais: profsMap[u.cnes] || []
-                            }, state.municipio, state.uf));
+                            }, state.municipio, state.uf, { allowSynthetic: false, competencia: targetComp }));
 
                             state.competencias = [
                                 { codigo: '202608', label: '08/2026', vigente: true },
