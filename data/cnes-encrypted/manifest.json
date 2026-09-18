@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "scope": {
+    "municipality_ibge": "210120",
+    "uf": "MA"
+  },
+  "active_competence": "202608",
+  "competencies": {
+    "202606": {
+      "status": "published",
+      "revision": 1,
+      "published_at": "2026-09-18T13:28:21Z",
+      "source": "DATASUS_FTP",
+      "blob": {
+        "path": "snapshots/202606/rev-1-4802f2be764181230fdab4660e36f743e3b4cc23b4f22575d44c380c2a9c683d.json.enc",
+        "sha256": "4802f2be764181230fdab4660e36f743e3b4cc23b4f22575d44c380c2a9c683d",
+        "source_sha256": "e84c6199e17415d19f8476813afd06e16420abc9f01b153d12718971b3d0ec1f"
+      },
+      "counts": {
+        "establishments": 116,
+        "professional_links": 3072,
+        "professionals": 2722,
+        "quarantined": 0
+      },
+      "coverage": {
+        "beds": false,
+        "equipment": false,
+        "habilitations": false,
+        "pf": true,
+        "services": false,
+        "st": true
+      }
+    },
+    "202607": {
+      "status": "published",
+      "revision": 2,
+      "published_at": "2026-09-16T18:40:04Z",
+      "source": "DATASUS_FTP",
+      "blob": {
+        "path": "snapshots/202607/rev-2-8cfc0ea2bdd8ccddd0033b1a6a228467021cb04f3be9a9ebc3cdb293c4675153.json.enc",
+        "sha256": "8cfc0ea2bdd8ccddd0033b1a6a228467021cb04f3be9a9ebc3cdb293c4675153",
+        "source_sha256": "e7d5810a198af668a6c02ef91b6c2c0b1af6c6fb95a71b7a8449433ec2ea9e57"
+      },
+      "counts": {
+        "establishments": 117,
+        "professional_links": 3078,
+        "professionals": 2725,
+        "quarantined": 0
+      },
+      "coverage": {
+        "beds": false,
+        "equipment": false,
+        "habilitations": false,
+        "pf": true,
+        "services": false,
+        "st": true
+      }
+    },
+    "202608": {
+      "status": "published",
+      "revision": 2,
+      "published_at": "2026-09-16T18:36:03Z",
+      "source": "DATASUS_FTP",
+      "blob": {
+        "path": "snapshots/202608/rev-2-dc9d7e6096c6efcedebcafc3b864435f14661db1f7021e9ce1b5496570b39a42.json.enc",
+        "sha256": "dc9d7e6096c6efcedebcafc3b864435f14661db1f7021e9ce1b5496570b39a42",
+        "source_sha256": "91c4e69f2bf741fc88d8c4a695c1314c2b57573996b0a0302205d3ae8d6def6f"
+      },
+      "counts": {
+        "establishments": 117,
+        "professional_links": 3091,
+        "professionals": 2735,
+        "quarantined": 0
+      },
+      "coverage": {
+        "beds": false,
+        "equipment": false,
+        "habilitations": false,
+        "pf": true,
+        "services": false,
+        "st": true
+      }
+    }
+  }
+}

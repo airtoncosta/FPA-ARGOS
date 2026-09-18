@@ -69,3 +69,74 @@ test('Bacabal com um único mês publicado exibe ausência de comparação', asy
 
     assert.match(view.innerHTML, /Ainda não há outra competência publicada/);
 });
+
+test('não transforma carga horária municipal incompleta em alerta ou Artigo 2º', () => {
+    const { module } = loadModule({});
+    const horas = new Map([['700000000000001', 84]]);
+    const vinculos = new Map([['700000000000001', 2]]);
+
+    const status = module.obterStatusPortaria134({
+        cns: '700000000000001',
+        chTotal: 44,
+        portaria134: 'SOBREPOSIÇÃO (>60h)'
+    }, horas, vinculos);
+
+    assert.equal(status.alerta, false);
+    assert.equal(status.oficial.alerta, false);
+    assert.equal(status.triagem.alerta, false);
+    assert.doesNotMatch(status.html, /Artigo 2º/i);
+});
+
+test('exibe Artigo 2º somente quando a anotação tem fonte oficial CNES', () => {
+    const { module } = loadModule({});
+    const status = module.obterStatusPortaria134({
+        cns: '700000000000001',
+        chTotal: 44,
+        portaria134: 'Artigo 2º',
+        portaria134Fonte: 'CNES_OFICIAL',
+        portaria134Competencia: '202608'
+    });
+
+    assert.equal(status.alerta, true);
+    assert.equal(status.oficial.alerta, true);
+    assert.match(status.html, /Artigo 2º/i);
+    assert.equal(status.triagem.alerta, false);
+});
+
+test('ficha cadastral reúne todos os vínculos do mesmo CNS', async () => {
+    const competencies = [{ codigo: '202608', label: '08/2026' }];
+    const payload = published('202608', 44, competencies);
+    payload.estabelecimentos[0].nomeFantasia = 'UNIDADE A';
+    payload.estabelecimentos[0].profissionais[0].portaria134 = 'SOBREPOSIÇÃO';
+    payload.estabelecimentos[0].profissionais[0].portaria134Fonte = '';
+    payload.estabelecimentos.push({
+        cnes: '0765432',
+        nomeFantasia: 'UNIDADE B',
+        profissionais: [{
+            linkIdentity: 'other-link',
+            cns: '700000000000001',
+            cbo: '223505',
+            nome: 'ANA',
+            chAmb: 20,
+            chTotal: 20
+        }]
+    });
+    const { module, view } = loadModule({ active: payload });
+
+    await module.carregarDados();
+    module.abrirDetalhesProfissional('700000000000001');
+
+    assert.match(view.innerHTML, /UNIDADE A/);
+    assert.match(view.innerHTML, /UNIDADE B/);
+});
+
+test('mapeia código PF conhecido e não inventa contratação ausente', () => {
+    const { module } = loadModule({});
+
+    assert.equal(
+        module.formatarTipoVinculo({ codigoVinculacao: '010101' }),
+        '010101 — ESTATUTÁRIO EFETIVO / SERVIDOR PRÓPRIO'
+    );
+    assert.match(module.formatarTipoVinculo({ codigoVinculacao: '999999' }), /não catalogado/);
+    assert.equal(module.formatarTipoVinculo({}), 'Não informado');
+});

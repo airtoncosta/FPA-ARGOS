@@ -21,6 +21,7 @@ from cnes_sync import (  # noqa: E402
     latest_common_competence,
     normalize_tables,
     publish_snapshot,
+    rebuild_public_from_private,
     select_cnes_files,
 )
 
@@ -175,6 +176,31 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(first["status"], "published")
             self.assertEqual(second["status"], "unchanged")
             self.assertEqual(first["snapshot_path"], second["snapshot_path"])
+
+    def test_rebuild_public_discards_unverified_portaria_134_enrichment(self):
+        with tempfile.TemporaryDirectory() as private_directory, tempfile.TemporaryDirectory() as public_directory:
+            private_root = Path(private_directory)
+            public_root = Path(public_directory)
+            publish_snapshot(self.snapshot, self.source_files, private_root, public_root)
+            manifest_path = public_root / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            prior_path = public_root / manifest["competencies"][COMPETENCE]["snapshot"]["path"]
+            contaminated = json.loads(prior_path.read_text(encoding="utf-8"))
+            contaminated["estabelecimentos"][0]["profissionais"][0]["portaria134"] = "SOBREPOSICAO (Art. 2 - 70h)"
+            prior_path.write_text(json.dumps(contaminated), encoding="utf-8")
+            import hashlib
+            manifest["competencies"][COMPETENCE]["snapshot"]["sha256"] = hashlib.sha256(prior_path.read_bytes()).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            repaired = rebuild_public_from_private(private_root, public_root)
+
+            current = json.loads(manifest_path.read_text(encoding="utf-8"))
+            clean_path = public_root / current["competencies"][COMPETENCE]["snapshot"]["path"]
+            clean = json.loads(clean_path.read_text(encoding="utf-8"))
+            self.assertEqual(repaired, [COMPETENCE])
+            self.assertNotEqual(clean_path, prior_path)
+            self.assertNotIn("portaria134", clean["estabelecimentos"][0]["profissionais"][0])
+            self.assertTrue(prior_path.exists())
 
     def test_republication_keeps_prior_snapshot_and_advances_revision(self):
         with tempfile.TemporaryDirectory() as directory:

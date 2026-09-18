@@ -1,3 +1,50 @@
 {
-  "version": 2
+  "version": 2,
+  "functions": {
+    "api/cnes/municipio.js": { "includeFiles": "data/cnes-encrypted/**" },
+    "api/cnes/bacabal.js": { "includeFiles": "data/cnes-encrypted/**" },
+    "api/cnes/estabelecimentos.js": { "includeFiles": "data/cnes-encrypted/**" }
+  },
+  "rewrites": [
+    {
+      "source": "/cnes_data/:path*",
+      "destination": "/api/cnes/municipio"
+    },
+    {
+      "source": "/code_sandbox_light_git_fe61910d_1781185357/cnes_data/:path*",
+      "destination": "/api/cnes/municipio"
+    },
+    {
+      "source": "/",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/index.html"
+    },
+    {
+      "source": "/js/:path*",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/js/:path*"
+    },
+    {
+      "source": "/css/:path*",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/css/:path*"
+    },
+    {
+      "source": "/img/:path*",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/img/:path*"
+    },
+    {
+      "source": "/sigtap/:path*",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/sigtap/:path*"
+    },
+    {
+      "source": "/sigtap_data/:path*",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/sigtap_data/:path*"
+    },
+    {
+      "source": "/radar_data/:path*",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/radar_data/:path*"
+    },
+    {
+      "source": "/audit_data/:path*",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/audit_data/:path*"
+    }
+  ]
 }

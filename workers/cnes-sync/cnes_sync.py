@@ -385,16 +385,24 @@ def _publish_public_snapshot(private_snapshot: Mapping[str, Any], record: Mappin
     public_payload = _public_snapshot(private_snapshot)
     public_hash = _sha256(public_payload)
     competence = private_snapshot["competence"]
-    relative = Path("snapshots") / competence / f"rev-{record['revision']}-{public_hash}.json"
+    manifest = _read_manifest(public_root) if (public_root / "manifest.json").exists() else {"schema_version": SCHEMA_VERSION, "scope": {"municipality_ibge": SCOPE_IBGE, "uf": SCOPE_UF}, "competencies": {}}
+    previous = manifest["competencies"].get(competence, {})
+    revision = max(int(record["revision"]), int(previous.get("revision", 0)))
+    relative = Path("snapshots") / competence / f"rev-{revision}-{public_hash}.json"
     public_path = public_root / relative
     if public_path.exists():
         if _sha256(json.loads(public_path.read_text(encoding="utf-8"))) != public_hash:
-            raise SnapshotValidationError(f"snapshot público imutável diverge: {public_path}")
-    else:
+            # An earlier process edited an immutable artifact. Keep it for
+            # audit and publish a distinct revision instead of overwriting it.
+            revision += 1
+            relative = Path("snapshots") / competence / f"rev-{revision}-{public_hash}.json"
+            public_path = public_root / relative
+            if public_path.exists() and _sha256(json.loads(public_path.read_text(encoding="utf-8"))) != public_hash:
+                raise SnapshotValidationError(f"snapshot público imutável diverge: {public_path}")
+    if not public_path.exists():
         _atomic_write_json(public_path, public_payload)
-    manifest = _read_manifest(public_root) if (public_root / "manifest.json").exists() else {"schema_version": SCHEMA_VERSION, "scope": {"municipality_ibge": SCOPE_IBGE, "uf": SCOPE_UF}, "competencies": {}}
     public_record = {
-        "revision": record["revision"],
+        "revision": revision,
         "status": "published",
         "published_at": record["published_at"],
         "source": record["source"],
@@ -451,6 +459,33 @@ def publish_snapshot(snapshot: Mapping[str, Any], source_files: Iterable[Mapping
     _set_active_competence(manifest)
     _atomic_write_json(private_root / "manifest.json", manifest)
     return {"status": "republished" if existing else "published", "revision": revision, "snapshot_path": record["snapshot_path"], "snapshot_sha256": snapshot_hash}
+
+
+def rebuild_public_from_private(private_root: Path | str, public_root: Path | str) -> list[str]:
+    """Recreate the public ST/PF view from validated private records, offline.
+
+    The public view is a strict projection of source fields. This repairs a
+    public artifact later modified by an enrichment script without trusting its
+    Portaria 134 labels, inferred dates, or contract descriptions.
+    """
+    root = Path(private_root).resolve()
+    manifest = _read_manifest(root)
+    repaired: list[str] = []
+    for competence, record in sorted(manifest["competencies"].items()):
+        if record.get("status") != "published":
+            continue
+        _competence(competence)
+        source_path = Path(record.get("snapshot_path", "")).resolve()
+        if not source_path.is_relative_to(root) or not source_path.is_file():
+            raise SnapshotValidationError(f"snapshot privado inválido para {competence}")
+        snapshot = json.loads(source_path.read_text(encoding="utf-8"))
+        if _sha256(snapshot) != record.get("snapshot_sha256"):
+            raise SnapshotValidationError(f"hash do snapshot privado diverge para {competence}")
+        if snapshot.get("competence") != competence or snapshot.get("scope", {}).get("municipality_ibge") != SCOPE_IBGE:
+            raise SnapshotValidationError(f"escopo do snapshot privado diverge para {competence}")
+        _publish_public_snapshot(snapshot, record, Path(public_root))
+        repaired.append(competence)
+    return repaired
 
 
 def _file_value(item: Any, name: str, default: Any = None) -> Any:
@@ -710,6 +745,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     backfill = commands.add_parser("backfill", help="sincroniza uma faixa inclusiva de competências")
     backfill.add_argument("start")
     backfill.add_argument("end")
+    commands.add_parser("rebuild-public", help="regera snapshots públicos a partir do manifesto privado, sem rede")
     return parser.parse_args(argv)
 
 
@@ -720,6 +756,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             result: Any = _check_result(asyncio.run(discover_cnes_files_from_ftp(args.competence, args.private_root)))
         elif args.command == "sync":
             result = sync_competence(args.competence, args.private_root, args.public_root)
+        elif args.command == "rebuild-public":
+            result = {"status": "rebuilt", "competencies": rebuild_public_from_private(args.private_root, args.public_root)}
         else:
             result = [{"competence": competence, **sync_competence(competence, args.private_root, args.public_root)} for competence in _month_range(args.start, args.end)]
     except (RuntimeError, SnapshotValidationError) as error:

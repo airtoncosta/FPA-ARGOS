@@ -11,8 +11,8 @@
 ## Critérios de aceitação
 
 - [x] Reproduzir regras locais responsáveis pela sinalização e consultar documentação oficial.
-- [ ] Inventariar competências reais e distinguir arquivos locais, artefatos publicados e registros no banco.
-- [ ] Confirmar causa da diferença local/deploy com evidência de configuração e respostas HTTP.
+- [x] Inventariar competências reais e distinguir arquivos locais, artefatos publicados e registros no banco.
+- [x] Confirmar causa da diferença local/deploy com evidência de configuração e respostas HTTP.
 - [ ] Criar regressões que falham antes da correção: múltiplos CBOs, marcação sem fonte, soma >60h, primeira ocorrência por CNS, competência ausente.
 - [ ] Corrigir exibição, filtro, exportação e ficha de vínculos usando a mesma regra.
 - [ ] Garantir carregamento de snapshots persistidos em ambiente publicado e erro explícito para competência indisponível.
@@ -38,4 +38,7 @@
 - Base dos nove testes Node existentes do módulo, snapshots e diff passou antes das alterações.
 - `cnes-module.js` rotula inferência municipal >60h como “Artigo 2º”; os snapshots ST/PF não contêm a anotação oficial da Portaria 134.
 - Os snapshots automáticos ficam em caminhos ignorados pelo Git. O agendador Node local não publica esses dados no ambiente Vercel.
+- O Supabase atual contém apenas 202608 (130 estabelecimentos/3.091 linhas) do legado, com tipo contratual presumido; 202606 e 202607 ausentes. O projeto Vercel não inclui as rotas Node de `server.js`.
+- 202606 foi importado de `PFMA2606.dbc` e `STMA2606.dbc` (116 estabelecimentos, 2.722 CNS distintos, 3.072 vínculos, quarentena zero). 202607/08 foram recompostos como revisões 2 sem marcações inferidas, com 3.078/3.091 vínculos; SHA-256 confirmado.
+- O script legado `enrich_cnes_bacabal.py` inseriu 419/417 falsos campos `portaria134` nos artefatos públicos de julho/agosto e recalculou o hash. Foi desativado junto com gerador, relabelador de competência e sincronizador Supabase anônimo.
 - O repositório iniciou sem alterações rastreadas; `.agents/plugins/` já estava não rastreado e será preservado.

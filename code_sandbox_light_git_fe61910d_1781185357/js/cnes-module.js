@@ -286,6 +286,22 @@ window.CnesModule = (function () {
         return s || String(cboStr).trim();
     }
 
+    function valorVinculo(p, campo) {
+        const valor = p && p[campo] != null ? String(p[campo]).trim() : '';
+        return valor || 'Não informado';
+    }
+
+    function formatarTipoVinculo(p) {
+        const real = p && (p.tipoVinculo || p.tipo_vinculo);
+        if (real != null && String(real).trim()) return String(real).trim();
+        const codigo = String(p && (p.codigoVinculacao || p.codigo_vinculacao || p.codigoVinculo || p.codigo_vinculo || '')).trim();
+        if (!codigo) return 'Não informado';
+        const catalogo = {
+            '010101': 'ESTATUTÁRIO EFETIVO / SERVIDOR PRÓPRIO'
+        };
+        return `${codigo} — ${catalogo[codigo] || 'não catalogado'}`;
+    }
+
     function formatarDescricaoCbo(ocupacao, cbo) {
         if (!ocupacao) return '';
         let s = String(ocupacao).trim();
@@ -349,32 +365,65 @@ window.CnesModule = (function () {
         return `<div class="cnes-dt-wrapper"><span class="cnes-dt-date">${dataStr}</span></div>`;
     }
 
-    function obterStatusPortaria134(p, mapaHoras, mapaVinculos) {
-        if (!p) return { alerta: false, artigo: '', nivel: 'regular', horasRede: 0, html: '' };
+    function coberturaPortaria134Completa(coverage) {
+        if (!coverage || typeof coverage !== 'object') return false;
+        return coverage.completa === true || coverage.complete === true ||
+            coverage.profissionaisCompleto === true || coverage.allProfessionals === true ||
+            String(coverage.status || '').toUpperCase() === 'COMPLETE';
+    }
+
+    function escaparTextoHtml(valor) {
+        return String(valor).replace(/[&<>"']/g, caractere => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[caractere]);
+    }
+
+    function obterStatusPortaria134(p, mapaHoras, mapaVinculos, options = {}) {
+        if (!p) {
+            return {
+                alerta: false, artigo: '', nivel: 'regular', horasRede: 0,
+                oficial: { alerta: false, artigo: '', fonte: '' },
+                triagem: { alerta: false, motivo: '', proveniencia: '' }, html: '', triagemHtml: ''
+            };
+        }
         const key = String(p.cnsMaster || p.cns || p.cpf || p.nome || '').replace(/\D/g, '') || String(p.nome || '').trim().toUpperCase();
         const chItem = Number(p.chTotal || ((p.chAmb || 0) + (p.chHosp || 0) + (p.chOutros || 0))) || 0;
-        const horasRede = (mapaHoras && mapaHoras.get(key)) || chItem;
-        const qtdVinculos = (mapaVinculos && mapaVinculos.get(key)) || 1;
-        const p134Str = String(p.portaria134 || '').toUpperCase().trim();
+        const horasRede = mapaHoras && mapaHoras.has(key) ? Number(mapaHoras.get(key)) || 0 : chItem;
+        const qtdVinculos = mapaVinculos && mapaVinculos.has(key) ? Number(mapaVinculos.get(key)) || 0 : 1;
+        const p134Str = String(p.portaria134 || '').trim();
+        const fonte = String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase();
+        const periodoOficial = String(p.portaria134Competencia || '').trim();
+        const temFlagOficial = fonte === 'CNES_OFICIAL' && p134Str.length > 0 && periodoOficial.length > 0;
+        const artigoOficial = temFlagOficial ? p134Str : '';
+        const coberturaCompleta = options.coberturaCompleta === true ||
+            coberturaPortaria134Completa(options.coverage) ||
+            (mapaHoras && mapaHoras.coberturaCompleta === true);
+        const temExcessoTriagem = Boolean(coberturaCompleta && qtdVinculos > 1 && horasRede > 60);
 
-        // Conforme Portaria SAS/MS nº 134/2011 e regras oficiais do DATASUS:
-        // 1. Vínculo único com 40h ou 44h é padrão legal e NÃO sofre incidência de Portaria 134 (célula fica em branco).
-        // 2. Alerta da Portaria 134 aplica-se exclusivamente quando:
-        //    a) Há anotação oficial expressa de incompatibilidade/sobreposição no DATASUS (ex: "ARTIGO 2º", "SOBREPOSIÇÃO", "134");
-        //    b) OU há acúmulo real de cargos/vínculos (qtdVinculos > 1) com carga horária total na rede excedendo 60 horas semanais (>60h).
-        const temFlagOficial = p134Str.includes('ARTIGO') || p134Str.includes('134') || p134Str.includes('SOBREPOSI') || (p134Str.includes('ALERTA') && !p134Str.includes('>40'));
-        const temExcessoMultiVinculo = qtdVinculos > 1 && horasRede > 60;
+        const oficial = {
+            alerta: temFlagOficial,
+            artigo: artigoOficial,
+                fonte: temFlagOficial ? 'CNES_OFICIAL' : '',
+                competencia: temFlagOficial ? periodoOficial : ''
+        };
+        const triagem = {
+            alerta: temExcessoTriagem,
+            motivo: temExcessoTriagem ? 'Carga horária municipal superior a 60h; requer conferência oficial' : '',
+            proveniencia: temExcessoTriagem ? 'ARGOS_TRIAGEM' : '',
+            horasRede,
+            qtdVinculos
+        };
 
-        const temAlerta = temFlagOficial || temExcessoMultiVinculo;
-
-        if (temAlerta) {
+        if (oficial.alerta) {
             return {
                 alerta: true,
-                artigo: 'Artigo 2º',
+                artigo: oficial.artigo,
                 nivel: horasRede > 60 ? 'critico' : 'alerta',
-                horasRede: horasRede,
+                horasRede,
+                oficial,
+                triagem,
                 html: `
-                    <div class="cnes-p134-warning-box">
+                    <div class="cnes-p134-warning-box" title="Observação oficial CNES: ${escaparTextoHtml(oficial.artigo)}">
                         <div class="cnes-p134-icon-wrap">
                             <svg class="cnes-p134-tri-icon" viewBox="0 0 24 24" width="16" height="16">
                                 <path d="M12 2L1 21h22L12 2z" fill="#facc15" stroke="#92400e" stroke-width="1.2" stroke-linejoin="round"/>
@@ -383,21 +432,24 @@ window.CnesModule = (function () {
                             </svg>
                             <span class="cnes-p134-dots">.......</span>
                         </div>
-                        <div class="cnes-p134-tooltip">
-                            Artigo 2º
-                        </div>
+                        <div class="cnes-p134-tooltip">${escaparTextoHtml(oficial.artigo)}</div>
                     </div>
-                `
+                `,
+                triagemHtml: ''
             };
         }
 
-        // Conforme DATASUS oficial do print, quando regular a célula fica completamente em branco!
         return {
             alerta: false,
             artigo: '',
-            nivel: 'regular',
-            horasRede: horasRede,
-            html: ''
+            nivel: triagem.alerta ? 'triagem' : 'regular',
+            horasRede,
+            oficial,
+            triagem,
+            html: '',
+            triagemHtml: triagem.alerta
+                ? `<span class="cnes-p134-triage" title="${triagem.motivo}">Triagem ARGOS: CH &gt;60h</span>`
+                : ''
         };
     }
 
@@ -553,15 +605,21 @@ window.CnesModule = (function () {
         const chOutros = Number(p.chOutros || p.carga_horaria_outros || 0);
         const chTotal = Number(p.chTotal || p.carga_horaria_total || (chAmb + chHosp + chOutros) || (allowSynthetic ? 40 : 0));
 
-        let portaria134 = p.portaria134 || '';
+        const portaria134Fonte = String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase();
+        // ST/PF and legacy enrichment files may carry an inferred text in
+        // portaria134. It is never an official observation without provenance.
+        const portaria134 = portaria134Fonte === 'CNES_OFICIAL' ? String(p.portaria134 || '').trim() : '';
 
         // Data de atribuição sempre preservada com valor real oficial do CNES DATASUS
-        const dtAtribuicao = p.dtAtribuicao || p.dt_atribuicao || p.data_atribuicao || p.dtEntrada || p.dt_entrada || '01/03/2021';
+        const dtAtribuicao = fallback(
+            p.dtAtribuicao || p.dt_atribuicao || p.data_atribuicao || p.dtEntrada || p.dt_entrada,
+            ''
+        );
 
         return {
             ...p,
             nome,
-            dtEntrada: p.dtEntrada || p.dt_entrada || '01/02/2021',
+            dtEntrada: fallback(p.dtEntrada || p.dt_entrada, ''),
             cns,
             cnsMaster: p.cnsMaster || cns,
             dtAtribuicao,
@@ -571,13 +629,15 @@ window.CnesModule = (function () {
             chHosp,
             chOutros,
             chTotal,
-            atendimentoSus: fallback(p.atendimentoSus, 'SIM'),
-            vinculacao: fallback(p.vinculacao, 'VINCULO EMPREGATICIO'),
-            tipoVinculo: fallback(p.tipoVinculo, 'CONTRATADO TEMPORÁRIO'),
-            subtipo: fallback(p.subtipo, 'PUBLICO'),
+            atendimentoSus: fallback(p.atendimentoSus, ''),
+            vinculacao: fallback(p.vinculacao || p.vinculo || p.vinculacaoEmpregaticia, ''),
+            tipoVinculo: fallback(p.tipoVinculo || p.tipo_vinculo, ''),
+            subtipo: fallback(p.subtipo, ''),
             compDesativacao: p.compDesativacao || '',
             situacao: fallback(p.situacao, p.ativo === false ? 'Desligado' : 'Ativo'),
             portaria134,
+            portaria134Fonte: portaria134Fonte === 'CNES_OFICIAL' ? 'CNES_OFICIAL' : '',
+            portaria134Competencia: p.portaria134Competencia || p.portaria134_competencia || '',
             ativo: p.ativo !== false,
             unidadeNome: unidadeNome || ''
         };
@@ -619,6 +679,40 @@ window.CnesModule = (function () {
             normalizarProfissional({ nome: `TEC. ENFERMAGEM DA ESF`, cbo: '322205', ocupacao: '322205 - TECNICO DE ENFERMAGEM DA ESF', chAmb: 40, chHosp: 0, chTotal: 40, situacao: 'Ativo' }, cnes, unidadeNome, 3),
             normalizarProfissional({ nome: `ACS. AGENTE COMUNITÁRIO DE SAÚDE`, cbo: '515105', ocupacao: '515105 - AGENTE COMUNITARIO DE SAUDE', chAmb: 40, chHosp: 0, chTotal: 40, situacao: 'Ativo' }, cnes, unidadeNome, 4)
         ];
+    }
+
+    async function fetchCnesPublicado(endpoint) {
+        const headers = {};
+        try {
+            const client = window.SupabaseConfig && typeof window.SupabaseConfig.getClient === 'function'
+                ? window.SupabaseConfig.getClient()
+                : null;
+            if (client && client.auth && typeof client.auth.getSession === 'function') {
+                const sessionResult = await client.auth.getSession();
+                const token = sessionResult && sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token;
+                if (token) headers.Authorization = `Bearer ${token}`;
+            }
+        } catch (authErr) {
+            console.warn('Sessão Supabase indisponível para consulta CNES:', authErr);
+        }
+
+        const response = await fetch(endpoint, { headers });
+        if (response.status === 401) {
+            const error = new Error('A consulta CNES exige uma sessão Supabase válida.');
+            error.code = 'CNES_UNAUTHORIZED';
+            throw error;
+        }
+        if (response.status === 503) {
+            const error = new Error('A competência CNES solicitada não está publicada no backend.');
+            error.code = 'CNES_UNAVAILABLE';
+            throw error;
+        }
+        if (!response.ok) {
+            const error = new Error(`Consulta CNES indisponível (HTTP ${response.status}).`);
+            error.code = 'CNES_HTTP_ERROR';
+            throw error;
+        }
+        return response.json();
     }
 
     /**
@@ -668,8 +762,12 @@ window.CnesModule = (function () {
                                 vinculacao: p.vinculacao,
                                 tipoVinculo: p.tipo_vinculo,
                                 subtipo: p.subtipo,
+                                codigoVinculacao: p.codigo_vinculacao,
+                                codigoVinculo: p.codigo_vinculo,
+                                codigoSubVinculo: p.codigo_subvinculo,
                                 situacao: p.situacao,
-                                portaria134: p.portaria134
+                                portaria134: p.portaria134,
+                                portaria134Fonte: p.portaria134_fonte
                             });
                         });
 
@@ -706,7 +804,12 @@ window.CnesModule = (function () {
                 if (parsed && parsed.estabelecimentos && parsed.estabelecimentos.length > 0) {
                     const minUnits = isBacabal ? 100 : 1;
                     if (parsed.estabelecimentos.length >= minUnits) {
-                        state.estabelecimentos = parsed.estabelecimentos.map(u => normalizarEstabelecimento(u, state.municipio, state.uf));
+                        state.estabelecimentos = parsed.estabelecimentos.map(u => normalizarEstabelecimento(
+                            u,
+                            state.municipio,
+                            state.uf,
+                            { competencia: parsed.competenciaPadrao || parsed.competencia || '' }
+                        ));
                         if (parsed.competencias) state.competencias = parsed.competencias;
                         state.dataSource = parsed.fonte || 'Cache Auditado Local';
                         state.sourceType = parsed.source_type || 'local_cache';
@@ -720,11 +823,12 @@ window.CnesModule = (function () {
             } catch (e) {}
         }
 
+        let fetchError = null;
         // Query the server so the manifest is the source of truth for Bacabal.
         try {
             const compQuery = requestedCompetence ? `&competencia=${requestedCompetence}` : '';
             const endpoint = `/api/cnes/estabelecimentos?ibge=${state.ibge}&uf=${state.uf}&municipio=${encodeURIComponent(state.municipio)}${compQuery}&t=${Date.now()}`;
-            const res = await fetch(endpoint).then(r => r.ok ? r.json() : null);
+            const res = await fetchCnesPublicado(endpoint);
             if (res && res.estabelecimentos && res.estabelecimentos.length > 0) {
                 // Validação geográfica: verificar se os estabelecimentos realmente pertencem ao município consultado
                 const pertencemAoMunicipio = res.estabelecimentos.some(u => {
@@ -734,11 +838,12 @@ window.CnesModule = (function () {
                 });
 
                 if (pertencemAoMunicipio || isBacabal) {
+                    const returnedCompetence = res.competenciaPadrao || res.competencia || res.competence || '';
                     state.estabelecimentos = res.estabelecimentos.map(u => normalizarEstabelecimento(
                         u,
                         state.municipio,
                         state.uf,
-                        { allowSynthetic: !isBacabal }
+                        { allowSynthetic: !isBacabal, competencia: returnedCompetence }
                     ));
                     if (res.competencias && res.competencias.length > 0) {
                         state.competencias = res.competencias;
@@ -747,7 +852,6 @@ window.CnesModule = (function () {
                     }
                     state.sourceType = res.source_type || res.sourceType || (res.legacy ? 'legacy_file' : 'remote');
                     state.isLegacy = res.legacy === true || state.sourceType === 'legacy_file';
-                    const returnedCompetence = res.competenciaPadrao || res.competencia || res.competence || '';
                     state.competenciaAtiva = isBacabal
                         ? (state.isLegacy ? '' : String(returnedCompetence || ''))
                         : (returnedCompetence || state.competenciaAtiva);
@@ -771,7 +875,8 @@ window.CnesModule = (function () {
                 }
             }
         } catch (e) {
-            console.warn('Endpoint /api/cnes/estabelecimentos indisponível, aplicando gerador local:', e);
+            fetchError = e;
+            console.warn('Endpoint /api/cnes/estabelecimentos indisponível:', e);
         }
 
         // Bacabal has no synthetic fallback. An empty/failed published source
@@ -781,10 +886,12 @@ window.CnesModule = (function () {
             state.estabelecimentos = [];
             state.competencias = [];
             state.competenciaAtiva = '';
-            state.sourceType = 'unavailable';
+            state.sourceType = fetchError && fetchError.code === 'CNES_UNAUTHORIZED' ? 'unauthorized' : 'unavailable';
             state.isLegacy = false;
             state.coverage = null;
-            state.dataSource = 'CNES Bacabal indisponível';
+            state.dataSource = fetchError && fetchError.code === 'CNES_UNAUTHORIZED'
+                ? 'CNES Bacabal requer login Supabase'
+                : (fetchError && fetchError.code === 'CNES_UNAVAILABLE' ? 'Competência CNES não publicada' : 'CNES Bacabal indisponível');
             state.loading = false;
             render();
             return;
@@ -861,6 +968,24 @@ window.CnesModule = (function () {
         return state.estabelecimentos.find(e => e.cnes === state.selectedCnes) || state.estabelecimentos[0] || null;
     }
 
+    function chaveProfissional(p) {
+        return String(p && (p.cnsMaster || p.cns || p.cpf || p.nome) || '')
+            .replace(/\D/g, '') || String(p && p.nome || '').trim().toUpperCase();
+    }
+
+    function criarMapasVinculos() {
+        const mapaHoras = new Map();
+        const mapaVinculos = new Map();
+        state.estabelecimentos.forEach(est => (est.profissionais || []).forEach(pr => {
+            const key = chaveProfissional(pr);
+            const ch = Number(pr.chTotal || ((pr.chAmb || 0) + (pr.chHosp || 0) + (pr.chOutros || 0))) || 0;
+            mapaHoras.set(key, (mapaHoras.get(key) || 0) + ch);
+            mapaVinculos.set(key, (mapaVinculos.get(key) || 0) + 1);
+        }));
+        mapaHoras.coberturaCompleta = coberturaPortaria134Completa(state.coverage);
+        return { mapaHoras, mapaVinculos };
+    }
+
     /**
      * Obter lista de profissionais para a grade de 17 colunas
      */
@@ -900,22 +1025,11 @@ window.CnesModule = (function () {
 
         // Filtro da Auditoria de Carga Horária e Vínculos (Portaria 134)
         if (state.tableFilter.apenasAlerta134) {
-            const mapaHoras = new Map();
-            const mapaVinculos = new Map();
-            state.estabelecimentos.forEach(est => {
-                if (est.profissionais) {
-                    est.profissionais.forEach(pr => {
-                        const k = String(pr.cnsMaster || pr.cns || pr.cpf || pr.nome || '').replace(/\D/g, '') || String(pr.nome || '').trim().toUpperCase();
-                        const ch = Number(pr.chTotal || ((pr.chAmb || 0) + (pr.chHosp || 0) + (pr.chOutros || 0))) || 0;
-                        mapaHoras.set(k, (mapaHoras.get(k) || 0) + ch);
-                        mapaVinculos.set(k, (mapaVinculos.get(k) || 0) + 1);
-                    });
-                }
-            });
+            const { mapaHoras, mapaVinculos } = criarMapasVinculos();
 
             list = list.filter(p => {
                 const status = obterStatusPortaria134(p, mapaHoras, mapaVinculos);
-                return status.alerta === true;
+                return status.oficial.alerta === true;
             });
         }
 
@@ -1165,9 +1279,9 @@ window.CnesModule = (function () {
                 (p.chHosp || 0) + 'h',
                 chTot + 'h',
                 p.atendimentoSus || 'SIM',
-                p.vinculacao || 'VÍNCULO EMPREGATÍCIO',
-                p.tipoVinculo || 'CONTRATADO TEMPORÁRIO',
-                p.subtipo || 'PÚBLICO',
+                valorVinculo(p, 'vinculacao'),
+                formatarTipoVinculo(p),
+                valorVinculo(p, 'subtipo'),
                 p.situacao || (p.ativo ? 'Ativo' : 'Desligado'),
                 statusTxt,
                 p.unidadeNome || (u ? u.nomeFantasia : state.municipio)
@@ -1200,22 +1314,24 @@ window.CnesModule = (function () {
      * Modal de Detalhes de um Profissional
      */
     function abrirDetalhesProfissional(cns) {
-        let pEncontrado = null;
-        let uEncontrada = null;
-
+        const alvo = String(cns || '').replace(/\D/g, '');
+        const vinculos = [];
         for (const u of state.estabelecimentos) {
-            if (u.profissionais) {
-                const f = u.profissionais.find(p => p.cns === cns);
-                if (f) {
-                    pEncontrado = f;
-                    uEncontrada = u;
-                    break;
+            (u.profissionais || []).forEach(p => {
+                const ids = [p.cns, p.cnsMaster, p.cpf].map(v => String(v || '').replace(/\D/g, ''));
+                if (alvo && ids.includes(alvo)) {
+                    vinculos.push({ ...p, unidade: u, cnes: u.cnes, unidadeNome: u.nomeFantasia });
                 }
-            }
+            });
         }
 
-        if (pEncontrado) {
-            state.modalProfissionalSelecionado = { ...pEncontrado, unidade: uEncontrada };
+        if (vinculos.length > 0) {
+            const principal = vinculos[0];
+            state.modalProfissionalSelecionado = {
+                ...principal,
+                unidade: principal.unidade,
+                vinculos
+            };
             render();
         }
     }
@@ -1279,7 +1395,7 @@ window.CnesModule = (function () {
                     <div class="cnes-unified-header-top">
                         <div class="cnes-top-breadcrumbs">
                             <i class="fas fa-hospital-alt" style="color: #0284c7; font-size: 1.15rem;"></i>
-                            <span><strong>${state.isLegacy ? 'CNES legado' : (state.sourceType === 'unavailable' ? 'CNES indisponível' : 'CNES Oficial')}</strong> — ${state.municipio} / ${state.uf}</span>
+                            <span><strong>${state.isLegacy ? 'CNES legado' : (['unavailable', 'unauthorized'].includes(state.sourceType) ? 'CNES indisponível' : 'CNES Oficial')}</strong> — ${state.municipio} / ${state.uf}</span>
                             ${state.viewMode !== 'portal' ? `
                                 <i class="fas fa-chevron-right" style="font-size: 0.7rem; color: #94a3b8;"></i>
                                 <button type="button" onclick="window.CnesModule.voltarAoPortal()">Consultas da Rede</button>
@@ -1881,18 +1997,7 @@ window.CnesModule = (function () {
         const endIdx = perPage ? startIdx + perPage : totalRegistros;
         const profsPaginados = perPage ? profsCompletos.slice(startIdx, endIdx) : profsCompletos;
 
-        const mapaHorasRede = new Map();
-        const mapaVinculosRede = new Map();
-        state.estabelecimentos.forEach(est => {
-            if (est.profissionais) {
-                est.profissionais.forEach(pr => {
-                    const k = String(pr.cnsMaster || pr.cns || pr.cpf || pr.nome || '').replace(/\D/g, '') || String(pr.nome || '').trim().toUpperCase();
-                    const ch = Number(pr.chTotal || ((pr.chAmb || 0) + (pr.chHosp || 0) + (pr.chOutros || 0))) || 0;
-                    mapaHorasRede.set(k, (mapaHorasRede.get(k) || 0) + ch);
-                    mapaVinculosRede.set(k, (mapaVinculosRede.get(k) || 0) + 1);
-                });
-            }
-        });
+        const { mapaHoras: mapaHorasRede, mapaVinculos: mapaVinculosRede } = criarMapasVinculos();
 
         const tituloUnidade = state.selectedCnes && u
             ? `${u.nomeFantasia} (CNES: ${u.cnes})`
@@ -2049,14 +2154,14 @@ window.CnesModule = (function () {
                                             </span>
                                         </td>
                                         <td class="th-center">${p.atendimentoSus || 'SIM'}</td>
-                                        <td class="td-prof-vinc" title="${p.vinculacao || 'VÍNCULO EMPREGATÍCIO'}">${p.vinculacao || 'VÍNCULO EMPREGATÍCIO'}</td>
-                                        <td class="td-prof-tipo" title="${p.tipoVinculo || 'CONTRATADO TEMPORÁRIO'}">${p.tipoVinculo || 'CONTRATADO TEMPORÁRIO'}</td>
-                                        <td class="td-prof-sub" title="${p.subtipo || 'PÚBLICO'}">${p.subtipo || 'PÚBLICO'}</td>
+                                        <td class="td-prof-vinc" title="${valorVinculo(p, 'vinculacao')}">${valorVinculo(p, 'vinculacao')}</td>
+                                        <td class="td-prof-tipo" title="${formatarTipoVinculo(p)}">${formatarTipoVinculo(p)}</td>
+                                        <td class="td-prof-sub" title="${valorVinculo(p, 'subtipo')}">${valorVinculo(p, 'subtipo')}</td>
                                         <td class="th-center ${p.ativo !== false && p.situacao !== 'Desligado' ? 'cnes-status-ativo-red' : 'cnes-status-desligado-gray'}">
                                             ${p.situacao || (p.ativo !== false ? 'Ativo' : 'Desligado')}
                                         </td>
                                         <td class="td-prof-p134">
-                                            ${status134.html}
+                                            ${status134.html || status134.triagemHtml}
                                         </td>
                                     </tr>
                                 `;
@@ -2124,6 +2229,7 @@ window.CnesModule = (function () {
     function renderModalDetalhesProfissional() {
         const p = state.modalProfissionalSelecionado;
         if (!p) return '';
+        const vinculos = Array.isArray(p.vinculos) && p.vinculos.length > 0 ? p.vinculos : [p];
 
         const chTot = p.chTotal || ((p.chAmb || 0) + (p.chHosp || 0) + (p.chOutros || 0));
 
@@ -2187,9 +2293,20 @@ window.CnesModule = (function () {
                             </div>
                             <div class="cnes-prof-detail-field" style="grid-column: span 2;">
                                 <span class="cnes-prof-detail-label">Vínculo Empregatício</span>
-                                <span class="cnes-prof-detail-val">${p.vinculacao || 'VINCULO EMPREGATICIO'} — ${p.tipoVinculo || 'CONTRATADO TEMPORÁRIO'} (${p.subtipo || 'PUBLICO'})</span>
+                                <span class="cnes-prof-detail-val">${valorVinculo(p, 'vinculacao')} — ${formatarTipoVinculo(p)} (${valorVinculo(p, 'subtipo')})</span>
                             </div>
                         </div>
+
+                        ${vinculos.length > 1 ? `
+                            <div style="margin-top: 1.25rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+                                <div class="cnes-prof-detail-label" style="margin-bottom: 0.5rem;">Todos os vínculos (${vinculos.length})</div>
+                                ${vinculos.map(v => `
+                                    <div class="cnes-prof-detail-field" style="margin-bottom: 0.45rem;">
+                                        <span class="cnes-prof-detail-val"><strong>${v.unidade ? v.unidade.nomeFantasia : (v.unidadeNome || 'Rede Municipal')}</strong> — ${v.cnes || 'CNES não informado'} — ${v.chTotal || 0}h — ${formatarTipoVinculo(v)}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
 
                         <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end;">
                             <button class="cnes-btn-primary-blue" onclick="window.CnesModule.fecharDetalhesProfissional()">
@@ -2365,9 +2482,28 @@ window.CnesModule = (function () {
         render();
     }
 
+    function filtrarItensMovimentacoes(mov, filtro = state.movimentacoesFiltro) {
+        if (!mov || !mov.detalhes) return [];
+        let itens = mov.detalhes.todas || [];
+        if (filtro.tipo === 'ENTRADA') itens = mov.detalhes.entradas || [];
+        else if (filtro.tipo === 'SAIDA') itens = mov.detalhes.saidas || [];
+        else if (filtro.tipo === 'ALTERACAO_CH') itens = mov.detalhes.alteracoesCargaHoraria || [];
+        else if (filtro.tipo === 'PORTARIA134') itens = itens.filter(it => Boolean(it.portaria134));
+        if (filtro.cnes) itens = itens.filter(it => String(it.cnes) === String(filtro.cnes));
+        if (filtro.search) {
+            itens = itens.filter(it =>
+                (it.nome && it.nome.toLowerCase().includes(filtro.search)) ||
+                (it.cns && it.cns.includes(filtro.search)) ||
+                (it.cbo && it.cbo.includes(filtro.search)) ||
+                (it.ocupacao && it.ocupacao.toLowerCase().includes(filtro.search))
+            );
+        }
+        return itens;
+    }
+
     function exportarMovimentacoesCsv() {
         if (!state.movimentacoes || !state.movimentacoes.detalhes) return;
-        const itens = state.movimentacoes.detalhes.todas;
+        const itens = filtrarItensMovimentacoes(state.movimentacoes);
         if (!itens || itens.length === 0) {
             if (typeof showToast === 'function') showToast('ℹ️ Nenhum dado para exportar.', 'info');
             return;
@@ -2375,7 +2511,7 @@ window.CnesModule = (function () {
 
         let csv = '\uFEFFTipo;Profissional;CNS;CBO;Ocupacao;Estabelecimento;CNES;CH_Anterior;CH_Atual;Diferenca_Horas;Alerta_CH;Competencia\n';
         itens.forEach(item => {
-            csv += `"${item.tipo}";"${item.nome}";"${item.cns}";"${item.cbo}";"${item.ocupacao}";"${item.estabNome}";"${item.cnes}";"${item.chAnterior ?? ''}";"${item.chAtual ?? ''}";"${item.diferencaCh ?? ''}";"${item.portaria134 || item.portaria134_alerta || 'SEM ALERTA CH'}";"${item.competencia || state.competenciaAtiva}"\n`;
+            csv += `"${item.tipo}";"${item.nome}";"${item.cns}";"${item.cbo}";"${item.ocupacao}";"${item.estabNome}";"${item.cnes}";"${item.chAnterior ?? ''}";"${item.chAtual ?? ''}";"${item.diferencaCh ?? ''}";"${item.portaria134 || item.portaria134_alerta || item.triagem || 'SEM ALERTA CH'}";"${item.competencia || state.competenciaAtiva}"\n`;
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2398,28 +2534,7 @@ window.CnesModule = (function () {
         const res = (mov && mov.resumo) || {};
         const f = state.movimentacoesFiltro;
 
-        // Filtrar itens
-        let itens = (mov && mov.detalhes && mov.detalhes.todas) || [];
-
-        if (f.tipo === 'ENTRADA') itens = (mov.detalhes && mov.detalhes.entradas) || [];
-        else if (f.tipo === 'SAIDA') itens = (mov.detalhes && mov.detalhes.saidas) || [];
-        else if (f.tipo === 'ALTERACAO_CH') itens = (mov.detalhes && mov.detalhes.alteracoesCargaHoraria) || [];
-        else if (f.tipo === 'PORTARIA134') {
-            itens = ((mov.detalhes && mov.detalhes.todas) || []).filter(it => Number(it.chAtual) > 40);
-        }
-
-        if (f.cnes) {
-            itens = itens.filter(it => String(it.cnes) === String(f.cnes));
-        }
-
-        if (f.search) {
-            itens = itens.filter(it => 
-                (it.nome && it.nome.toLowerCase().includes(f.search)) ||
-                (it.cns && it.cns.includes(f.search)) ||
-                (it.cbo && it.cbo.includes(f.search)) ||
-                (it.ocupacao && it.ocupacao.toLowerCase().includes(f.search))
-            );
-        }
+        const itens = filtrarItensMovimentacoes(mov, f);
 
         const totalFiltrado = itens.length;
         const perPage = f.perPage || 15;
@@ -2682,6 +2797,8 @@ window.CnesModule = (function () {
         copiarCnes: copiarCnes,
         copiarCns: copiarCns,
         formatarCboOficial: formatarCboOficial,
+        formatarTipoVinculo: formatarTipoVinculo,
+        obterStatusPortaria134: obterStatusPortaria134,
         getCategoriaUnidade: getCategoriaUnidade,
         isUnidadeMantidaMunicipal: isUnidadeMantidaMunicipal,
         abrirModalCompetencia: abrirModalCompetencia,

@@ -308,7 +308,7 @@
                     subtipo: 'PUBLICO',
                     compDesativacao: '',
                     situacao: 'Ativo',
-                    portaria134: isMultiVinculo ? 'SOBREPOSIÇÃO' : '',
+                    portaria134: '',
                     ativo: true
                 });
             }
@@ -341,7 +341,7 @@
                     subtipo: 'PUBLICO',
                     compDesativacao: '',
                     situacao: 'Ativo',
-                    portaria134: isMultiVinculo ? 'ALERTA 134' : '',
+                    portaria134: '',
                     ativo: true
                 });
             }
@@ -520,11 +520,11 @@
                 const chAmb = parseInt(row['HORAMBUL'] || row['CH_AMB'] || row['CARGA_HORARIA_AMBULATORIAL'] || 0, 10);
                 const chHosp = parseInt(row['HORAHOSP'] || row['CH_HOSP'] || row['CARGA_HORARIA_HOSPITALAR'] || 0, 10);
                 const chOutr = parseInt(row['HORAOUTR'] || row['CH_OUTR'] || row['CARGA_HORARIA_OUTROS'] || 0, 10);
-                const chTotal = parseInt(row['HORATOTAL'] || row['CH_TOTAL'] || row['CARGA_HORARIA'] || (chAmb + chHosp + chOutr) || 40, 10);
+                const chTotal = parseInt(row['HORATOTAL'] || row['CH_TOTAL'] || row['CARGA_HORARIA'] || (chAmb + chHosp + chOutr) || 0, 10);
 
-                let portaria134 = '';
-                if (chTotal > 60) portaria134 = 'SOBREPOSIÇÃO (>60h)';
-                else if (chTotal > 40) portaria134 = 'ALERTA (>40h)';
+                // CH alone is a triage input, never an official Portaria 134
+                // observation. ST/PF exports have no trusted flag field.
+                const portaria134 = '';
 
                 estabelecimentosMap[cnes].profissionais.push({
                     nome: nomeProf || `PROFISSIONAL CNS ${cns}`,
@@ -537,8 +537,12 @@
                     chOutros: chOutr,
                     chTotal: chTotal,
                     atendimentoSus: 'SIM',
-                    vinculacao: row['VINCULAC'] || row['VINCULO'] || 'VINCULO EMPREGATICIO',
-                    tipoVinculo: row['TP_VINCULO'] || 'CONTRATADO TEMPORÁRIO',
+                    vinculacao: row['VINCULAC'] || row['VINCULO'] || '',
+                    tipoVinculo: row['TP_VINCULO'] || row['TIPO_VINCULO'] || '',
+                    subtipo: row['SUBTIPO'] || row['SUBTIPO_VINCULO'] || '',
+                    codigoVinculacao: row['CO_VINCULACAO'] || row['CODIGO_VINCULACAO'] || '',
+                    codigoVinculo: row['CO_VINCULO'] || row['CODIGO_VINCULO'] || '',
+                    codigoSubVinculo: row['CO_SUBVINCULO'] || row['CODIGO_SUBVINCULO'] || '',
                     situacao: 'Ativo',
                     portaria134: portaria134,
                     ativo: true

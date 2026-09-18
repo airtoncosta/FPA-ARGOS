@@ -118,3 +118,21 @@ test('recusa snapshot sem escopo e competência explícitos', () => {
     }));
     assert.equal(readPublishedSnapshot(root), null);
 });
+
+test('recusa snapshot que carrega marcacao Portaria 134 sem proveniencia oficial', () => {
+    const root = createStoreRoot();
+    const snapshot = {
+        competencia: '202608',
+        codigoIbge: '210120',
+        estabelecimentos: [{
+            cnes: '0123456',
+            profissionais: [{ portaria134: 'Artigo 2º (inferido)' }]
+        }]
+    };
+    const ref = writeSnapshot(root, '202608', snapshot);
+    writeManifest(root, manifestFor('202608', {
+        '202608': { status: 'published', snapshot: ref }
+    }));
+
+    assert.equal(readPublishedSnapshot(root), null);
+});

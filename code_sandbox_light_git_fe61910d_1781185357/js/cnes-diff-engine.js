@@ -26,6 +26,13 @@
             // employment link. CNS + CBO alone can represent several links.
             const identity = (cnes, cns, cbo, p) => p.linkIdentity ||
                 [cnes, cns, cbo, p.codigoVinculacao || '', p.codigoVinculo || '', p.codigoSubVinculo || ''].join('_');
+            const observacaoOficial = p => {
+                const fonte = String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase();
+                const competencia = String(p.portaria134Competencia || p.competencia || '').trim();
+                return fonte === 'CNES_OFICIAL' && competencia && String(p.portaria134 || '').trim()
+                    ? String(p.portaria134).trim()
+                    : '';
+            };
             const mapaAnterior = new Map();
             const profsPorCnsAnt = new Map(); // Para rastrear trocas de unidade
 
@@ -115,7 +122,10 @@
                     const difHosp = (pAtual.chHosp || 0) - (pAnt.chHosp || 0);
 
                     if (difTotal !== 0 || difAmb !== 0 || difHosp !== 0) {
-                        const portariaAlerta = pAtual.chTotal > 60 ? 'REVISAR CH (>60h)' : (pAtual.chTotal > 40 ? 'REVISAR CH (>40h)' : 'SEM ALERTA CH');
+                        const portariaAlerta = observacaoOficial(pAtual);
+                        const triagemCh = !portariaAlerta && pAtual.chTotal > 40
+                            ? `Triagem CH (>40h): ${pAtual.chTotal}h; sem observação oficial CNES`
+                            : '';
                         alteracoesCargaHoraria.push({
                             tipo: 'ALTERACAO_CH',
                             tipoBadge: difTotal > 0 ? 'badge-ch-aumento' : 'badge-ch-reducao',
@@ -131,28 +141,30 @@
                             diferencaCh: difTotal,
                             detalheHoras: `Amb: ${pAnt.chAmb || 0}h ➔ ${pAtual.chAmb || 0}h | Hosp: ${pAnt.chHosp || 0}h ➔ ${pAtual.chHosp || 0}h`,
                             portaria134: portariaAlerta,
+                            triagem: triagemCh,
                             competencia: compAtu
                         });
                     }
                 }
 
-                // Hours are a triage signal. Legal/financing conclusions need
-                // team and service context that ST/PF alone does not provide.
-                const vinculosAtuaisCns = profsPorCnsAtu.get(pAtual.cns) || [];
-                const somaHorasMunicipio = vinculosAtuaisCns.reduce((acc, v) => acc + (v.chTotal || 0), 0);
-                if (somaHorasMunicipio > 60 && vinculosAtuaisCns.length > 1) {
-                    if (!alertasPortaria134.some(a => a.cns === pAtual.cns)) {
-                        alertasPortaria134.push({
-                            cns: pAtual.cns,
-                            nome: pAtual.nome,
-                            cbo: pAtual.cbo,
-                            ocupacao: pAtual.ocupacao,
-                            totalHoras: somaHorasMunicipio,
-                            vinculos: vinculosAtuaisCns.map(v => `${v.estabNome} (${v.chTotal}h)`).join(' + '),
-                            alerta: 'Carga horária municipal superior a 60h para o mesmo CNS',
-                            grauRisco: 'REVISAR CONTEXTO DE EQUIPE E SERVIÇO'
-                        });
-                    }
+                // CH/counting from ST/PF is only a local triage signal. It is
+                // never promoted to an official Portaria 134 observation.
+                const oficial = observacaoOficial(pAtual);
+                if (oficial && !alertasPortaria134.some(a => a.cns === pAtual.cns)) {
+                    const vinculosAtuaisCns = profsPorCnsAtu.get(pAtual.cns) || [];
+                    alertasPortaria134.push({
+                        cns: pAtual.cns,
+                        nome: pAtual.nome,
+                        cbo: pAtual.cbo,
+                        ocupacao: pAtual.ocupacao,
+                        totalHoras: vinculosAtuaisCns.reduce((acc, v) => acc + (v.chTotal || 0), 0),
+                        vinculos: vinculosAtuaisCns.map(v => `${v.estabNome} (${v.chTotal}h)`).join(' + '),
+                        portaria134: oficial,
+                        fonte: 'CNES_OFICIAL',
+                        competencia: pAtual.portaria134Competencia || pAtual.competencia,
+                        alerta: oficial,
+                        grauRisco: 'OBSERVAÇÃO OFICIAL CNES'
+                    });
                 }
             });
 

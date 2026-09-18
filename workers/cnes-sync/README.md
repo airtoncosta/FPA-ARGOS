@@ -20,9 +20,15 @@ No Linux, use `.venv/bin/python` nos mesmos comandos. O PySUS guarda seu cache e
 .venv\Scripts\python.exe workers/cnes-sync/cnes_sync.py sync
 .venv\Scripts\python.exe workers/cnes-sync/cnes_sync.py sync 202608
 .venv\Scripts\python.exe workers/cnes-sync/cnes_sync.py backfill 202601 202608
+.venv\Scripts\python.exe workers/cnes-sync/cnes_sync.py rebuild-public
 ```
 
 As opções `--private-root` e `--public-root` permitem apontar os diretórios antes do subcomando. Os valores padrão são `data/cnes/` (privado) e `code_sandbox_light_git_fe61910d_1781185357/cnes_data/auto/` (público).
+
+`rebuild-public` recompõe offline os arquivos públicos a partir de snapshots
+privados validados por hash. Uma versão pública modificada por script legado é
+preservada para auditoria e substituída no manifesto por uma nova revisão.
+O comando não inventa competências nem consulta o FTP.
 
 Em um servidor Node persistente, o `server.js` inicia uma verificação e sincronização no arranque e repete a cada 24 horas quando encontra `.venv` na raiz ou `CNES_PYTHON` configurado. `CNES_SYNC_ENABLED=0` desliga essa rotina. O agendador não executa ciclos sobrepostos. Os snapshots e o manifesto precisam estar no mesmo volume persistente usado pelo servidor HTTP. Hospedagem estática ou execução sem processo persistente exige agendamento externo e armazenamento compartilhado; a rotina Node não consegue atualizar uma implantação Vercel estática por si só.
 
@@ -37,3 +43,10 @@ Em um servidor Node persistente, o `server.js` inicia uma verificação e sincro
 ## Limite de homologação
 
 Os testes automatizados usam tabelas pequenas e stubs. Em 16/09/2026, `check` encontrou `PFMA2608.dbc` e `STMA2608.dbc` no FTP DATASUS. Uma execução real de `sync` publicou 202607 e 202608 para Bacabal, com 3.078 e 3.091 vínculos, respectivamente; um segundo `sync 202608` retornou `unchanged` na revisão 1. Esses arquivos ficam ignorados pelo Git. O worker usa o cliente FTP do PySUS diretamente, sem depender da atualização do catálogo DuckLake.
+
+Em 18/09/2026, `sync 202606` publicou junho com 116 estabelecimentos, 2.722
+profissionais e 3.072 vínculos. Os públicos de julho e agosto foram recompostos
+dos privados como revisões 2, com 3.078 e 3.091 vínculos, sem marcações inferidas
+da Portaria 134. As três competências tiveram zero quarentenas e hashes públicos
+válidos. Os scripts antigos de geração, cópia de competências, enriquecimento e
+sincronização Supabase foram desativados por poderem alterar fatos cadastrais.

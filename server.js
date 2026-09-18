@@ -16,6 +16,7 @@ const { Logger, generateCorrelationId } = require('./lib/logger');
 const { AuditLogger } = require('./lib/audit-logger');
 const { shouldCompress, compressBuffer, createCompressionStream } = require('./lib/compression');
 const { SiasusSyncService } = require('./lib/siasus-sync-service');
+const { createCnesAuthorizer } = require('./lib/cnes-access-control');
 const { readPublishedSnapshotDetails } = require('./lib/cnes-snapshot-store');
 const { startCnesSyncScheduler, resolveCnesPython } = require('./lib/cnes-sync-scheduler');
 const { getRadarScheduler } = require('./lib/radar-scheduler');
@@ -32,6 +33,7 @@ const globalSiasusSyncService = new SiasusSyncService({
     baseDir: path.join(PUBLIC_DIR, 'siasus_data'),
     retentionBdsia: 6
 });
+const globalCnesAuthorizer = createCnesAuthorizer();
 let globalCnesSyncScheduler = null;
 
 function getRateLimitPolicy(pathname, method) {
@@ -933,7 +935,7 @@ globalJobQueue.registerHandler('enviar_email_bpa', async (job, updateProgress) =
     return successRes;
 });
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
     const reqStartTime = Date.now();
     const correlationId = (req.headers['x-request-id'] && String(req.headers['x-request-id']).trim())
         || generateCorrelationId();
@@ -982,6 +984,24 @@ const server = http.createServer((req, res) => {
             retryAfterSeconds: rateResult.retryAfterSeconds
         }));
         return;
+    }
+
+    if (pathname.startsWith('/api/cnes/')) {
+        if (req.method === 'OPTIONS') {
+            handleCors(res);
+            res.writeHead(200);
+            res.end();
+            return;
+        }
+        const access = await globalCnesAuthorizer(req);
+        if (!access.authorized) {
+            const unavailable = access.code === 'CNES_AUTH_NOT_CONFIGURED' || access.code === 'CNES_AUTH_UNAVAILABLE';
+            sendJsonResponse(req, res, unavailable ? 503 : 401, {
+                error: unavailable ? 'Validação de sessão CNES indisponível' : 'Autorização CNES obrigatória',
+                code: access.code || 'CNES_AUTH_REQUIRED'
+            });
+            return;
+        }
     }
 
     // 1. Rota de Proxy para a API oficial do FNS
@@ -1581,6 +1601,12 @@ const server = http.createServer((req, res) => {
     }
 
     // 2. Servir arquivos estáticos da aplicação
+    // CNES carries professional links and must only leave through an authorized API.
+    if (pathname === '/cnes_data' || pathname.startsWith('/cnes_data/')) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Dados CNES exigem acesso autorizado', code: 'CNES_AUTH_REQUIRED' }));
+        return;
+    }
     let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
 
     // Evitar directory traversal
@@ -1645,7 +1671,9 @@ server.listen(PORT, () => {
     console.log(`=============================================================\n`);
 
     // Inicia agendador automático do SIA/SUS (a cada 6 horas)
-    globalSiasusSyncService.startAutoSync();
+    if (process.env.SIASUS_SYNC_ENABLED !== '0') {
+        globalSiasusSyncService.startAutoSync();
+    }
 
     // Inicia agendador do Radar & Blog de Inteligência Web (Opção A: 24h portais / 6h redes sociais)
     try {
