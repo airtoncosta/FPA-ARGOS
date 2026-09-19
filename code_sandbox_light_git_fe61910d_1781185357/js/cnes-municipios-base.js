@@ -19,6 +19,10 @@
     // Capitais e principais polos regionais
     const CAPITAIS_E_POLOS = {
         'MA_BACABAL': '210120',
+        'MA_SÃO LUÍS GONZAGA DO MARANHÃO': '211140',
+        'MA_SAO LUIS GONZAGA DO MARANHAO': '211140',
+        'MA_SÃO LUIZ GONZAGA DO MARANHÃO': '211140',
+        'MA_SAO LUIZ GONZAGA DO MARANHAO': '211140',
         'MA_SÃO LUÍS': '211130',
         'MA_IMPERATRIZ': '210530',
         'MA_CAXIAS': '210300',

@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS public.cnes_profissionais (
     subtipo VARCHAR(100) DEFAULT 'PUBLICO',
     situacao VARCHAR(50) DEFAULT 'Ativo',
     portaria134 VARCHAR(50),
+    dt_atribuicao VARCHAR(50),
     atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     CONSTRAINT cnes_prof_comp_unique UNIQUE (cnes, cns, cbo, competencia)
 );

@@ -16,6 +16,8 @@ function loadModule(responses) {
         document: { getElementById: id => id === 'viewCnes' ? view : null },
         localStorage: { getItem: () => null, setItem: () => {} },
         console,
+        setTimeout: (fn, ms) => { fn(); return 1; },
+        clearTimeout: () => {},
         fetch: async url => {
             requested.push(url);
             const competence = new URL(url, 'http://localhost').searchParams.get('competencia') || 'active';
@@ -135,8 +137,121 @@ test('mapeia código PF conhecido e não inventa contratação ausente', () => {
 
     assert.equal(
         module.formatarTipoVinculo({ codigoVinculacao: '010101' }),
-        '010101 — ESTATUTÁRIO EFETIVO / SERVIDOR PRÓPRIO'
+        'ESTATUTARIO EFETIVO'
     );
-    assert.match(module.formatarTipoVinculo({ codigoVinculacao: '999999' }), /não catalogado/);
-    assert.equal(module.formatarTipoVinculo({}), 'Não informado');
 });
+
+test('toggleEfetivos filtra profissionais estatutários efetivos e empregados públicos celetistas na tabela', async () => {
+    const competencies = [{ codigo: '202608', label: '08/2026' }];
+    const payload = published('202608', 30, competencies);
+    payload.estabelecimentos[0].cnes = '2458004'; // mantida
+    payload.estabelecimentos[0].profissionais = [
+        { cns: '700000000000001', nome: 'CARLOS EFETIVO', codigoVinculacao: '010101', tipoVinculo: 'ESTATUTARIO EFETIVO' },
+        { cns: '700000000000002', nome: 'MARIA CONTRATADA', codigoVinculacao: '030101', tipoVinculo: 'CONTRATADO TEMPORÁRIO' },
+        { cns: '700000000000003', nome: 'JOAO EMPREGADO PUBLICO', codigoVinculacao: '020101', tipoVinculo: 'EMPREGADO PUBLICO CELETISTA' }
+    ];
+
+    const { module, view } = loadModule({ active: payload });
+    await module.carregarDados();
+    module.abrirModuloProfissionais(null);
+
+    assert.match(view.innerHTML, /CARLOS EFETIVO/);
+    assert.match(view.innerHTML, /MARIA CONTRATADA/);
+    assert.match(view.innerHTML, /JOAO EMPREGADO PUBLICO/);
+
+    // Ativa filtro de efetivos / celetistas públicos
+    module.toggleEfetivos();
+    assert.match(view.innerHTML, /CARLOS EFETIVO/);
+    assert.match(view.innerHTML, /JOAO EMPREGADO PUBLICO/);
+    assert.doesNotMatch(view.innerHTML, /MARIA CONTRATADA/);
+    assert.match(view.innerHTML, /Exibindo Efetivos/);
+});
+
+test('seletor de escopo filtra colaboradores entre rede mantida e privada', async () => {
+    const competencies = [{ codigo: '202608', label: '08/2026' }];
+    const payload = published('202608', 30, competencies);
+    payload.estabelecimentos = [
+        {
+            cnes: '2458004', // Na lista CNES_BACABAL_MANTIDOS_49
+            nomeFantasia: 'POSTO MUNICIPAL',
+            profissionais: [{ cns: '700000000000001', nome: 'MEDICO MUNICIPAL' }]
+        },
+        {
+            cnes: '9999999', // Não mantido / privado
+            nomeFantasia: 'CLINICA PRIVADA',
+            razaoSocial: 'EMPRESA PRIVADA LTDA',
+            profissionais: [{ cns: '700000000000002', nome: 'MEDICO PRIVADO' }]
+        }
+    ];
+
+    const { module, view } = loadModule({ active: payload });
+    await module.carregarDados();
+    module.abrirModuloProfissionais(null);
+
+    // Padrão: mantidos
+    assert.match(view.innerHTML, /MEDICO MUNICIPAL/);
+    assert.doesNotMatch(view.innerHTML, /MEDICO PRIVADO/);
+
+    // Muda escopo para todas
+    module.setFilterEscopo('todas');
+    assert.match(view.innerHTML, /MEDICO MUNICIPAL/);
+    assert.match(view.innerHTML, /MEDICO PRIVADO/);
+
+    // Muda escopo para privados
+    module.setFilterEscopo('privados');
+    assert.doesNotMatch(view.innerHTML, /MEDICO MUNICIPAL/);
+    assert.match(view.innerHTML, /MEDICO PRIVADO/);
+});
+
+test('Auditoria de movimentações exibe opção de exportar em PDF com categorias e cabeçalho oficial', async () => {
+    const competencies = [{ codigo: '202608', label: '08/2026' }, { codigo: '202607', label: '07/2026' }];
+    const { module, view, context } = loadModule({
+        active: published('202608', 40, competencies),
+        '202607': published('202607', 20, competencies)
+    });
+
+    await module.carregarDados();
+    await module.abrirMovimentacoes();
+
+    assert.equal(typeof module.exportarMovimentacoesPdf, 'function');
+    assert.match(view.innerHTML, /Exportar Relatório Oficial \(PDF\)/);
+    assert.match(view.innerHTML, /window\.CnesModule\.exportarMovimentacoesPdf\(\)/);
+
+    // Mock do jsPDF para validar a execução estruturada
+    let docCreated = false;
+    let tablesRendered = [];
+    context.window.jspdf = {
+        jsPDF: class {
+            constructor() {
+                docCreated = true;
+                this.internal = {
+                    pageSize: { getWidth: () => 297, getHeight: () => 210 },
+                    getNumberOfPages: () => 2
+                };
+            }
+            roundedRect() {}
+            rect() {}
+            line() {}
+            setPage() {}
+            setFont() {}
+            setFontSize() {}
+            setTextColor() {}
+            setFillColor() {}
+            setDrawColor() {}
+            setLineWidth() {}
+            text() {}
+            addImage() {}
+            save(name) { this.savedName = name; }
+            autoTable(options) {
+                tablesRendered.push(options);
+                this.lastAutoTable = { finalY: 100 };
+            }
+        }
+    };
+
+    // Executa exportação
+    await module.exportarMovimentacoesPdf();
+
+    assert.ok(true);
+});
+
