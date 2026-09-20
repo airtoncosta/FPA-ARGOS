@@ -3009,10 +3009,15 @@ function processContent(content, fileName = 'arquivo') {
                         hideModal('modalImportar');
                         showToast(`✅ ${parsed.competencia} — ${parsed.municipio}-${parsed.uf} importado com sucesso!`, 'success');
 
-                        // Aciona a Malha Fina Anti-Glosa com o Radar Cyber ARGOS
-                        if (typeof parsed.conteudo === 'string' && window.MalhaFinaEngine && typeof window.MalhaFinaEngine.executar === 'function') {
+                        // Aciona o Pente Fino Anti-Glosa com o Radar Cyber ARGOS
+                        if (typeof parsed.conteudo === 'string' && (window.PenteFinoEngine || window.MalhaFinaEngine)) {
+                            const engine = window.PenteFinoEngine || window.MalhaFinaEngine;
                             setTimeout(() => {
-                                window.MalhaFinaEngine.executar(parsed);
+                                if (typeof engine.executarComAnimacao3D === 'function') {
+                                    engine.executarComAnimacao3D(parsed);
+                                } else {
+                                    engine.executar(parsed);
+                                }
                             }, 400);
                         }
                     } catch(err) {

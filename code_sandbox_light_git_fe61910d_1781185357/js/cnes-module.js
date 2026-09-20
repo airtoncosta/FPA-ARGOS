@@ -2125,7 +2125,7 @@ window.CnesModule = (function () {
     }
 
     /**
-     * Métodos de integração para a Malha Fina Anti-Glosa
+     * Métodos de integração para o Pente Fino Anti-Glosa
      */
     function validarProfissionalNoCnes(cns, cnes) {
         if (!cns || !cnes) return null;
@@ -3249,7 +3249,7 @@ window.CnesModule = (function () {
 
                         <div style="margin-top: 1.25rem; font-size: 0.75rem; color: #64748b; background: #f8fafc; padding: 0.75rem; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
                             <i class="fas fa-info-circle" style="color: #0284c7;"></i>
-                            <strong>Dica de Integração:</strong> Os dados importados alimentarão instantaneamente o cruzamento de glosas da Malha Fina e a validação de vínculos deste município.
+                            <strong>Dica de Integração:</strong> Os dados importados alimentarão instantaneamente o cruzamento de glosas do Pente Fino e a validação de vínculos deste município.
                         </div>
 
                         <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.5rem;">

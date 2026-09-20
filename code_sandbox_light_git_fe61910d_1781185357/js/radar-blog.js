@@ -195,7 +195,7 @@ window.RadarBlogModule = (function () {
             reviewedBy: 'Engenharia de Software FPA ARGOS',
             subtitle: 'Integração de motores de IA para checagem cruzada de CPF, CNS e compatibilidade SIGTAP elimina inconsistências de digitação antes da geração dos magnéticos oficiais.',
             content: `
-                <p>O uso de plataformas inteligentes integradas como o <strong>FPA ARGOS</strong> marca uma nova fase na gestão da saúde pública municipal, convertendo arquivos de produção ambulatorial em dados estruturados com auditoria de malha fina instantânea.</p>
+                <p>O uso de plataformas inteligentes integradas como o <strong>FPA ARGOS</strong> marca uma nova fase na gestão da saúde pública municipal, convertendo arquivos de produção ambulatorial em dados estruturados com auditoria de pente fino instantânea.</p>
                 
                 <p>A validação em tempo real de critérios regulatórios — como compatibilidade de CBO, limites de idade, tetos orçamentários e conciliação bancária do FNS — reduz o retrabalho dos digitadores e protege os cofres municipais contra glosas administrativas do Ministério da Saúde.</p>
             `,

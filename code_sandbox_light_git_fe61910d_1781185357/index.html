@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/boletim-executivo.css">
     <link rel="stylesheet" href="css/cnes-module.css?v=20260918_escopo_efetivos">
     <link rel="stylesheet" href="css/malha-fina.css">
+    <link rel="stylesheet" href="css/pente-fino-3d.css">
     <link rel="stylesheet" href="css/login-responsive.css">
     <link rel="stylesheet" href="css/download-sistema.css">
     <link rel="stylesheet" href="css/radar-blog.css">
@@ -82,8 +83,8 @@
                 <button class="btn-header-premium btn-premium-boletim" id="btnBoletimTop" onclick="window.BoletimExecutivo.abrir()" title="Boletim Executivo para o Secretário e Prefeito" style="background: linear-gradient(135deg, #0f172a, #1e293b); border: 1px solid #38bdf8; color: #38bdf8;">
                     <i class="fas fa-crown"></i><span>Boletim Executivo</span>
                 </button>
-                <button class="btn-header-premium btn-premium-malhafina" id="btnMalhaFinaTop" onclick="window.MalhaFinaEngine.executar()" title="Auditoria de Malha Fina Anti-Glosa DATASUS" style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #818cf8; color: #a5b4fc;">
-                    <i class="fas fa-shield-alt"></i><span>Malha Fina</span>
+                <button class="btn-header-premium btn-premium-malhafina" id="btnMalhaFinaTop" onclick="window.PenteFinoEngine.executar()" title="Auditoria de Pente Fino Anti-Glosa DATASUS" style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #818cf8; color: #a5b4fc;">
+                    <i class="fas fa-shield-alt"></i><span>Pente Fino</span>
                 </button>
                 <button class="btn-header-premium btn-premium-import" id="btnImportar" title="Importar TXT SIA/SUS">
                     <i class="fas fa-file-import"></i><span>Importar</span>
@@ -1805,17 +1806,17 @@
 
         <!-- ======================== SEÇÃO PRODUÇÕES BPA ======================== -->
         <section id="section-producoes-bpa" class="content-section">
-            <div class="section-header">
+            <div class="section-header bpa-main-header">
                 <div>
                     <h2><i class="fas fa-file-medical-alt"></i> Central de Produções BPA</h2>
                     <div class="section-badge" id="bpaAccessScope" role="status">Carregando suas unidades...</div>
                 </div>
                 <div class="bpa-top-actions">
-                    <button class="btn-primary" id="btnNovoEnvioBpa">
-                        <i class="fas fa-cloud-upload-alt"></i> Enviar Produção BPA
-                    </button>
-                    <button class="btn-secondary" id="btnBaixarLoteBpa" title="Baixar todos os arquivos da competência selecionada">
+                    <button class="btn-secondary" id="btnBaixarLoteBpa" style="display: none;" title="Baixar todos os arquivos da competência selecionada">
                         <i class="fas fa-download"></i> Baixar Pacote da Competência
+                    </button>
+                    <button class="btn-secondary" id="btnNovaUnidadeManualBpa" style="display: none; border-color: rgba(16, 185, 129, 0.4); color: #059669;" title="Inserir manualmente uma nova unidade de saúde e CNES (Exclusivo ADM e Francileide)">
+                        <i class="fas fa-plus-circle"></i> + Inserir Unidade
                     </button>
                     <button class="btn-secondary" id="btnGerenciarResponsaveisBpa" style="display: none; border-color: rgba(56, 189, 248, 0.4); color: #0284c7;" title="Definir os digitadores responsáveis por cada unidade (Exclusivo ADM e Francileide)">
                         <i class="fas fa-users-cog"></i> Atribuir Responsáveis
@@ -1826,38 +1827,69 @@
                 </div>
             </div>
 
-            <!-- BARRA DE FILTROS DO BPA -->
-            <div class="bpa-filter-toolbar">
-                <div class="bpa-filter-group">
-                    <label for="selectBpaCompetencia"><i class="fas fa-calendar-alt"></i> Competência:</label>
-                    <select id="selectBpaCompetencia" class="bpa-select">
-                        <option value="">Todas as Competências</option>
-                    </select>
+            <!-- BLOCO HERO CENTRALIZADO — ENVIAR PRODUÇÃO BPA (CHAMATIVO, PULSANTE & PREMIUM) -->
+            <div class="bpa-hero-action-panel">
+                <button class="bpa-hero-cta-btn" id="btnNovoEnvioBpa" type="button" title="Clique para enviar e validar um novo arquivo de produção BPA">
+                    <span class="bpa-hero-cta-halo"></span>
+                    <span class="bpa-hero-cta-icon-box">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </span>
+                    <span class="bpa-hero-cta-text-group">
+                        <span class="bpa-hero-cta-headline">Enviar Produção BPA</span>
+                        <span class="bpa-hero-cta-subline">Importar arquivo magnético SIA/SUS • Consolidado (BPA-C) ou Individualizado (BPA-I)</span>
+                    </span>
+                    <span class="bpa-hero-cta-pill">
+                        <i class="fas fa-arrow-up-from-bracket"></i> Novo Envio
+                    </span>
+                </button>
+            </div>
+
+            <!-- BARRA DE CONTROLE E FILTROS DO BPA (DESIGN SYSTEM ARGOS) -->
+            <div class="bpa-control-card">
+                <div class="bpa-control-filters-left">
+                    <div class="bpa-control-filter-box">
+                        <label for="selectBpaCompetencia" class="bpa-control-label">
+                            <i class="fas fa-calendar-alt"></i> Competência
+                        </label>
+                        <select id="selectBpaCompetencia" class="bpa-select-control">
+                            <option value="">Todas as Competências</option>
+                        </select>
+                    </div>
+
+                    <div class="bpa-control-filter-box">
+                        <label for="selectBpaTipoFiltro" class="bpa-control-label">
+                            <i class="fas fa-layer-group"></i> Modalidade
+                        </label>
+                        <select id="selectBpaTipoFiltro" class="bpa-select-control">
+                            <option value="">Todas as Modalidades</option>
+                            <option value="AMBOS">Produção Dupla (BPA-C + BPA-I)</option>
+                            <option value="PARCIAL">Entrega Parcial (Falta 1)</option>
+                            <option value="BPA-C">Apenas BPA-C (Consolidado)</option>
+                            <option value="BPA-I">Apenas BPA-I (Individualizado)</option>
+                        </select>
+                    </div>
+
+                    <!-- GRUPO RESPONSÁVEL (EXCLUSIVO GESTÃO / ADM / FRANCILEIDE) -->
+                    <div class="bpa-control-filter-box" id="bpaGroupResponsavelFilter" style="display: none;">
+                        <label for="selectBpaResponsavel" class="bpa-control-label">
+                            <i class="fas fa-user-check"></i> Responsável
+                        </label>
+                        <select id="selectBpaResponsavel" class="bpa-select-control">
+                            <option value="">Todos os Responsáveis</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="bpa-filter-group">
-                    <label for="selectBpaResponsavel"><i class="fas fa-user-check"></i> Responsável:</label>
-                    <select id="selectBpaResponsavel" class="bpa-select">
-                        <option value="">Todos os Responsáveis</option>
-                    </select>
-                </div>
-                <div class="bpa-filter-group">
-                    <label for="selectBpaTipoFiltro"><i class="fas fa-layer-group"></i> Modalidade:</label>
-                    <select id="selectBpaTipoFiltro" class="bpa-select">
-                        <option value="">Todas as Modalidades</option>
-                        <option value="AMBOS">Produção Dupla (BPA-C + BPA-I)</option>
-                        <option value="PARCIAL">Entrega Parcial (Falta 1)</option>
-                        <option value="BPA-C">Apenas BPA-C (Consolidado)</option>
-                        <option value="BPA-I">Apenas BPA-I (Individualizado)</option>
-                    </select>
-                </div>
-                <div class="bpa-search-group">
-                    <i class="fas fa-search bpa-search-icon"></i>
-                    <input type="text" id="searchBpaInput" placeholder="Pesquisar por arquivo, unidade ou digitador...">
+
+                <div class="bpa-control-search-right">
+                    <div class="bpa-control-search-box">
+                        <i class="fas fa-search bpa-search-icon"></i>
+                        <input type="text" id="searchBpaInput" placeholder="Pesquisar por arquivo ou unidade..." autocomplete="off">
+                    </div>
                 </div>
             </div>
 
-            <!-- CHIPS INTELIGENTES DE PROFISSIONAIS RESPONSÁVEIS -->
-            <div class="bpa-smart-chips-wrapper">
+            <!-- CHIPS DE RESPONSÁVEIS (EXCLUSIVO GESTÃO / ADM / FRANCILEIDE) -->
+            <div class="bpa-smart-chips-wrapper" id="bpaSmartChipsWrapper" style="display: none;">
                 <div class="bpa-smart-chips-label">
                     <i class="fas fa-user-friends"></i>
                     <span>Responsáveis:</span>
@@ -1867,15 +1899,15 @@
                 </div>
             </div>
 
-            <!-- PAINEL DE CONTROLE GERENCIAL (VISÃO DA FRANCILEIDE / DIGITADORES) -->
+            <!-- PAINEL DE INDICADORES (KPIS) -->
             <div class="bpa-kpi-container">
                 <div class="bpa-kpi-card interactive" id="bpaCardTotal" data-status-filter="" title="Clique para exibir todas as unidades">
                     <div class="bpa-kpi-info">
                         <div class="bpa-kpi-header-row">
-                            <span class="bpa-kpi-label">Unidades Esperadas</span>
+                            <span class="bpa-kpi-label" id="bpaKpiTotalLabel">Unidades Esperadas</span>
                             <span class="bpa-kpi-filter-tag" id="tagFilterTotal" style="display: none;"><i class="fas fa-filter"></i> Todos</span>
                         </div>
-                        <h3 class="bpa-kpi-value" id="bpaKpiTotal">9</h3>
+                        <h3 class="bpa-kpi-value" id="bpaKpiTotal">0</h3>
                         <span class="bpa-kpi-sub" id="bpaKpiCompLabel">Competência Julho/2026</span>
                     </div>
                     <div class="bpa-kpi-icon total"><i class="fas fa-hospital-alt"></i></div>
@@ -1929,22 +1961,22 @@
                 </button>
             </div>
 
-            <!-- QUADRO DE STATUS DAS UNIDADES (CHECKLIST DA FRANCILEIDE) -->
-            <div class="bpa-checklist-wrapper">
+            <!-- QUADRO DE STATUS DAS UNIDADES (CHECKLIST) -->
+            <div class="bpa-checklist-wrapper" id="bpaChecklistWrapper">
                 <div class="bpa-checklist-header">
                     <h4><i class="fas fa-tasks"></i> Entregas por unidade</h4>
-                    <span class="bpa-checklist-tip"><i class="fas fa-info-circle"></i> Confira BPA-C e BPA-I da competência e anexe no espaço que falta</span>
+                    <span class="bpa-checklist-tip"><i class="fas fa-info-circle"></i> Confira BPA-C e BPA-I da competência e anexe no espaço correspondente</span>
                 </div>
                 <div class="bpa-checklist-grid" id="bpaChecklistContainer">
                     <!-- Gerado dinamicamente pelo bpa-module.js -->
                 </div>
             </div>
 
-            <!-- TABELA DE ARQUIVOS (PADRÃO ESCURO ESTILO O PRINT DE REFERÊNCIA) -->
+            <!-- TABELA DE ARQUIVOS (DESIGN SYSTEM ARGOS — TEMA CLARO PREMIUM) -->
             <div class="bpa-table-card">
                 <div class="bpa-table-header">
                     <div class="bpa-table-title">
-                        <i class="fas fa-list-alt"></i>
+                        <i class="fas fa-file-invoice"></i>
                         <span>Arquivos de Produção Disponíveis para Download</span>
                     </div>
                     <span class="bpa-table-badge">BPA Magnético SIA/SUS</span>
@@ -1958,7 +1990,7 @@
                                 <th>Competência</th>
                                 <th>Digitador / Envio</th>
                                 <th>Tamanho</th>
-                                <th class="text-center" style="width: 160px;">Download</th>
+                                <th class="text-center" style="width: 170px;">Download</th>
                             </tr>
                         </thead>
                         <tbody id="tbodyBpaArquivos">
@@ -2236,10 +2268,10 @@
                                     <div id="bpaProfissionaisAmostra" class="bpa-profissionais-scroll-box" style="display: none;"></div>
                                 </div>
 
-                                <!-- Botão de Ação Imediata da Malha Fina -->
+                                <!-- Botão de Ação Imediata do Pente Fino ARGOS -->
                                 <div style="margin-top: 0.75rem;">
-                                    <button type="button" onclick="window.MalhaFinaEngine.executar(BpaModule.filePendingUpload)" style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #818cf8; color: #c7d2fe; font-weight: 700; width: 100%; padding: 0.65rem; border-radius: 0.55rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(49, 46, 129, 0.35); transition: all 0.2s ease;">
-                                        <i class="fas fa-shield-alt" style="color: #a5b4fc;"></i> Auditar Agora com a Malha Fina Anti-Glosa
+                                    <button type="button" id="btnAuditarPenteFinoBpa" onclick="window.PenteFinoEngine.executarComAnimacao3D(BpaModule.filePendingUpload)" style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #818cf8; color: #c7d2fe; font-weight: 700; width: 100%; padding: 0.65rem; border-radius: 0.55rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(49, 46, 129, 0.35); transition: all 0.2s ease;">
+                                        <i class="fas fa-shield-alt" style="color: #a5b4fc;"></i> Auditar Agora com o Pente Fino Anti-Glosa
                                     </button>
                                 </div>
                             </div>
@@ -2339,6 +2371,46 @@
                 <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; padding: 0.75rem 1rem; border-radius: 0.35rem; margin-bottom: 1.2rem; font-size: 0.85rem; color: #334155;">
                     <i class="fas fa-shield-alt" style="color: #0284c7; margin-right: 0.4rem;"></i> Painel de Gestão exclusivo para <strong>Administradores</strong> e <strong>Francileide</strong>. Defina quem é o digitador responsável e quais modalidades de BPA (Consolidado, Individualizado ou Ambos) cada unidade deve entregar.
                 </div>
+
+                <!-- CARD PARA INSERIR NOVA UNIDADE MANUALMENTE -->
+                <div class="bpa-add-unit-card" style="background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 0.65rem; padding: 1rem 1.1rem; margin-bottom: 1.2rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.65rem;">
+                        <span style="font-weight: 700; font-size: 0.88rem; color: #0f172a; display: flex; align-items: center; gap: 0.45rem;">
+                            <i class="fas fa-plus-circle" style="color: #0284c7;"></i> Cadastrar Nova Unidade de Saúde Manualmente
+                        </span>
+                        <span style="font-size: 0.73rem; color: #64748b;">Insira nome e CNES para disponibilizar para atribuição</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1.1fr 1.3fr 1.4fr auto; gap: 0.6rem; align-items: end;">
+                        <div>
+                            <label style="display: block; font-size: 0.73rem; font-weight: 600; color: #475569; margin-bottom: 0.25rem;">Nome da Unidade *</label>
+                            <input type="text" id="inputNovaUnidadeNome" class="bpa-input" placeholder="Ex: UBS NOVO HORIZONTE" style="width: 100%; font-size: 0.8rem; padding: 0.45rem 0.6rem; text-transform: uppercase;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.73rem; font-weight: 600; color: #475569; margin-bottom: 0.25rem;">CNES (7 dígitos)</label>
+                            <input type="text" id="inputNovaUnidadeCnes" class="bpa-input" placeholder="Ex: 1234567" maxlength="7" style="width: 100%; font-size: 0.8rem; padding: 0.45rem 0.6rem; font-family: monospace;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.73rem; font-weight: 600; color: #475569; margin-bottom: 0.25rem;">Modalidade</label>
+                            <select id="selectNovaUnidadeModal" class="bpa-select" style="width: 100%; font-size: 0.8rem; padding: 0.45rem 0.6rem; font-weight: 600;">
+                                <option value="AMBOS">AMBOS (BPA-C + BPA-I)</option>
+                                <option value="BPA-C">Apenas BPA-C</option>
+                                <option value="BPA-I">Apenas BPA-I</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.73rem; font-weight: 600; color: #475569; margin-bottom: 0.25rem;">Digitador Responsável</label>
+                            <select id="selectNovaUnidadeResp" class="bpa-select" style="width: 100%; font-size: 0.8rem; padding: 0.45rem 0.6rem;">
+                                <!-- Preenchido dinamicamente pelo BpaModule -->
+                            </select>
+                        </div>
+                        <div>
+                            <button type="button" class="btn-primary" id="btnAdicionarNovaUnidadeBpa" style="padding: 0.48rem 0.9rem; font-size: 0.8rem; white-space: nowrap; height: 35px; display: inline-flex; align-items: center; gap: 0.35rem;" onclick="BpaModule.adicionarNovaUnidadeManual()">
+                                <i class="fas fa-plus"></i> Inserir Unidade
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bpa-responsaveis-table-wrapper" style="border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden;">
                     <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
                         <thead style="background: #f1f5f9;">
@@ -2347,6 +2419,7 @@
                                 <th style="padding: 0.7rem 1rem; text-align: left; width: 100px;">CNES</th>
                                 <th style="padding: 0.7rem 1rem; text-align: left; width: 175px;">Digitador Responsável</th>
                                 <th style="padding: 0.7rem 1rem; text-align: left; width: 185px;">Modalidade Esperada</th>
+                                <th style="padding: 0.7rem 0.5rem; text-align: center; width: 50px;">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="tbodyGerenciarResponsaveisBpa">
@@ -2876,6 +2949,8 @@
     <script src="js/cnes-module.js"></script>
     <script src="js/bpa-audit-core.js"></script>
     <script src="js/sigtap-audit-api.js"></script>
+    <script src="js/pente-fino-engine.js"></script>
+    <script src="js/pente-fino-3d-renderer.js"></script>
     <script src="js/malha-fina-engine.js"></script>
     <script src="js/download-sistema-module.js"></script>
     <script src="js/radar-blog.js"></script>
