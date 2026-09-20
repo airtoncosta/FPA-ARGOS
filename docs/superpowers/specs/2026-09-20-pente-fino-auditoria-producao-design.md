@@ -1,7 +1,7 @@
 # Pente Fino ARGOS — Auditoria de Produção Design
 
 **Data:** 20/09/2026  
-**Status:** aguardando revisão do usuário  
+**Status:** aprovado para implementação  
 **Substitui, para o motor de produção, as regras de dados da especificação `2026-09-20-pente-fino-argos-3d-design.md`.**
 
 ## Objetivo
