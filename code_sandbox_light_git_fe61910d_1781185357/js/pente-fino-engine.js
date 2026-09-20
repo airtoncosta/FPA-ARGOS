@@ -219,11 +219,6 @@
             }
         }
 
-        if (Array.isArray(regras.outrasGlosas) && regras.outrasGlosas.length > 0) {
-            totalGlosas += regras.outrasGlosas.length;
-            regrasComGlosa.push('Outras Inconsistências Estruturais');
-        }
-
         const podeEnviar = totalGlosas === 0;
 
         return {
@@ -231,7 +226,7 @@
             status: podeEnviar ? 'APROVADO' : 'GLOSA_DETECTADA',
             totalGlosas: totalGlosas,
             regrasComGlosa: regrasComGlosa,
-            mensagem: podeEnviar ? 'Pode enviar a produção sem glosa' : `Foram detectadas ${totalGlosas} ocorrências de glosa que impedem a aprovação imediata.`
+            mensagem: podeEnviar ? 'Pode enviar a produção sem glosa' : `Foram detectadas ${totalGlosas} ocorrências de glosa nas regras do Pente Fino.`
         };
     }
 
