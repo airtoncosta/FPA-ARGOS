@@ -1068,8 +1068,8 @@
 }
 
 /* Coluna CNS Master e Botão de Cópia */
-.cnes-table-17cols .td-prof-cns {
-    text-align: center;
+.cnes-table-17cols .td-prof-cns,
+.cnes-est-table .td-est-cnes {
     white-space: nowrap;
 }
 

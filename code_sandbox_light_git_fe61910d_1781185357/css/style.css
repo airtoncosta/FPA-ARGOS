@@ -7100,28 +7100,83 @@ html {
     color: #ef4444;
 }
 
-/* MODAL DE UPLOAD COM DRAG & DROP */
+/* MODAL DE UPLOAD BPA - MODO PAISAGEM (HORIZONTAL) MODERNO & RESPONSIVO */
+.modal-box.bpa-modal-landscape {
+    max-width: min(1140px, 95vw);
+    width: 95vw;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+.bpa-modal-body {
+    padding: 1.25rem 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    background: #f8fafc;
+}
+
+.bpa-modal-landscape-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 1.25rem;
+    align-items: stretch;
+}
+
+@media (max-width: 920px) {
+    .bpa-modal-landscape-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+    .modal-box.bpa-modal-landscape {
+        width: 96vw;
+        max-height: 95vh;
+    }
+}
+
+/* Coluna Esquerda: Inspeção & Raio-X */
+.bpa-modal-col-inspect {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
 .bpa-dropzone {
     border: 2px dashed #94a3b8;
     border-radius: 0.75rem;
-    padding: 1.8rem 1.5rem;
+    padding: 1.5rem;
     text-align: center;
-    background: #f8fafc;
+    background: #ffffff;
     cursor: pointer;
-    transition: all var(--transition);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 280px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .bpa-dropzone:hover,
 .bpa-dropzone.dragover {
     border-color: #0284c7;
     background: #f0f9ff;
-    transform: scale(1.01);
+    transform: scale(1.005);
 }
 
 .bpa-dropzone.has-file {
-    border-style: solid;
-    border-color: #10b981;
-    background: #f0fdf4;
+    border: 1px solid #10b981;
+    background: #ffffff;
+    padding: 0;
+    cursor: default;
+    min-height: auto;
+    display: block;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);
+    transform: none;
 }
 
 .bpa-drop-icon {
@@ -7161,10 +7216,9 @@ html {
 
 .bpa-file-detected-card {
     background: #ffffff;
-    border: 1px solid #10b981;
-    border-radius: 0.5rem;
-    padding: 0.85rem 1rem;
-    box-shadow: var(--shadow-sm);
+    border-radius: 0.75rem;
+    padding: 1rem 1.15rem;
+    border: none;
 }
 
 .bpa-detected-top {
@@ -7172,37 +7226,344 @@ html {
     align-items: center;
     gap: 0.85rem;
     text-align: left;
+    flex-wrap: wrap;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid #f1f5f9;
 }
 
-.bpa-detected-top i.fa-file-code {
-    font-size: 1.8rem;
+.bpa-file-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
     color: #10b981;
+    flex-shrink: 0;
 }
 
-.bpa-detected-details strong {
-    font-size: 0.95rem;
-    color: #1e293b;
-    display: block;
+.bpa-detected-details {
+    flex: 1;
+    min-width: 200px;
+}
+
+.bpa-file-name-title {
     font-family: 'Roboto Mono', monospace;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+    word-break: break-all;
 }
 
-.bpa-detected-details div {
-    font-size: 0.8rem;
-    color: #64748b;
-    margin-top: 0.15rem;
+.bpa-file-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+}
+
+.bpa-mini-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.73rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.bpa-mini-chip.primary {
+    background: #e0f2fe;
+    color: #0369a1;
+    border-color: #bae6fd;
+    font-weight: 700;
+}
+
+.bpa-mini-chip.success {
+    background: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+    font-weight: 700;
+}
+
+.bpa-detected-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .bpa-detected-badge {
-    margin-left: auto;
-    background: #10b981;
+    background: #0284c7;
     color: #ffffff;
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     font-weight: 700;
-    padding: 0.25rem 0.6rem;
+    padding: 0.25rem 0.65rem;
     border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(2, 132, 199, 0.2);
+}
+
+.bpa-btn-trocar-arquivo {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: color 0.15s ease;
+}
+
+.bpa-btn-trocar-arquivo:hover {
+    color: #0284c7;
+    text-decoration: underline;
+}
+
+/* Área de Raio-X e Inspeção */
+.bpa-raiox-box {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    text-align: left;
+}
+
+.bpa-tipo-alerta {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    color: #0369a1;
+    font-size: 0.78rem;
+    font-weight: 500;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+}
+
+.bpa-section-divider-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #334155;
+    margin: 0.65rem 0 0.4rem;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+}
+
+.bpa-procedimentos-pills-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+}
+
+.bpa-proc-pill-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 0.74rem;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+.bpa-proc-pill-item:hover {
+    border-color: #0284c7;
+    background: #f0f9ff;
+}
+
+.bpa-proc-pill-item code {
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 600;
+    color: #334155;
+}
+
+.bpa-proc-pill-item .qty {
+    background: #e0f2fe;
+    color: #0369a1;
+    font-weight: 700;
+    padding: 0 4px;
+    border-radius: 3px;
+}
+
+/* Lista de Profissionais Identificados */
+.bpa-profissionais-scroll-box {
+    max-height: 225px;
+    overflow-y: auto;
+    padding-right: 4px;
+    margin-top: 0.4rem;
+}
+
+.bpa-profissionais-scroll-box::-webkit-scrollbar {
+    width: 5px;
+}
+
+.bpa-profissionais-scroll-box::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.bpa-prof-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.45rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    transition: all 0.15s ease;
+}
+
+.bpa-prof-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.bpa-prof-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.bpa-prof-card-name {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.84rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.bpa-prof-badge-cns {
+    background: #e0f2fe;
+    color: #0369a1;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.73rem;
+    font-family: 'Roboto Mono', monospace;
+    white-space: nowrap;
+}
+
+.bpa-prof-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+    padding-top: 0.3rem;
+    border-top: 1px dashed #f1f5f9;
+    font-size: 0.75rem;
+}
+
+.bpa-prof-cbo-text {
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
     gap: 0.3rem;
+}
+
+.bpa-prof-total-badge {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #0f172a;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 9999px;
+    font-size: 0.73rem;
+    white-space: nowrap;
+}
+
+.bpa-prof-procs-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+    border-top: 1px dashed #f1f5f9;
+}
+
+/* Coluna Direita: Formulário de Confirmação */
+.bpa-modal-col-form {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.bpa-form-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.bpa-form-panel-title {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.bpa-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.bpa-field-label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: #334155;
+    margin: 0;
+}
+
+.bpa-email-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 0.6rem;
+    padding: 0.75rem 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.bpa-email-box:hover {
+    background: #ecfdf5;
+    border-color: #86efac;
 }
 
 .bpa-input {

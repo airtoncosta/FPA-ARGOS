@@ -39,26 +39,26 @@ const BpaModule = {
     },
 
     siglasUnidades: {
-        'TOMO': 'HOSPITAL MARIA SOCORRO BRANDÃO', // Exames de Tomografia do Hospital HMSO
-        'HMSO': 'HOSPITAL MARIA SOCORRO BRANDÃO',
+        'TOMO': 'HOSPITAL MARIA SOCORRO BRANDAO', // Exames de Tomografia do Hospital HMSO
+        'HMSO': 'HOSPITAL MARIA SOCORRO BRANDAO',
         'HMI': 'HOSPITAL MATERNO INFANTIL',
-        'CESP': 'CENTRO DE ESPECIALIDADES DR. COELHO',
-        'COELHO': 'CENTRO DE ESPECIALIDADES DR. COELHO',
-        'LCDIAS': 'LABORATÓRIO CENTRAL DR. COELHO DIAS',
-        'LAB': 'LABORATÓRIO CENTRAL DR. COELHO DIAS',
-        'FISIO': 'CENTRO DE FISIOTERAPIA',
-        'PAFISIO': 'CENTRO DE FISIOTERAPIA',
-        'SAE': 'SAE',
+        'CESP': 'CENTRO DE ESPECIALIDADES DR COELHO',
+        'COELHO': 'CENTRO DE ESPECIALIDADES DR COELHO',
+        'LCDIAS': 'LABORATORIO CENTRAL DR COELHO DIAS',
+        'LAB': 'LABORATORIO CENTRAL DR COELHO DIAS',
+        'FISIO': 'CENTRO DE FISIOTERAPIA DE BACABAL',
+        'PAFISIO': 'CENTRO DE FISIOTERAPIA DE BACABAL',
+        'SAE': 'SAE SERVICO AMBULATORIAL ESPECIALIZ',
         'TFD': 'UNIDADE DE TRATAMENTO FORA DO DOMIC',
-        'CAPSI': 'CAPSI',
-        'CAPS': 'CAPS',
-        'CTA': 'CTA',
-        'POLI': 'POLICLÍNICA DE BACABAL',
-        'CEO': 'CENTRO DE ESPECIALIDADES ODONTOLÓGICAS',
-        'CREG': 'CENTRAL DE REGULAÇÃO',
-        'REGULACAO': 'CENTRAL DE REGULAÇÃO',
-        'VISANIT': 'VIGILÂNCIA SANITÁRIA',
-        'VIGILANCIA': 'VIGILÂNCIA SANITÁRIA',
+        'CAPSI': 'CENTRO DE ATENCAO PSICOSSOCIAL INFA',
+        'CAPS': 'CENTRO DE ATENCAO PSICOSSOCIAL CAPS',
+        'CTA': 'COACTA CENTRO DE TESTAGEM ANONIMA P',
+        'POLI': 'POLICLINICA DE BACABAL',
+        'CEO': 'CENTRO DE ESPECIALIDADE ODONTOLOGIC',
+        'CREG': 'CENTRAL DE REGULACAO DAS URGENCIAS',
+        'REGULACAO': 'CENTRAL DE REGULACAO DAS URGENCIAS',
+        'VISANIT': 'SERVICO DE VIGILANCIA SANITARIA BAC',
+        'VIGILANCIA': 'SERVICO DE VIGILANCIA SANITARIA BAC',
         'SAV': 'SAMU 192 SAV BACABAL 01',
         'SBV01': 'SAMU 192 SBV BACABAL 01',
         'SBV 01': 'SAMU 192 SBV BACABAL 01',
@@ -66,24 +66,25 @@ const BpaModule = {
         'SBV 02': 'SAMU 192 SBV BACABAL 02',
         'SBV03': 'SAMU 192 SBV BACABAL 03',
         'SBV 03': 'SAMU 192 SBV BACABAL 03',
-        'MOTO01': 'MOTOLÂNCIA 01',
-        'MOTO 01': 'MOTOLÂNCIA 01',
-        'MOTO02': 'MOTOLÂNCIA 02',
-        'MOTO 02': 'MOTOLÂNCIA 02',
-        'MOTO03': 'MOTOLÂNCIA 03',
-        'MOTO 03': 'MOTOLÂNCIA 03'
+        'MOTO01': 'MOTOLANCIA BACABAL 01',
+        'MOTO 01': 'MOTOLANCIA BACABAL 01',
+        'MOTO02': 'MOTOLANCIA BACABAL 02',
+        'MOTO 02': 'MOTOLANCIA BACABAL 02',
+        'MOTO03': 'MOTOLANCIA BACABAL 03',
+        'MOTO 03': 'MOTOLANCIA BACABAL 03'
     },
 
     cnesUnidadesMap: {
-        '2387412': 'HOSPITAL MARIA SOCORRO BRANDÃO',
+        '2387412': 'HOSPITAL MARIA SOCORRO BRANDAO',
         '0000001': 'UNIDADE DE TRATAMENTO FORA DO DOMIC',
         '2387439': 'HOSPITAL MATERNO INFANTIL',
-        '2389114': 'LABORATÓRIO CENTRAL DR. COELHO DIAS',
-        '2389122': 'CENTRO DE ESPECIALIDADES DR. COELHO',
+        '2389114': 'LABORATORIO CENTRAL DR COELHO DIAS',
+        '2389122': 'CENTRO DE ESPECIALIDADES DR COELHO',
         '2389130': 'SAE SERVICO AMBULATORIAL ESPECIALIZ',
+        '3889157': 'CENTRO DE FISIOTERAPIA DE BACABAL',
         '2389149': 'CENTRO DE FISIOTERAPIA DE BACABAL',
         '2389157': 'CENTRAL DE REGULACAO DAS URGENCIAS',
-        '2389165': 'POLICLÍNICA DE BACABAL',
+        '2389165': 'POLICLINICA DE BACABAL',
         '7014710': 'CENTRO DE ATENCAO PSICOSSOCIAL CAPS',
         '7083834': 'COACTA CENTRO DE TESTAGEM ANONIMA P',
         '9654321': 'CENTRO DE ATENCAO PSICOSSOCIAL INFA',
@@ -99,23 +100,145 @@ const BpaModule = {
     },
 
     async init() {
+        this.sanitizeIfFirstRun();
         this.bindEvents();
         this.loadProducoes();
         await this.loadCnesBase();
     },
 
+    sanitizeIfFirstRun() {
+        const RESET_FLAG = 'argos_sanitized_zero_2026_09_19_v3';
+        try {
+            if (typeof localStorage !== 'undefined' && localStorage.getItem(RESET_FLAG) !== 'done') {
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && (k.startsWith('argos_producoes_bpa') || k === 'argos_producoes_profissionais_cns' || k === 'argos_espelho_producao')) {
+                        keysToRemove.push(k);
+                    }
+                }
+                keysToRemove.forEach(k => localStorage.removeItem(k));
+                localStorage.setItem(this.responsaveisKey, JSON.stringify({}));
+                localStorage.setItem(RESET_FLAG, 'done');
+                console.info('🧹 Higienização ARGOS aplicada: produções e atribuições zeradas.');
+            }
+        } catch(e) {}
+    },
+
+    async clearAllData() {
+        try {
+            // 1. Limpar produções locais do BPA
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && (k.startsWith('argos_producoes_bpa') || k === 'argos_producoes_profissionais_cns' || k === 'argos_espelho_producao')) {
+                    keysToRemove.push(k);
+                }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+
+            // 2. Zerar atribuições de responsáveis
+            localStorage.setItem(this.responsaveisKey, JSON.stringify({}));
+
+            // 3. Atualizar configurações na nuvem se conectado
+            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+                try {
+                    const client = window.SupabaseConfig.getClient();
+                    if (client) {
+                        await client.from('configuracoes').upsert([
+                            { chave: 'bpa_responsaveis', valor: JSON.stringify({}) }
+                        ], { onConflict: 'chave' });
+                    }
+                } catch(e) {}
+            }
+
+            // 4. Limpar memória BPA
+            this.producoes = [];
+            this.filePendingUpload = null;
+            this.pendingEmailProducao = null;
+            this.currentCompetenciaFiltro = '';
+            this.currentResponsavelFiltro = '';
+            this.currentStatusFilter = '';
+            this.currentTipoFiltro = '';
+            this.currentSearchTerm = '';
+
+            // 5. Limpar Espelho de Produção
+            if (typeof window !== 'undefined' && window.ProducaoProfissionalModule) {
+                if (typeof window.ProducaoProfissionalModule.clearAllData === 'function') {
+                    window.ProducaoProfissionalModule.clearAllData();
+                } else {
+                    window.ProducaoProfissionalModule.records = [];
+                    try { localStorage.removeItem('argos_producoes_profissionais_cns'); } catch(e){}
+                    if (typeof window.ProducaoProfissionalModule.render === 'function') {
+                        window.ProducaoProfissionalModule.render();
+                    }
+                }
+            }
+
+            this.renderAll();
+            this.showToast('Higienização realizada: todos os dados de produção e atribuições foram zerados!', 'success');
+        } catch(e) {
+            console.error('Erro na higienização:', e);
+            alert('Falha ao higienizar: ' + e.message);
+        }
+    },
+
+    solicitarZerarDados() {
+        if (!this.isAdminOrFrancileide()) return;
+        const confirmMsg = '⚠️ HIGIENIZAÇÃO DE DADOS:\n\nDeseja realmente ZERAR todos os dados de Produção BPA, o Espelho de Produção e deixar todas as atribuições zeradas?\n\nEsta ação limpará o histórico para permitir que você envie as produções do zero com segurança.';
+        if (confirm(confirmMsg)) {
+            this.clearAllData();
+        }
+    },
+
     async loadCnesBase() {
-        if (!this.cnesBaseCache && typeof fetch === 'function') {
+        if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos) && this.cnesBaseCache.estabelecimentos.length > 0) {
+            return this.cnesBaseCache;
+        }
+        if (typeof window !== 'undefined' && window.ArgosCnesBase && Array.isArray(window.ArgosCnesBase.estabelecimentos)) {
+            this.cnesBaseCache = window.ArgosCnesBase;
+            return this.cnesBaseCache;
+        }
+        if (typeof window !== 'undefined' && window.CnesModule?.state && Array.isArray(window.CnesModule.state.estabelecimentos) && window.CnesModule.state.estabelecimentos.length > 0) {
+            this.cnesBaseCache = { estabelecimentos: window.CnesModule.state.estabelecimentos };
+            window.ArgosCnesBase = this.cnesBaseCache;
+            return this.cnesBaseCache;
+        }
+        if (typeof window !== 'undefined' && window.ProducaoProfissionalModule?.cnesCache && Array.isArray(window.ProducaoProfissionalModule.cnesCache.estabelecimentos) && window.ProducaoProfissionalModule.cnesCache.estabelecimentos.length > 0) {
+            this.cnesBaseCache = window.ProducaoProfissionalModule.cnesCache;
+            window.ArgosCnesBase = this.cnesBaseCache;
+            return this.cnesBaseCache;
+        }
+
+        if (typeof fetch === 'function') {
             try {
-                const res = await fetch('/api/cnes/bacabal').catch(() => null);
+                const headers = {};
+                if (typeof window !== 'undefined' && window.SupabaseConfig) {
+                    if (typeof window.SupabaseConfig.getClient === 'function') {
+                        const client = window.SupabaseConfig.getClient();
+                        if (client && client.auth && typeof client.auth.getSession === 'function') {
+                            const sessionResult = await client.auth.getSession().catch(() => null);
+                            const token = sessionResult?.data?.session?.access_token;
+                            if (token) headers.Authorization = `Bearer ${token}`;
+                        }
+                    }
+                    if (!headers.Authorization && typeof window.SupabaseConfig.getAnonKey === 'function') {
+                        const anon = window.SupabaseConfig.getAnonKey();
+                        if (anon) headers.Authorization = `Bearer ${anon}`;
+                    }
+                }
+                const res = await fetch('/api/cnes/bacabal', { headers }).catch(() => null);
                 if (res && res.ok) {
                     const txt = await res.text();
                     this.cnesBaseCache = JSON.parse(txt.replace(/^\uFEFF/, ''));
+                    if (typeof window !== 'undefined') window.ArgosCnesBase = this.cnesBaseCache;
+                    return this.cnesBaseCache;
                 }
             } catch (e) {
                 console.warn('CNES data fetch falhou no BpaModule:', e);
             }
         }
+        return null;
     },
 
     /* =========================================================
@@ -123,83 +246,58 @@ const BpaModule = {
        ========================================================= */
     getUnidadesSistema() {
         if (this.accessLoadError) return [];
-        let unidades = [];
 
-        // 1. Obter unidades carregadas no estado ativo do sistema (APP_STATE)
-        if (window.APP_STATE && window.APP_STATE.data && Array.isArray(window.APP_STATE.data.unidades) && window.APP_STATE.data.unidades.length > 0) {
-            unidades = window.APP_STATE.data.unidades.map(u => ({
-                id: u.id || u.cnes || u.nome,
-                nome: (u.nome || '').trim().toUpperCase(),
-                cnes: (u.cnes || '').trim()
-            }));
-        } 
-        
-        // 2. Fallback garantido para DEMO_DATA (as 21 unidades do Painel de Unidades)
-        if (unidades.length === 0) {
-            const demoSource = (window.DEMO_DATA && Array.isArray(window.DEMO_DATA.unidades))
-                ? window.DEMO_DATA.unidades
-                : (typeof DEMO_DATA !== 'undefined' && Array.isArray(DEMO_DATA.unidades) ? DEMO_DATA.unidades : []);
+        // As 21 Unidades Executoras oficiais da Produção BPA de Bacabal (conforme tabela municipal de faturamento)
+        const unidadesOficiais = [
+            { id: 'hmso', cnes: '2387412', nome: 'HOSPITAL MARIA SOCORRO BRANDAO' },
+            { id: 'hmi', cnes: '2387439', nome: 'HOSPITAL MATERNO INFANTIL' },
+            { id: 'cesp', cnes: '2389122', nome: 'CENTRO DE ESPECIALIDADES DR COELHO' },
+            { id: 'tfd', cnes: '0000001', nome: 'UNIDADE DE TRATAMENTO FORA DO DOMIC' },
+            { id: 'lcdias', cnes: '2389114', nome: 'LABORATORIO CENTRAL DR COELHO DIAS' },
+            { id: 'pbacabal', cnes: '2389165', nome: 'POLICLINICA DE BACABAL' },
+            { id: 'sae', cnes: '2389130', nome: 'SAE SERVICO AMBULATORIAL ESPECIALIZ' },
+            { id: 'fisio', cnes: '3889157', nome: 'CENTRO DE FISIOTERAPIA DE BACABAL' },
+            { id: 'caps', cnes: '7014710', nome: 'CENTRO DE ATENCAO PSICOSSOCIAL CAPS' },
+            { id: 'cta', cnes: '7083834', nome: 'COACTA CENTRO DE TESTAGEM ANONIMA P' },
+            { id: 'ceo', cnes: '2389200', nome: 'CENTRO DE ESPECIALIDADE ODONTOLOGIC' },
+            { id: 'capsi', cnes: '9654321', nome: 'CENTRO DE ATENCAO PSICOSSOCIAL INFA' },
+            { id: 'creg', cnes: '2389157', nome: 'CENTRAL DE REGULACAO DAS URGENCIAS' },
+            { id: 'moto02', cnes: '2389251', nome: 'MOTOLANCIA BACABAL 02' },
+            { id: 'visanit', cnes: '2389173', nome: 'SERVICO DE VIGILANCIA SANITARIA BAC' },
+            { id: 'savsav01', cnes: '2389181', nome: 'SAMU 192 SAV BACABAL 01' },
+            { id: 'sbv01', cnes: '2389219', nome: 'SAMU 192 SBV BACABAL 01' },
+            { id: 'sbv02', cnes: '2389227', nome: 'SAMU 192 SBV BACABAL 02' },
+            { id: 'sbv03', cnes: '2389235', nome: 'SAMU 192 SBV BACABAL 03' },
+            { id: 'moto01', cnes: '2389243', nome: 'MOTOLANCIA BACABAL 01' },
+            { id: 'moto03', cnes: '2389260', nome: 'MOTOLANCIA BACABAL 03' }
+        ];
 
-            if (demoSource.length > 0) {
-                unidades = demoSource.map(u => ({
-                    id: u.id || u.cnes || u.nome,
-                    nome: (u.nome || '').trim().toUpperCase(),
-                    cnes: (u.cnes || '').trim()
-                }));
-            }
-        }
+        let unidades = unidadesOficiais.map(u => ({ ...u }));
 
-        // 3. Fallback de contingência caso nem DEMO_DATA esteja acessível (todas as 21 unidades de Bacabal completas)
-        if (unidades.length === 0) {
-            unidades = [
-                { id: 'hmso', cnes: '2387412', nome: 'HOSPITAL MARIA SOCORRO BRANDÃO' },
-                { id: 'tfd', cnes: '0000001', nome: 'UNIDADE DE TRATAMENTO FORA DO DOMIC' },
-                { id: 'hmi', cnes: '2387439', nome: 'HOSPITAL MATERNO INFANTIL' },
-                { id: 'lcdias', cnes: '2389114', nome: 'LABORATÓRIO CENTRAL DR. COELHO DIAS' },
-                { id: 'cesp', cnes: '2389122', nome: 'CENTRO DE ESPECIALIDADES DR. COELHO' },
-                { id: 'sae', cnes: '2389130', nome: 'SAE SERVICO AMBULATORIAL ESPECIALIZ' },
-                { id: 'fisio', cnes: '2389149', nome: 'CENTRO DE FISIOTERAPIA DE BACABAL' },
-                { id: 'creg', cnes: '2389157', nome: 'CENTRAL DE REGULACAO DAS URGENCIAS' },
-                { id: 'pbacabal', cnes: '2389165', nome: 'POLICLÍNICA DE BACABAL' },
-                { id: 'caps', cnes: '7014710', nome: 'CENTRO DE ATENCAO PSICOSSOCIAL CAPS' },
-                { id: 'cta', cnes: '7083834', nome: 'COACTA CENTRO DE TESTAGEM ANONIMA P' },
-                { id: 'capsi', cnes: '9654321', nome: 'CENTRO DE ATENCAO PSICOSSOCIAL INFA' },
-                { id: 'visanit', cnes: '2389173', nome: 'SERVICO DE VIGILANCIA SANITARIA BAC' },
-                { id: 'savsav01', cnes: '2389181', nome: 'SAMU 192 SAV BACABAL 01' },
-                { id: 'ceo', cnes: '2389200', nome: 'CENTRO DE ESPECIALIDADE ODONTOLOGIC' },
-                { id: 'sbv01', cnes: '2389219', nome: 'SAMU 192 SBV BACABAL 01' },
-                { id: 'sbv02', cnes: '2389227', nome: 'SAMU 192 SBV BACABAL 02' },
-                { id: 'sbv03', cnes: '2389235', nome: 'SAMU 192 SBV BACABAL 03' },
-                { id: 'moto01', cnes: '2389243', nome: 'MOTOLANCIA BACABAL 01' },
-                { id: 'moto02', cnes: '2389251', nome: 'MOTOLANCIA BACABAL 02' },
-                { id: 'moto03', cnes: '2389260', nome: 'MOTOLANCIA BACABAL 03' }
-            ];
-        }
-
-        // 4. Incluir unidades de produções já enviadas que sejam casos isolados (exceto exames SADT como Tomografia)
-        this.producoes.forEach(p => {
-            if (p.estabelecimento_nome) {
-                const nomeNorm = p.estabelecimento_nome.trim().toUpperCase();
-                if (nomeNorm === 'TOMOGRAFIA' || nomeNorm === 'TOMO') return; // Exame SADT do HMSO, não é unidade isolada
-                const cnesP = (p.cnes || '').trim();
-                const exists = unidades.some(u => 
-                    (cnesP && u.cnes && u.cnes.replace(/\D/g, '') === cnesP.replace(/\D/g, '')) ||
-                    u.nome === nomeNorm ||
-                    u.nome.includes(nomeNorm) ||
-                    nomeNorm.includes(u.nome)
-                );
-                if (!exists) {
-                    unidades.push({
-                        id: 'iso_' + Math.random().toString(36).substring(2, 7),
-                        nome: nomeNorm,
-                        cnes: p.cnes || '',
-                        isIsolado: true
-                    });
+        // Incluir unidades de produções já enviadas que sejam casos isolados (exceto exames SADT como Tomografia)
+        if (Array.isArray(this.producoes)) {
+            this.producoes.forEach(p => {
+                if (p.estabelecimento_nome) {
+                    const nomeNorm = p.estabelecimento_nome.trim().toUpperCase();
+                    if (nomeNorm === 'TOMOGRAFIA' || nomeNorm === 'TOMO') return; // Exame SADT do HMSO, não é unidade isolada
+                    const cnesP = (p.cnes || '').trim();
+                    const exists = unidades.some(u => 
+                        (cnesP && u.cnes && u.cnes.replace(/\D/g, '') === cnesP.replace(/\D/g, '')) ||
+                        this.normalizeIdentity(u.nome) === this.normalizeIdentity(nomeNorm)
+                    );
+                    if (!exists) {
+                        unidades.push({
+                            id: 'iso_' + Math.random().toString(36).substring(2, 7),
+                            nome: nomeNorm,
+                            cnes: p.cnes || '',
+                            isIsolado: true
+                        });
+                    }
                 }
-            }
-        });
+            });
+        }
 
-        // 6. Vincular o responsável e a modalidade definidos pelo ADM / Francileide
+        // Vincular o responsável e a modalidade definidos pelo ADM / Francileide
         const respMap = this.getResponsaveisMap();
         const modalMap = this.getModalidadesMap();
         unidades.forEach(u => {
@@ -215,7 +313,9 @@ const BpaModule = {
             u.modalidade = modalMap[cleanCnes] || modalMap[u.cnes] || modalMap[u.nome] || modalMap[u.id];
             if (!u.modalidade) {
                 for (const [k, mod] of Object.entries(modalMap)) {
-                    if (u.nome.includes(k) || k.includes(u.nome)) {
+                    if (this.normalizeIdentity(u.nome) === this.normalizeIdentity(k) ||
+                        this.normalizeIdentity(u.nome).includes(this.normalizeIdentity(k)) ||
+                        this.normalizeIdentity(k).includes(this.normalizeIdentity(u.nome))) {
                         u.modalidade = mod;
                         break;
                     }
@@ -247,14 +347,24 @@ const BpaModule = {
     },
 
     normalizeIdentity(value) {
-        return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+        return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^\w\s]/g, ' ')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ');
     },
 
     isAssignedToUser(unit, user = this.getCurrentUser()) {
         if (!user.username) return false;
         const assigned = this.normalizeIdentity(unit.responsavel);
         if (!assigned || assigned === 'nao atribuido') return false;
-        return [user.username, user.name].filter(Boolean).some(value => this.normalizeIdentity(value) === assigned);
+        const names = [user.username, user.name];
+        if ((user.username || '').toLowerCase() === 'airton' || (user.role || '').toUpperCase() === 'ADM') {
+            names.push('airton/argos', 'airton argos', 'airton costa', 'airton', 'argos');
+        }
+        return names.filter(Boolean).some(value => this.normalizeIdentity(value) === assigned);
     },
 
     matchesUnit(record, unit) {
@@ -276,31 +386,53 @@ const BpaModule = {
 
     assertUploadAccess(data) {
         if (this.accessLoadError || !this.getCurrentUser().username) throw new Error('Acesso indisponível. Entre novamente e recarregue as unidades.');
-        if (data.cnesList?.length > 1) throw new Error('O arquivo contém várias unidades. A auditoria verifica todas as linhas, mas para salvar nesta unidade exporte um arquivo por CNES.');
         const record = { cnes: data.cnes, estabelecimento_nome: data.estabelecimentoNome };
         const unit = this.getUnidadesSistema().find(u => this.matchesUnit(record, u));
         if (!this.isAdminOrFrancileide() && !unit) throw new Error('Você só pode anexar produções das unidades atribuídas a você.');
-        if (unit && this.normalizeIdentity(unit.nome) !== this.normalizeIdentity(data.estabelecimentoNome)) {
+        if (unit && data.estabelecimentoNome && this.normalizeIdentity(unit.nome) !== this.normalizeIdentity(data.estabelecimentoNome)) {
             throw new Error('A unidade selecionada não corresponde ao CNES do arquivo. Confira antes de enviar.');
         }
         if (!data.estabelecimentoNome || data.estabelecimentoNome === 'ESTABELECIMENTO NÃO IDENTIFICADO') throw new Error('Selecione a unidade da produção.');
-        if (unit) data.cnes = unit.cnes;
+        if (unit) {
+            data.cnes = unit.cnes;
+            data.estabelecimentoNome = unit.nome;
+        }
     },
 
     getSystemUsers() {
+        let baseUsers = [];
         if (window.UsersModule && Array.isArray(window.UsersModule.users) && window.UsersModule.users.length > 0) {
-            return window.UsersModule.users;
+            baseUsers = window.UsersModule.users;
+        } else {
+            baseUsers = [
+                { username: 'ewerton', name: 'Ewerton', role: 'DIGITADOR' },
+                { username: 'aline', name: 'Aline', role: 'DIGITADOR' },
+                { username: 'flavia', name: 'Flávia', role: 'DIGITADOR' },
+                { username: 'jessica', name: 'Jéssica', role: 'DIGITADOR' },
+                { username: 'carol', name: 'Carol', role: 'DIGITADOR' },
+                { username: 'francileide', name: 'Francileide', role: 'SUPERINTENDENTE' },
+                { username: 'airton', name: 'AIRTON/ARGOS', role: 'ADM' }
+            ];
         }
-        return [
-            { username: 'ewerton', name: 'Ewerton', role: 'DIGITADOR' },
-            { username: 'aline', name: 'Aline', role: 'DIGITADOR' },
-            { username: 'flavia', name: 'Flávia', role: 'DIGITADOR' },
-            { username: 'jessica', name: 'Jéssica', role: 'DIGITADOR' },
-            { username: 'carol', name: 'Carol', role: 'DIGITADOR' },
-            { username: 'mariline', name: 'Mariline', role: 'DIGITADOR' },
-            { username: 'francileide', name: 'Francileide', role: 'SUPERINTENDENTE' },
-            { username: 'airton', name: 'Airton Costa', role: 'ADM' }
-        ];
+
+        const filtered = baseUsers
+            .filter(u => {
+                const un = (u.username || '').toLowerCase();
+                const nm = (u.name || '').toLowerCase();
+                return un !== 'mariline' && un !== 'marilene' && !nm.includes('mariline') && !nm.includes('marilene');
+            })
+            .map(u => {
+                if ((u.username || '').toLowerCase() === 'airton') {
+                    return { ...u, name: 'AIRTON/ARGOS' };
+                }
+                return u;
+            });
+
+        if (!filtered.some(u => (u.username || '').toLowerCase() === 'airton' || (u.name || '').includes('AIRTON'))) {
+            filtered.push({ username: 'airton', name: 'AIRTON/ARGOS', role: 'ADM' });
+        }
+
+        return filtered;
     },
 
     getResponsaveisMap() {
@@ -308,49 +440,7 @@ const BpaModule = {
             const str = localStorage.getItem(this.responsaveisKey);
             if (str) return JSON.parse(str);
         } catch(e){}
-        return {
-            'HOSPITAL MARIA SOCORRO BRANDÃO': 'Flávia',
-            'HOSPITAL MATERNO INFANTIL': 'Jéssica',
-            'CENTRO DE ESPECIALIDADES DR. COELHO': 'Carol',
-            'CENTRO DE ESPECIALIDADES DR COELHO': 'Carol',
-            'LABORATÓRIO CENTRAL DR. COELHO DIAS': 'Jéssica',
-            'LABORATORIO CENTRAL DR COELHO DIAS': 'Jéssica',
-            'CENTRO DE FISIOTERAPIA': 'Flávia',
-            'CENTRO DE FISIOTERAPIA DE BACABAL': 'Flávia',
-            '2389149': 'Flávia',
-            'SAE': 'Aline',
-            'SAE SERVICO AMBULATORIAL ESPECIALIZ': 'Aline',
-            'TFD': 'Ewerton',
-            'UNIDADE DE TRATAMENTO FORA DO DOMIC': 'Ewerton',
-            'CAPS': 'Carol',
-            'CENTRO DE ATENCAO PSICOSSOCIAL CAPS': 'Carol',
-            'CAPSI': 'Carol',
-            'CENTRO DE ATENCAO PSICOSSOCIAL INFA': 'Carol',
-            'CTA': 'Aline',
-            'COACTA CENTRO DE TESTAGEM ANONIMA P': 'Aline',
-            'POLICLÍNICA DE BACABAL': 'Aline',
-            'POLICLINICA DE BACABAL': 'Aline',
-            'CEO': 'Mariline',
-            'CENTRO DE ESPECIALIDADE ODONTOLOGIC': 'Mariline',
-            'CENTRAL DE REGULAÇÃO': 'Ewerton',
-            'CENTRAL DE REGULACAO DAS URGENCIAS': 'Ewerton',
-            'VIGILÂNCIA SANITÁRIA': 'Flávia',
-            'SERVICO DE VIGILANCIA SANITARIA BAC': 'Flávia',
-            'SAMU SAV 01': 'Ewerton',
-            'SAMU 192 SAV BACABAL 01': 'Ewerton',
-            'SAMU SBV 01': 'Ewerton',
-            'SAMU 192 SBV BACABAL 01': 'Ewerton',
-            'SAMU SBV 02': 'Ewerton',
-            'SAMU 192 SBV BACABAL 02': 'Ewerton',
-            'SAMU SBV 03': 'Ewerton',
-            'SAMU 192 SBV BACABAL 03': 'Ewerton',
-            'MOTOLÂNCIA 01': 'Ewerton',
-            'MOTOLANCIA BACABAL 01': 'Ewerton',
-            'MOTOLÂNCIA 02': 'Ewerton',
-            'MOTOLANCIA BACABAL 02': 'Ewerton',
-            'MOTOLÂNCIA 03': 'Ewerton',
-            'MOTOLANCIA BACABAL 03': 'Ewerton'
-        };
+        return {};
     },
 
     getModalidadesMap() {
@@ -453,6 +543,17 @@ const BpaModule = {
         });
 
         tbody.innerHTML = html;
+
+        const btnZerar = document.getElementById('btnZerarAtribuicoesBpa');
+        if (btnZerar) {
+            btnZerar.onclick = () => {
+                if (confirm('Deseja realmente deixar todas as 21 unidades zeradas (Não Atribuído)?')) {
+                    tbody.querySelectorAll('.bpa-select-resp-row').forEach(sel => sel.value = '');
+                    this.showToast('Todas as unidades marcadas como Não Atribuído. Clique em "Salvar Atribuições" para confirmar.', 'info');
+                }
+            };
+        }
+
         modal.classList.remove('hidden');
     },
 
@@ -464,9 +565,9 @@ const BpaModule = {
     async saveResponsaveis() {
         if (!this.isAdminOrFrancileide()) return;
 
-        // Salvar Responsáveis
+        // Salvar Responsáveis (Base Limpa)
         const selects = document.querySelectorAll('.bpa-select-resp-row');
-        const newMap = this.getResponsaveisMap();
+        const newMap = {};
         selects.forEach(sel => {
             const key = sel.getAttribute('data-key');
             const cnes = sel.getAttribute('data-cnes');
@@ -518,10 +619,89 @@ const BpaModule = {
         const records = parsed.records;
         const cnesList = [...new Set(records.map(r => r.cnes).filter(Boolean))];
         const competencies = [...new Set(records.map(r => r.competencia).filter(Boolean))];
-        const cnes = cnesList.length === 1 ? cnesList[0] : '';
-        const unit = this.getUnidadesSistema().find(u => u.cnes === cnes);
+
+        // 1. Frequência de ocorrência de cada CNES no arquivo
+        const cnesFrequency = new Map();
+        for (const r of records) {
+            if (r.cnes) {
+                const c = String(r.cnes).trim();
+                cnesFrequency.set(c, (cnesFrequency.get(c) || 0) + 1);
+            }
+        }
+
+        // 2. Cruzamento com as Unidades Oficiais do Sistema (Bacabal)
+        const unidadesSistema = this.getUnidadesSistema();
+        const officialMatches = cnesList
+            .map(c => ({ cnes: c, unit: unidadesSistema.find(u => String(u.cnes || '').replace(/\D/g, '') === String(c).replace(/\D/g, '')) }))
+            .filter(item => !!item.unit);
+
+        // 3. Detecção por Sigla no Nome do Arquivo (ex: PAFISIO -> CENTRO DE FISIOTERAPIA)
+        const fileNameUpper = String(file?.name || '').toUpperCase();
+        let unitByFilename = null;
+        for (const [sigla, nomeUnidade] of Object.entries(this.siglasUnidades || {})) {
+            const cleanSigla = sigla.toUpperCase().trim();
+            if (cleanSigla && fileNameUpper.includes(cleanSigla)) {
+                const matched = unidadesSistema.find(u => 
+                    this.normalizeIdentity(u.nome) === this.normalizeIdentity(nomeUnidade) ||
+                    (u.id && u.id.toUpperCase() === cleanSigla)
+                );
+                if (matched) {
+                    unitByFilename = matched;
+                    break;
+                }
+            }
+        }
+
+        // 4. Determinação assertiva do CNES e Unidade do arquivo
+        let unit = null;
+        let cnes = '';
+
+        if (cnesList.length === 1) {
+            cnes = cnesList[0];
+            unit = unidadesSistema.find(u => String(u.cnes || '').replace(/\D/g, '') === String(cnes).replace(/\D/g, ''));
+        } else if (cnesList.length > 1) {
+            // Em arquivos com múltiplas menções (ex: linhas com falha posicional de exportação),
+            // priorizar a unidade oficial municipal identificada
+            if (officialMatches.length === 1) {
+                unit = officialMatches[0].unit;
+                cnes = officialMatches[0].cnes;
+            } else if (officialMatches.length > 1) {
+                officialMatches.sort((a, b) => (cnesFrequency.get(b.cnes) || 0) - (cnesFrequency.get(a.cnes) || 0));
+                unit = officialMatches[0].unit;
+                cnes = officialMatches[0].cnes;
+            }
+            if (!unit && unitByFilename) {
+                unit = unitByFilename;
+                cnes = unit.cnes || '';
+            }
+            if (!cnes && cnesList.length > 0) {
+                const sortedByFreq = [...cnesList].sort((a, b) => (cnesFrequency.get(b) || 0) - (cnesFrequency.get(a) || 0));
+                cnes = sortedByFreq[0];
+            }
+        } else if (cnesList.length === 0 && unitByFilename) {
+            unit = unitByFilename;
+            cnes = unit.cnes || '';
+        }
+
+        if (!unit && cnes) {
+            unit = unidadesSistema.find(u => String(u.cnes || '').replace(/\D/g, '') === String(cnes).replace(/\D/g, ''));
+        }
+        if (!unit && cnes && typeof window !== 'undefined' && window.CNES_METADATA_BACABAL && window.CNES_METADATA_BACABAL[cnes]) {
+            const meta = window.CNES_METADATA_BACABAL[cnes];
+            unit = { id: 'cnes_' + cnes, cnes: cnes, nome: String(meta.nomeFantasia || meta.razaoSocial || `CNES ${cnes}`).trim().toUpperCase() };
+        }
+        if (!unit && cnes && this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
+            const est = this.cnesBaseCache.estabelecimentos.find(e => String(e.cnes || '').replace(/\D/g, '') === String(cnes).replace(/\D/g, ''));
+            if (est) {
+                unit = { id: 'cnes_' + cnes, cnes: cnes, nome: String(est.nomeFantasia || est.nome || est.razaoSocial || `CNES ${cnes}`).trim().toUpperCase() };
+            }
+        }
+        if (!unit && cnes && this.cnesUnidadesMap && this.cnesUnidadesMap[cnes]) {
+            unit = { id: 'cnes_' + cnes, cnes: cnes, nome: this.cnesUnidadesMap[cnes] };
+        }
+
         const presentation = window.BpaAuditCore.competencia(parsed.header?.competencia);
-        const comp = presentation || (competencies.length === 1 ? window.BpaAuditCore.competencia(competencies[0]) : '');
+        const comp = presentation || (competencies.length === 1 ? window.BpaAuditCore.competencia(competencies[0]) : (competencies[0] ? window.BpaAuditCore.competencia(competencies[0]) : ''));
         const competencia = comp ? comp.slice(4) + '/' + comp.slice(0, 4) : '';
         const count02 = records.filter(r => r.tipo === 'BPA-C').length;
         const count03 = records.filter(r => r.tipo === 'BPA-I').length;
@@ -627,7 +807,7 @@ const BpaModule = {
 
         const profissionaisAmostra = this.formatProfissionaisAmostra(profissionaisDetalhados);
         return {
-            nomeArquivo: file?.name || '', estabelecimentoNome: unit?.nome || '', cnes, cnesList,
+            nomeArquivo: file?.name || '', estabelecimentoNome: unit?.nome || (cnes ? ((this.cnesUnidadesMap && this.cnesUnidadesMap[cnes]) || `ESTABELECIMENTO CNES ${cnes}`) : ''), cnes: unit?.cnes || cnes, cnesList,
             competencia, competenciasAtendimento: competencies, competenciaFormatada: this.formatCompetenciaLabel(competencia),
             tipoBpa: count02 && count03 ? 'AMBOS' : count03 ? 'BPA-I' : 'BPA-C',
             tipoExplicacao: records.length + ' registros reais: ' + count02 + ' BPA-C e ' + count03 + ' BPA-I. ' + (parsed.issues.length ? 'Há pontos de estrutura para conferir na auditoria.' : 'Execute a auditoria para verificar as regras e bases da competência.'),
@@ -647,30 +827,52 @@ const BpaModule = {
     formatProfissionaisAmostra(profissionaisDetalhados) {
         if (!Array.isArray(profissionaisDetalhados) || !profissionaisDetalhados.length) return [];
         return profissionaisDetalhados.map(prof => {
-            const nomeStr = prof.nome ? (' <strong style="color: #0f172a;">' + prof.nome + '</strong>') : '';
-            const cboStr = prof.cboDesc 
-                ? (' <span style="color: #64748b; font-size: 0.76rem;">(' + prof.cboDesc + ')</span>') 
-                : (prof.cbo ? (' <span style="color: #64748b; font-size: 0.76rem;">(CBO: ' + prof.cbo + ')</span>') : '');
+            const temNome = !!(prof.nome && !prof.nome.startsWith('Profissional CNS'));
+            const cboCode = prof.cbo || '';
+            const cboLabel = prof.cboDesc || (cboCode ? (typeof CBO_DICTIONARY !== 'undefined' && CBO_DICTIONARY[cboCode] ? `${cboCode} - ${CBO_DICTIONARY[cboCode]}` : `CBO ${cboCode}`) : '');
+
+            // Identificação do profissional
+            let headerProfHtml = '';
+            if (temNome) {
+                headerProfHtml = '<strong style="color: #0f172a; font-size: 0.86rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fas fa-user-md" style="color: #0284c7;"></i> ' + prof.nome + '</strong> ' +
+                    '<code class="bpa-prof-badge-cns">CNS ' + prof.cns + '</code>';
+            } else {
+                headerProfHtml = '<code class="bpa-prof-badge-cns" style="background: #f1f5f9; color: #334155;">CNS ' + prof.cns + '</code> ' +
+                    '<span style="color: #dc2626; font-size: 0.74rem; font-style: italic;">(Profissional sem vínculo localizado nesta unidade)</span>';
+            }
+
+            const cboStr = cboLabel ? '<span class="bpa-prof-cbo-text"><i class="fas fa-id-badge" style="color: #94a3b8;"></i> ' + cboLabel + '</span>' : '';
+
+            // Badge de vínculo CNES
+            let badgeVinculo = '';
+            if (temNome && prof.vinculadoUnidade !== false) {
+                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; padding: 1px 6px; font-size: 0.70rem; font-weight: 600; white-space: nowrap;" title="Vínculo confirmado no CNES e DATASUS"><i class="fas fa-check-circle"></i> Vínculo Confirmado no CNES</span>';
+            } else if (temNome && prof.vinculadoUnidade === false) {
+                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #fffbeb; color: #b45309; border: 1px solid #fde68a; border-radius: 4px; padding: 1px 6px; font-size: 0.70rem; font-weight: 600; white-space: nowrap;" title="Profissional cadastrado em outro CNES do município"><i class="fas fa-exclamation-circle"></i> Vínculo em outra Unidade</span>';
+            }
 
             let procsHtml = '';
             if (prof.procedimentos && prof.procedimentos.length > 0) {
-                const badges = prof.procedimentos.slice(0, 4).map(p => 
-                    '<span style="display: inline-flex; align-items: center; gap: 4px; background: #ffffff; border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; margin: 2px 4px 2px 0; font-size: 0.74rem;">' +
-                    '<code>' + p.codigo + '</code>: <strong style="color: #0284c7;">' + p.quantidade + '</strong>' +
+                const badges = prof.procedimentos.slice(0, 5).map(p => 
+                    '<span class="bpa-proc-pill-item" style="background: #ffffff; border: 1px solid #e2e8f0; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem; white-space: nowrap;">' +
+                    '<code style="font-family: monospace; color: #334155;">' + p.codigo + '</code>: <strong style="color: #0284c7;">' + p.quantidade + '</strong>' +
                     '</span>'
                 ).join(' ');
-                procsHtml = '<div style="margin-top: 3px; padding-left: 1.1rem; color: #475569; font-size: 0.74rem;">↳ ' + badges + '</div>';
+                procsHtml = '<div class="bpa-prof-procs-row"><span style="font-size: 0.70rem; color: #64748b; font-weight: 600; margin-right: 2px;">Procedimentos:</span> ' + badges + '</div>';
             }
 
             let equipeHtml = '';
             if (prof.membrosEquipe && prof.membrosEquipe.length > 0) {
                 const nomesEquipe = prof.membrosEquipe.map(m => m.nome.split(' ')[0] + ' (' + m.cns.slice(-4) + ')').join(' • ');
-                equipeHtml = '<div style="padding-left: 1.1rem; color: #0369a1; font-size: 0.72rem; font-weight: 500;">Médicos vinculados: ' + nomesEquipe + '</div>';
+                equipeHtml = '<div style="margin-top: 0.25rem; font-size: 0.72rem; color: #0369a1;"><i class="fas fa-users" style="margin-right: 3px;"></i> Médicos vinculados: ' + nomesEquipe + '</div>';
             }
 
-            return '<div style="margin-bottom: 0.45rem; line-height: 1.4; background: #f8fafc; padding: 0.4rem 0.6rem; border-radius: 0.4rem; border: 1px solid #e2e8f0;">' +
-                '• <code style="background: #e0f2fe; color: #0369a1; padding: 1px 5px; border-radius: 3px; font-weight: 700;">' + prof.cns + '</code>' + 
-                nomeStr + cboStr + ' — <strong>quantidade total: ' + prof.quantidade + '</strong>' +
+            return '<div class="bpa-prof-card">' +
+                '<div class="bpa-prof-card-top">' +
+                    '<div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">' + headerProfHtml + '</div>' +
+                    '<div style="display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;">' + badgeVinculo + ' <span class="bpa-prof-total-badge" title="quantidade total: ' + prof.quantidade + '"><i class="fas fa-clipboard-check" style="color: #0284c7; margin-right: 2px;"></i> ' + prof.quantidade + ' atendimentos</span></div>' +
+                '</div>' +
+                (cboStr ? '<div class="bpa-prof-card-meta">' + cboStr + '</div>' : '') +
                 procsHtml + equipeHtml + 
                 '</div>';
         });
@@ -679,33 +881,86 @@ const BpaModule = {
     lookupProfissional(cns, cnes = '') {
         const cleanCns = String(cns || '').replace(/\D/g, '');
         if (!cleanCns) return null;
+        const cleanCnes = String(cnes || '').replace(/\D/g, '');
 
+        const estabs = [];
         try {
-            if (typeof window !== 'undefined' && window.CnesModule && window.CnesModule.state && Array.isArray(window.CnesModule.state.estabelecimentos)) {
-                const estabs = window.CnesModule.state.estabelecimentos;
-                if (cnes) {
-                    const u = estabs.find(est => String(est.cnes || '').replace(/\D/g, '') === String(cnes).replace(/\D/g, ''));
-                    if (u && Array.isArray(u.profissionais)) {
-                        const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
-                        if (found) return found;
-                    }
-                }
-                for (const u of estabs) {
-                    if (Array.isArray(u.profissionais)) {
-                        const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
-                        if (found) return found;
-                    }
-                }
-            }
-            if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
-                for (const u of this.cnesBaseCache.estabelecimentos) {
-                    if (Array.isArray(u.profissionais)) {
-                        const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
-                        if (found) return found;
-                    }
-                }
+            if (typeof window !== 'undefined' && window.CnesModule?.state && Array.isArray(window.CnesModule.state.estabelecimentos)) {
+                estabs.push(...window.CnesModule.state.estabelecimentos);
             }
         } catch (e) {}
+        if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
+            estabs.push(...this.cnesBaseCache.estabelecimentos);
+        }
+        if (typeof window !== 'undefined' && window.ArgosCnesBase && Array.isArray(window.ArgosCnesBase.estabelecimentos)) {
+            estabs.push(...window.ArgosCnesBase.estabelecimentos);
+        }
+        if (typeof window !== 'undefined' && window.ProducaoProfissionalModule?.cnesCache && Array.isArray(window.ProducaoProfissionalModule.cnesCache.estabelecimentos)) {
+            estabs.push(...window.ProducaoProfissionalModule.cnesCache.estabelecimentos);
+        }
+
+        let found = null;
+        let unitFound = null;
+
+        // 1. Tentar buscar primeiro na unidade específica (cleanCnes)
+        if (cleanCnes) {
+            const targetUnit = estabs.find(est => String(est.cnes || '').replace(/\D/g, '') === cleanCnes);
+            if (targetUnit && Array.isArray(targetUnit.profissionais)) {
+                const p = targetUnit.profissionais.find(x => String(x.cns || x.cnsMaster || '').replace(/\D/g, '') === cleanCns);
+                if (p) {
+                    found = p;
+                    unitFound = targetUnit;
+                }
+            }
+        }
+
+        // 2. Se não achou na unidade específica, buscar em qualquer estabelecimento do município
+        if (!found) {
+            for (const est of estabs) {
+                if (Array.isArray(est.profissionais)) {
+                    const p = est.profissionais.find(x => String(x.cns || x.cnsMaster || '').replace(/\D/g, '') === cleanCns);
+                    if (p) {
+                        found = p;
+                        unitFound = est;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Se encontrou no catálogo de estabelecimentos
+        if (found) {
+            const vinculadoUnidade = !cleanCnes || (unitFound && String(unitFound.cnes || '').replace(/\D/g, '') === cleanCnes);
+            const cboCode = String(found.cbo || '').trim();
+            const cboDescDict = (typeof CBO_DICTIONARY !== 'undefined' && CBO_DICTIONARY[cboCode])
+                || (typeof window !== 'undefined' && window.CBO_DICTIONARY && window.CBO_DICTIONARY[cboCode])
+                || '';
+            const ocupacao = found.ocupacao || (cboDescDict ? `${cboCode} - ${cboDescDict}` : (cboCode ? `CBO ${cboCode}` : ''));
+
+            // Cruzamento com a base oficial de vínculos DATASUS
+            let vinculoInfo = null;
+            if (typeof window !== 'undefined' && window.DATASUS_VINCULOS_BACABAL) {
+                const map = window.DATASUS_VINCULOS_BACABAL;
+                vinculoInfo = (cleanCnes && cboCode && map[`${cleanCnes}_${cleanCns}_${cboCode}`])
+                    || (cleanCnes && map[`${cleanCnes}_${cleanCns}`])
+                    || (cboCode && (map[`${cleanCns}_${cboCode}`] || map[`cns_${cleanCns}_${cboCode}`]))
+                    || map[`cns_${cleanCns}`]
+                    || map[cleanCns]
+                    || null;
+            }
+
+            return {
+                ...found,
+                nome: found.nome || '',
+                cns: cleanCns,
+                cbo: cboCode,
+                ocupacao: ocupacao,
+                vinculadoUnidade: vinculadoUnidade,
+                cnesUnidade: unitFound ? String(unitFound.cnes || '').replace(/\D/g, '') : cleanCnes,
+                nomeUnidade: unitFound ? (unitFound.nomeFantasia || unitFound.nome || '') : '',
+                vinculoOficial: vinculoInfo
+            };
+        }
 
         return null;
     },
@@ -754,42 +1009,35 @@ const BpaModule = {
 
     async enrichProfissionaisNames(parsed) {
         if (!parsed || !parsed.profissionaisDetalhados || !parsed.profissionaisDetalhados.length) return;
-        const hasMissing = parsed.profissionaisDetalhados.some(p => !p.nome);
+        const hasMissing = parsed.profissionaisDetalhados.some(p => !p.nome || p.nome.startsWith('Profissional CNS'));
         if (!hasMissing) return;
 
         try {
-            if (!this.cnesBaseCache && typeof fetch === 'function') {
-                const res = await fetch('/api/cnes/bacabal').catch(() => null);
-                if (res && res.ok) {
-                    this.cnesBaseCache = await res.json();
-                }
-            }
-            if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
-                let updated = false;
-                for (const prof of parsed.profissionaisDetalhados) {
-                    if (!prof.nome) {
-                        for (const u of this.cnesBaseCache.estabelecimentos) {
-                            if (Array.isArray(u.profissionais)) {
-                                const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === prof.cns);
-                                if (found) {
-                                    prof.nome = found.nome || '';
-                                    prof.cboDesc = found.ocupacao || prof.cboDesc;
-                                    updated = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                if (updated && this.filePendingUpload === parsed) {
-                    parsed.profissionaisAmostra = this.formatProfissionaisAmostra(parsed.profissionaisDetalhados);
-                    const elProfs = document.getElementById('bpaProfissionaisAmostra');
-                    if (elProfs) {
-                        elProfs.innerHTML = '<strong style="color: #1e293b; display: block; margin-bottom: 0.35rem;"><i class="fas fa-user-md" style="color: #0284c7;"></i> Profissionais Identificados no Arquivo (CNS):</strong>' + parsed.profissionaisAmostra.join('');
+            await this.loadCnesBase();
+            let updated = false;
+            for (const prof of parsed.profissionaisDetalhados) {
+                if (!prof.nome || prof.nome.startsWith('Profissional CNS')) {
+                    const info = this.lookupProfissional(prof.cnsReal || prof.cns, parsed.cnes);
+                    if (info && info.nome) {
+                        prof.nome = info.nome;
+                        prof.cboDesc = info.ocupacao || prof.cboDesc;
+                        prof.vinculadoUnidade = info.vinculadoUnidade;
+                        prof.vinculoOficial = info.vinculoOficial;
+                        updated = true;
                     }
                 }
             }
-        } catch (e) {}
+            if (updated) {
+                parsed.profissionaisAmostra = this.formatProfissionaisAmostra(parsed.profissionaisDetalhados);
+                const elProfs = document.getElementById('bpaProfissionaisAmostra');
+                if (elProfs && (this.filePendingUpload === parsed || !this.filePendingUpload)) {
+                    elProfs.style.display = 'block';
+                    elProfs.innerHTML = '<div class="bpa-section-divider-title"><span><i class="fas fa-user-md" style="color: #0284c7;"></i> Profissionais Identificados (' + parsed.profissionaisDetalhados.length + ')</span><span style="font-weight: 500; color: #10b981; font-size: 0.72rem;"><i class="fas fa-shield-alt"></i> Cruzamento CNES Ativo</span></div>' + parsed.profissionaisAmostra.slice(0, 8).join('');
+                }
+            }
+        } catch (e) {
+            console.warn('Erro ao enriquecer nomes no preview BPA:', e);
+        }
     },
 
     formatFileSize(bytes) {
@@ -1135,6 +1383,15 @@ const BpaModule = {
         }
         this.producoes.splice(index, 1);
         localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
+
+        // Notificar o modulo de Espelho de Produção para expurgo em cascata
+        try {
+            if (typeof window !== 'undefined' && window.ProducaoProfissionalModule && typeof window.ProducaoProfissionalModule.removeProducao === 'function') {
+                window.ProducaoProfissionalModule.removeProducao(id);
+            }
+        } catch (e) {
+            console.warn('Falha ao sincronizar exclusão com ProducaoProfissionalModule:', e);
+        }
 
         this.renderAll();
         this.showToast('Produção removida com sucesso.', 'info');
@@ -1969,10 +2226,14 @@ const BpaModule = {
         if (respSelect) respSelect.disabled = !privileged;
         const chips = document.getElementById('bpaSmartChipsContainer');
         if (chips) chips.style.display = privileged ? '' : 'none';
-        // Controlar visibilidade do botão de atribuição de responsáveis
+        // Controlar visibilidade do botão de atribuição de responsáveis e higienização
         const btnResp = document.getElementById('btnGerenciarResponsaveisBpa');
         if (btnResp) {
             btnResp.style.display = this.isAdminOrFrancileide() ? 'inline-flex' : 'none';
+        }
+        const btnHigiene = document.getElementById('btnHigienizarDadosBpa');
+        if (btnHigiene) {
+            btnHigiene.style.display = this.isAdminOrFrancileide() ? 'inline-flex' : 'none';
         }
 
         this.populateResponsaveisFilter();
@@ -2066,14 +2327,17 @@ const BpaModule = {
                 const escapedName = name.replace(/'/g, "\\'");
                 const hasAlert = (s.pendentes > 0 || s.parciais > 0);
                 const pendingClass = hasAlert ? 'pending-count' : '';
-                const titleText = `${name}: ${s.completas} de ${s.total} completas` + 
+                const isUnassigned = (name.toLowerCase() === 'nao atribuido' || name.toLowerCase() === 'não atribuído');
+                const displayName = isUnassigned ? 'Não Atribuído' : name;
+                const avatarContent = isUnassigned ? '<i class="fas fa-user-slash" style="font-size: 0.72rem;"></i>' : s.initials;
+                const titleText = `${displayName}: ${s.completas} de ${s.total} completas` + 
                     (s.parciais > 0 ? `, ${s.parciais} entrega(s) parcial(is)` : '') + 
                     (s.pendentes > 0 ? `, ${s.pendentes} sem envio` : '');
 
                 chipsHtml += `
                     <div class="bpa-chip ${isActive ? 'active' : ''}" onclick="BpaModule.setResponsavelFilter('${escapedName}')" title="${titleText}">
-                        <span class="bpa-chip-avatar">${s.initials}</span>
-                        <span>${name}</span>
+                        <span class="bpa-chip-avatar">${avatarContent}</span>
+                        <span>${displayName}</span>
                         <span class="bpa-chip-badge ${pendingClass}">${s.completas}/${s.total}${s.parciais > 0 ? '*' : ''}</span>
                     </div>
                 `;
@@ -3022,6 +3286,7 @@ const BpaModule = {
         const modal = document.getElementById('modalUploadBpa');
         if (!modal) return;
 
+        this.loadCnesBase(); // Pré-carrega a base CNES em background
         this.filePendingUpload = null;
         this.fileSelectionId = (this.fileSelectionId || 0) + 1;
         document.getElementById('bpaFileInput').value = '';
@@ -3078,9 +3343,12 @@ const BpaModule = {
             return;
         }
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             if (selectionId !== this.fileSelectionId) return;
             const textContent = e.target.result;
+            if (!this.cnesBaseCache) {
+                await this.loadCnesBase();
+            }
             const parsed = this.parseBpaFile(file, textContent);
 
             if (this.uploadTarget) {
@@ -3115,12 +3383,28 @@ const BpaModule = {
             // Exibição do Raio-X com explicação e amostra
             const elExplicacao = document.getElementById('bpaTipoExplicacao');
             const elAmostra = document.getElementById('bpaProcedimentosAmostra');
-            if (elExplicacao) elExplicacao.innerHTML = parsed.tipoExplicacao;
+            if (elExplicacao) {
+                elExplicacao.innerHTML = `<i class="fas fa-info-circle" style="color: #0284c7; margin-top: 2px; flex-shrink: 0;"></i> <span>${parsed.tipoExplicacao}</span>`;
+            }
             if (elAmostra) {
-                if (parsed.procedimentosAmostra && parsed.procedimentosAmostra.length > 0) {
-                    elAmostra.innerHTML = `<strong>Principais Procedimentos no Arquivo:</strong><br>` + parsed.procedimentosAmostra.join('<br>');
+                if (parsed.procedimentosDetalhados && parsed.procedimentosDetalhados.length > 0) {
+                    const topProcs = parsed.procedimentosDetalhados.slice(0, 6);
+                    elAmostra.innerHTML = `
+                        <div class="bpa-section-divider-title">
+                            <span><i class="fas fa-layer-group" style="color: #0284c7;"></i> Principais Procedimentos no Arquivo</span>
+                            <span style="font-weight: 500; color: #64748b; font-size: 0.72rem;">${parsed.procedimentosDetalhados.length} procedimentos</span>
+                        </div>
+                        <div class="bpa-procedimentos-pills-wrap">
+                            ${topProcs.map(p => `
+                                <span class="bpa-proc-pill-item" title="Procedimento ${p.codigo}: ${p.quantidade} atendimentos">
+                                    <code>${p.codigo}</code>
+                                    <span class="qty">${p.quantidade}</span>
+                                </span>
+                            `).join('')}
+                        </div>
+                    `;
                 } else {
-                    elAmostra.innerHTML = `<em>Estrutura padrão de faturamento reconhecida com sucesso.</em>`;
+                    elAmostra.innerHTML = `<div style="color: #64748b; font-size: 0.75rem; font-style: italic;"><i class="fas fa-check"></i> Estrutura padrão de faturamento reconhecida com sucesso.</div>`;
                 }
             }
 
@@ -3129,7 +3413,13 @@ const BpaModule = {
             if (elProfsAmostra) {
                 if (parsed.profissionaisAmostra && parsed.profissionaisAmostra.length > 0) {
                     elProfsAmostra.style.display = 'block';
-                    elProfsAmostra.innerHTML = '<strong style="color: #0f172a; display: block; margin-bottom: 0.35rem;"><i class="fas fa-user-md" style="color: #0284c7;"></i> Profissionais Identificados (' + parsed.profissionaisDetalhados.length + '):</strong>' + parsed.profissionaisAmostra.slice(0, 5).join('');
+                    elProfsAmostra.innerHTML = `
+                        <div class="bpa-section-divider-title">
+                            <span><i class="fas fa-user-md" style="color: #0284c7;"></i> Profissionais Identificados (${parsed.profissionaisDetalhados.length})</span>
+                            <span style="font-weight: 500; color: #10b981; font-size: 0.72rem;"><i class="fas fa-shield-alt"></i> Cruzamento CNES Ativo</span>
+                        </div>
+                        ${parsed.profissionaisAmostra.slice(0, 8).join('')}
+                    `;
                 } else {
                     elProfsAmostra.style.display = 'none';
                 }
@@ -3211,6 +3501,10 @@ const BpaModule = {
         if (btnCancelResp) btnCancelResp.addEventListener('click', () => this.closeAssignResponsaveisModal());
         const btnSalvarResp = document.getElementById('btnSalvarResponsaveisBpa');
         if (btnSalvarResp) btnSalvarResp.addEventListener('click', () => this.saveResponsaveis());
+
+        // Higienização / Zerar Dados (ADM / Francileide)
+        const btnHigiene = document.getElementById('btnHigienizarDadosBpa');
+        if (btnHigiene) btnHigiene.addEventListener('click', () => this.solicitarZerarDados());
 
         // Modais de Upload
         const btnClose = document.getElementById('btnCloseModalUploadBpa');
@@ -3297,6 +3591,12 @@ const BpaModule = {
 
         if (dropzone && fileInput) {
             dropzone.addEventListener('click', (e) => {
+                if (dropzone.classList.contains('has-file')) {
+                    if (e.target.closest('#btnTrocarArquivoBpa')) {
+                        fileInput.click();
+                    }
+                    return;
+                }
                 if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
                     fileInput.click();
                 }

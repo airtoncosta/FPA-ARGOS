@@ -527,6 +527,42 @@ function adicionarNomesDeReferenciaLegada(snapshot) {
     }
 }
 
+function enriquecerPortaria134Oficial(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.estabelecimentos)) return snapshot;
+    const mapPath = path.join(PUBLIC_DIR, 'cnes_data', 'datasus_portaria134.json');
+    if (!fs.existsSync(mapPath)) return snapshot;
+    try {
+        const map = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+        const estabelecimentos = snapshot.estabelecimentos.map(est => {
+            const cnesStr = String(est.cnes || '').trim();
+            const profissionais = (est.profissionais || []).map(p => {
+                if (p.portaria134) return p;
+                const cnsClean = String(p.cns || '').replace(/\D/g, '');
+                const cboClean = String(p.cbo || '').split(' ')[0].replace(/\D/g, '');
+                const nomeClean = String(p.nome || '').toUpperCase().replace(/\s+/g, ' ').trim();
+                const found = (cnesStr && cnsClean && cboClean && map[`${cnesStr}_${cnsClean}_${cboClean}`])
+                    || (cnesStr && cnsClean && map[`${cnesStr}_${cnsClean}`])
+                    || (cnesStr && nomeClean && cboClean && map[`${cnesStr}_${nomeClean}_${cboClean}`])
+                    || (cnesStr && nomeClean && map[`${cnesStr}_${nomeClean}`])
+                    || (cnsClean && map[`cns_${cnsClean}`])
+                    || null;
+                if (found && found.portaria134) {
+                    return {
+                        ...p,
+                        portaria134: found.portaria134,
+                        portaria134Fonte: found.portaria134Fonte || 'CNES_OFICIAL'
+                    };
+                }
+                return p;
+            });
+            return { ...est, profissionais };
+        });
+        return { ...snapshot, estabelecimentos };
+    } catch (_err) {
+        return snapshot;
+    }
+}
+
 function enviarSnapshotCnesBacabal(req, res, competencia) {
     let published = null;
     try {
@@ -537,14 +573,24 @@ function enviarSnapshotCnesBacabal(req, res, competencia) {
     if (!published) return false;
 
     const activeEntry = published.manifest.competencies?.[published.competence] || {};
-    const snapshot = adicionarNomesDeReferenciaLegada(published.snapshot);
+    const snapshot = enriquecerPortaria134Oficial(adicionarNomesDeReferenciaLegada(published.snapshot));
+    const competencies = [...published.competencies];
+    const cnesDataDir = path.join(PUBLIC_DIR, 'cnes_data');
+    if (!competencies.some(c => c.codigo === '202607') && fs.existsSync(path.join(cnesDataDir, 'cnes_210120_202607.json'))) {
+        competencies.push({
+            codigo: '202607',
+            label: '07/2026',
+            vigente: false
+        });
+    }
+
     sendJsonResponse(req, res, 200, {
         ...snapshot,
         codigoIbge: snapshot.codigoIbge || '210120',
         municipio: snapshot.municipio || 'BACABAL',
         uf: snapshot.uf || 'MA',
         competenciaPadrao: published.competence,
-        competencias: published.competencies,
+        competencias: competencies,
         dataAtualizacao: activeEntry.published_at || null,
         coverage: snapshot.coverage || activeEntry.coverage || null,
         counts: snapshot.counts || activeEntry.counts || null,
@@ -1038,6 +1084,13 @@ const server = http.createServer(async (req, res) => {
             }
 
             if (compParam) {
+                const fileByComp = path.join(cnesDataDir, `cnes_${cleanIbge}_${compParam}.json`);
+                if (fs.existsSync(fileByComp)) {
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    fs.createReadStream(fileByComp).pipe(res);
+                    return;
+                }
+
                 sendJsonResponse(req, res, 404, {
                     error: 'Competência CNES não publicada para Bacabal',
                     code: 'CNES_COMPETENCE_UNAVAILABLE',
@@ -1162,6 +1215,12 @@ const server = http.createServer(async (req, res) => {
         const compParam = query.get('competencia') || '';
         if (enviarSnapshotCnesBacabal(req, res, compParam)) return;
         if (compParam) {
+            const fileByComp = path.join(PUBLIC_DIR, 'cnes_data', `cnes_210120_${compParam}.json`);
+            if (fs.existsSync(fileByComp)) {
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                fs.createReadStream(fileByComp).pipe(res);
+                return;
+            }
             sendJsonResponse(req, res, 404, {
                 error: 'Competência CNES não publicada para Bacabal',
                 code: 'CNES_COMPETENCE_UNAVAILABLE',

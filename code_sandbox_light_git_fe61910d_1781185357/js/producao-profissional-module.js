@@ -1,5 +1,5 @@
 /**
- * FPA-ARGOS - Módulo: Produção Profissional CNS
+ * FPA-ARGOS - Módulo: Espelho de Produção (Produtividade Profissional / CNS)
  * Monitoramento, auditoria e acompanhamento da produtividade médica por CNS,
  * detalhamento dos códigos de procedimentos SUS/SIGTAP, quantidades e valores por unidade.
  * Compatível tanto com BPA-I (individualizado com CNS) quanto BPA-C (consolidado por CBO).
@@ -76,13 +76,43 @@ window.ProducaoProfissionalModule = {
             }
         }
 
+        if (this.cnesCache && Array.isArray(this.cnesCache.estabelecimentos) && this.cnesCache.estabelecimentos.length > 0) {
+            return;
+        }
+        if (typeof window !== 'undefined' && window.ArgosCnesBase && Array.isArray(window.ArgosCnesBase.estabelecimentos)) {
+            this.cnesCache = window.ArgosCnesBase;
+            return;
+        }
+        if (typeof window !== 'undefined' && window.BpaModule?.cnesBaseCache && Array.isArray(window.BpaModule.cnesBaseCache.estabelecimentos)) {
+            this.cnesCache = window.BpaModule.cnesBaseCache;
+            window.ArgosCnesBase = this.cnesCache;
+            return;
+        }
+
         // Carrega base CNES para associar nomes de profissionais e ocupações aos CNS
+        // Injeta cabeçalhos de autorização exigidos pelo servidor
         if (!this.cnesCache && typeof fetch === 'function') {
             try {
-                const res = await fetch('/api/cnes/bacabal').catch(() => null);
+                const headers = {};
+                if (typeof window !== 'undefined' && window.SupabaseConfig) {
+                    if (typeof window.SupabaseConfig.getClient === 'function') {
+                        const client = window.SupabaseConfig.getClient();
+                        if (client && client.auth && typeof client.auth.getSession === 'function') {
+                            const sessionResult = await client.auth.getSession().catch(() => null);
+                            const token = sessionResult?.data?.session?.access_token;
+                            if (token) headers.Authorization = `Bearer ${token}`;
+                        }
+                    }
+                    if (!headers.Authorization && typeof window.SupabaseConfig.getAnonKey === 'function') {
+                        const anon = window.SupabaseConfig.getAnonKey();
+                        if (anon) headers.Authorization = `Bearer ${anon}`;
+                    }
+                }
+                const res = await fetch('/api/cnes/bacabal', { headers }).catch(() => null);
                 if (res && res.ok) {
                     const txt = await res.text();
                     this.cnesCache = JSON.parse(txt.replace(/^\uFEFF/, ''));
+                    if (typeof window !== 'undefined') window.ArgosCnesBase = this.cnesCache;
                 }
             } catch (e) {
                 console.warn('CNES data fetch falhou:', e);
@@ -98,44 +128,85 @@ window.ProducaoProfissionalModule = {
     lookupProfissional(cns, cnes = '') {
         const cleanCns = String(cns || '').replace(/\D/g, '');
         if (!cleanCns) return null;
+        const cleanCnes = String(cnes || '').replace(/\D/g, '');
 
-        // 1. Tentar via CnesModule ativo em memória
+        const estabs = [];
         try {
             if (typeof window !== 'undefined' && window.CnesModule && window.CnesModule.state && Array.isArray(window.CnesModule.state.estabelecimentos)) {
-                const estabs = window.CnesModule.state.estabelecimentos;
-                if (cnes) {
-                    const cleanCnes = String(cnes).replace(/\D/g, '');
-                    const u = estabs.find(est => String(est.cnes || '').replace(/\D/g, '') === cleanCnes);
-                    if (u && Array.isArray(u.profissionais)) {
-                        const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
-                        if (found) return found;
-                    }
-                }
-                for (const u of estabs) {
-                    if (Array.isArray(u.profissionais)) {
-                        const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
-                        if (found) return found;
-                    }
-                }
+                estabs.push(...window.CnesModule.state.estabelecimentos);
             }
         } catch (e) {}
-
-        // 2. Tentar via cnesCache estático carregado
         if (this.cnesCache && Array.isArray(this.cnesCache.estabelecimentos)) {
-            if (cnes) {
-                const cleanCnes = String(cnes).replace(/\D/g, '');
-                const u = this.cnesCache.estabelecimentos.find(est => String(est.cnes || '').replace(/\D/g, '') === cleanCnes);
-                if (u && Array.isArray(u.profissionais)) {
-                    const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
-                    if (found) return found;
+            estabs.push(...this.cnesCache.estabelecimentos);
+        }
+        if (typeof window !== 'undefined' && window.ArgosCnesBase && Array.isArray(window.ArgosCnesBase.estabelecimentos)) {
+            estabs.push(...window.ArgosCnesBase.estabelecimentos);
+        }
+        if (typeof window !== 'undefined' && window.BpaModule && window.BpaModule.cnesBaseCache && Array.isArray(window.BpaModule.cnesBaseCache.estabelecimentos)) {
+            estabs.push(...window.BpaModule.cnesBaseCache.estabelecimentos);
+        }
+
+        let found = null;
+        let unitFound = null;
+        let vinculadoUnidade = true;
+
+        // 1. Tenta buscar primeiro na própria unidade (cnes) informada
+        if (cleanCnes) {
+            const unit = estabs.find(est => String(est.cnes || '').replace(/\D/g, '') === cleanCnes);
+            if (unit && Array.isArray(unit.profissionais)) {
+                const p = unit.profissionais.find(x => String(x.cns || x.cnsMaster || '').replace(/\D/g, '') === cleanCns);
+                if (p) {
+                    found = p;
+                    unitFound = unit;
+                    vinculadoUnidade = true;
                 }
             }
-            for (const u of this.cnesCache.estabelecimentos) {
+        }
+
+        // 2. Se não achou na unidade específica, procura em qualquer unidade cadastrada no município
+        if (!found) {
+            for (const u of estabs) {
                 if (Array.isArray(u.profissionais)) {
-                    const found = u.profissionais.find(p => String(p.cns || p.cnsMaster || '').replace(/\D/g, '') === cleanCns);
-                    if (found) return found;
+                    const p = u.profissionais.find(x => String(x.cns || x.cnsMaster || '').replace(/\D/g, '') === cleanCns);
+                    if (p) {
+                        found = p;
+                        unitFound = u;
+                        vinculadoUnidade = cleanCnes ? false : true;
+                        break;
+                    }
                 }
             }
+        }
+
+        if (found) {
+            const cboCode = String(found.cbo || '').trim();
+            const cboDescDict = (typeof CBO_DICTIONARY !== 'undefined' && CBO_DICTIONARY[cboCode])
+                || (typeof window !== 'undefined' && window.CBO_DICTIONARY && window.CBO_DICTIONARY[cboCode])
+                || '';
+            const ocupacao = found.ocupacao || (cboDescDict ? `${cboCode} - ${cboDescDict}` : (cboCode ? `CBO ${cboCode}` : ''));
+
+            let vinculoInfo = null;
+            if (typeof window !== 'undefined' && window.DATASUS_VINCULOS_BACABAL) {
+                const map = window.DATASUS_VINCULOS_BACABAL;
+                vinculoInfo = (cleanCnes && cboCode && map[`${cleanCnes}_${cleanCns}_${cboCode}`])
+                    || (cleanCnes && map[`${cleanCnes}_${cleanCns}`])
+                    || (cboCode && (map[`${cleanCns}_${cboCode}`] || map[`cns_${cleanCns}_${cboCode}`]))
+                    || map[`cns_${cleanCns}`]
+                    || map[cleanCns]
+                    || null;
+            }
+
+            return {
+                ...found,
+                nome: found.nome || '',
+                cns: cleanCns,
+                cbo: cboCode,
+                ocupacao: ocupacao,
+                vinculadoUnidade: vinculadoUnidade,
+                cnesUnidade: unitFound ? String(unitFound.cnes || '').replace(/\D/g, '') : cleanCnes,
+                nomeUnidade: unitFound ? (unitFound.nomeFantasia || unitFound.nome || '') : '',
+                vinculoOficial: vinculoInfo
+            };
         }
 
         return null;
@@ -189,11 +260,11 @@ window.ProducaoProfissionalModule = {
      */
     recordProducaoProfissionais(producaoRecord, producaoData) {
         if (!producaoRecord) return;
-        const profs = producaoData?.profissionaisDetalhados || [];
         const cnes = producaoRecord.cnes || producaoData?.cnes || '';
         const unidade = producaoRecord.estabelecimento_nome || producaoData?.estabelecimentoNome || 'UNIDADE NÃO INFORMADA';
         const competencia = producaoRecord.competencia || producaoData?.competencia || '';
         const producaoId = producaoRecord.id;
+        const rawContent = producaoRecord.conteudo_arquivo || producaoData?.conteudo || '';
 
         // Carrega registros existentes
         let saved = [];
@@ -203,14 +274,25 @@ window.ProducaoProfissionalModule = {
             saved = [];
         }
 
-        // Remove registros antigos vinculados à mesma produção caso seja reenvio
+        // Remove registros antigos vinculados à mesma produção (idempotência / reenvio)
         saved = saved.filter(r => r.producao_id !== producaoId);
 
-        // Se o arquivo contiver profissionais detalhados (BPA-I ou BPA-C já agrupado)
-        if (Array.isArray(profs) && profs.length > 0) {
-            for (const p of profs) {
+        // Agregação unificada determinística
+        const auditCore = (typeof window !== 'undefined' && window.BpaAuditCore) ? window.BpaAuditCore : (typeof globalThis !== 'undefined' && globalThis.BpaAuditCore ? globalThis.BpaAuditCore : null);
+
+        if (rawContent && auditCore) {
+            try {
+                const parsed = auditCore.parse(rawContent);
+                const profRecords = this.aggregateProfissionais(parsed.records, cnes, unidade, competencia, producaoId, producaoRecord.nome_arquivo);
+                saved.push(...profRecords);
+            } catch (e) {
+                console.error('Falha ao agregar profissionais da remessa BPA:', e);
+            }
+        } else if (Array.isArray(producaoData?.profissionaisDetalhados) && producaoData.profissionaisDetalhados.length > 0) {
+            // Fallback caso não haja conteúdo de arquivo bruto
+            for (const p of producaoData.profissionaisDetalhados) {
                 const info = this.lookupProfissional(p.cns, cnes);
-                const nome = p.nome || info?.nome || (p.cns ? 'Profissional Identificado pelo CNS' : (p.cboDesc || `CBO ${p.cbo}`));
+                const nome = p.nome || info?.nome || (p.cns ? `Profissional CNS ${p.cns}` : (p.cboDesc || `CBO ${p.cbo}`));
                 const cboDesc = p.cboDesc || info?.ocupacao || (p.cbo ? ('CBO ' + p.cbo) : 'Ocupação SUS');
 
                 let totalValor = 0;
@@ -240,19 +322,13 @@ window.ProducaoProfissionalModule = {
                     competencia,
                     nome_arquivo: producaoRecord.nome_arquivo || producaoData?.nomeArquivo || '',
                     totalQuantidade: p.quantidade || 0,
-                    totalAtendimentos: p.atendimentos || 0,
-                    totalValor,
+                    totalAtendimentos: p.atendimentos || Math.max(1, p.quantidade || 0),
+                    totalValor: Number(totalValor.toFixed(2)),
                     procedimentos: procsWithValues,
+                    vinculoConfirmado: info?.vinculadoUnidade ?? true,
+                    vinculoAlerta: !info?.vinculadoUnidade,
                     criado_em: new Date().toISOString()
                 });
-            }
-        } else {
-            // Se profs estiver vazio (ex: BPA-C puro), extrair diretamente do conteudo do arquivo
-            const rawContent = producaoRecord.conteudo_arquivo || producaoData?.conteudo || '';
-            if (rawContent && window.BpaAuditCore) {
-                const parsed = window.BpaAuditCore.parse(rawContent);
-                const profRecords = this.extractProfissionaisFromRecords(parsed.records, cnes, unidade, competencia, producaoId, producaoRecord.nome_arquivo);
-                saved.push(...profRecords);
             }
         }
 
@@ -269,79 +345,112 @@ window.ProducaoProfissionalModule = {
         }
     },
 
-    extractProfissionaisFromRecords(records, cnes, unidade, competencia, producaoId, nomeArquivo) {
+    /**
+     * Agregação determinística oficial:
+     * - Atendimentos: pacientes únicos na mesma data (BPA-I) ou procedimentos consolidados (BPA-C).
+     * - Quantidade: soma aritmética de procedimentos executados para fins de faturamento.
+     * - CNES: cruzamento com a base de estabelecimentos e alerta de vínculo.
+     */
+    aggregateProfissionais(records, cnes, unidade, competencia, producaoId, nomeArquivo) {
         if (!Array.isArray(records) || records.length === 0) return [];
         const profMap = new Map();
 
         for (const r of records) {
+            const isBpaI = r.tipo === 'BPA-I' || (r.cnsProfissional && String(r.cnsProfissional).trim().length > 0);
             let cns = String(r.cnsProfissional || '').trim();
             const cbo = String(r.cbo || '').trim();
             const qty = /^\d+$/.test(r.quantidade) ? Number(r.quantidade) : 1;
 
             let key = cns;
-            let resolvedProfs = [];
-            if (!key && cbo) {
-                resolvedProfs = this.lookupProfissionaisByCbo(cbo, cnes, unidade);
-                if (resolvedProfs.length === 1) {
-                    key = resolvedProfs[0].cns || `CBO_${cbo}`;
-                } else if (resolvedProfs.length > 1) {
-                    key = `EQUIPE_${cbo}`;
-                } else {
-                    key = `CBO_${cbo}`;
-                }
-            }
+            let isConsolidadoBpaC = false;
 
-            if (!key && !cbo) continue;
-            if (!key) key = `CBO_${cbo}`;
+            if (!isBpaI || !key) {
+                // BPA-C Consolidado por CBO
+                isConsolidadoBpaC = true;
+                key = cbo ? `CBO_${cbo}` : 'SEM_CBO';
+            }
 
             if (!profMap.has(key)) {
                 let nome = '';
                 let cboDesc = '';
                 let membrosEquipe = [];
+                let vinculoConfirmado = false;
+                let vinculoAlerta = false;
 
-                if (resolvedProfs.length === 1) {
-                    nome = resolvedProfs[0].nome || '';
-                    cboDesc = resolvedProfs[0].ocupacao || (cbo ? `CBO ${cbo}` : '');
-                } else if (resolvedProfs.length > 1) {
-                    const ocupLabel = resolvedProfs[0].ocupacao?.split('-')[1]?.trim() || 'Especializada';
-                    nome = `Equipe de ${ocupLabel} (${resolvedProfs.length} médicos/profissionais)`;
-                    cboDesc = resolvedProfs[0].ocupacao || (`CBO ${cbo}`);
-                    membrosEquipe = resolvedProfs.map(p => ({ nome: p.nome, cns: p.cns, ocupacao: p.ocupacao }));
-                } else if (!key.startsWith('CBO_') && !key.startsWith('EQUIPE_')) {
+                if (!isConsolidadoBpaC) {
                     const info = this.lookupProfissional(key, cnes);
-                    nome = info?.nome || '';
-                    cboDesc = info?.ocupacao || (cbo ? `CBO ${cbo}` : '');
+                    if (info) {
+                        nome = info.nome || `Profissional CNS ${key}`;
+                        cboDesc = info.ocupacao || (cbo ? `CBO ${cbo}` : '');
+                        vinculoConfirmado = !!info.vinculadoUnidade;
+                        vinculoAlerta = !info.vinculadoUnidade;
+                    } else {
+                        nome = `Profissional CNS ${key}`;
+                        cboDesc = cbo ? `CBO ${cbo}` : 'Ocupação SUS';
+                        vinculoConfirmado = false;
+                        vinculoAlerta = true;
+                    }
                 } else {
-                    nome = `Equipe Especializada (CBO ${cbo})`;
-                    cboDesc = `CBO ${cbo}`;
+                    // BPA-C Consolidado por CBO
+                    const resolvedProfs = this.lookupProfissionaisByCbo(cbo, cnes, unidade);
+                    if (resolvedProfs.length === 1) {
+                        nome = `${resolvedProfs[0].nome} (Consolidado CBO ${cbo})`;
+                        cboDesc = resolvedProfs[0].ocupacao || `CBO ${cbo}`;
+                        membrosEquipe = resolvedProfs.map(p => ({ nome: p.nome, cns: p.cns, ocupacao: p.ocupacao }));
+                    } else if (resolvedProfs.length > 1) {
+                        const ocupLabel = resolvedProfs[0].ocupacao?.split('-')[1]?.trim() || 'Especializada';
+                        nome = `Equipe de ${ocupLabel} (${resolvedProfs.length} no CNES)`;
+                        cboDesc = resolvedProfs[0].ocupacao || `CBO ${cbo}`;
+                        membrosEquipe = resolvedProfs.map(p => ({ nome: p.nome, cns: p.cns, ocupacao: p.ocupacao }));
+                    } else {
+                        nome = `Produção Consolidada (CBO ${cbo})`;
+                        cboDesc = `CBO ${cbo}`;
+                    }
+                    vinculoConfirmado = true;
+                    vinculoAlerta = false;
                 }
 
                 profMap.set(key, {
-                    cns: key.startsWith('EQUIPE_') ? `CBO ${cbo} (${resolvedProfs.length} CNS vinculados)` : key.startsWith('CBO_') ? `Consolidado CBO ${cbo}` : key,
-                    cnsDisplay: key.startsWith('EQUIPE_') ? `CBO ${cbo} (${resolvedProfs.length} CNS)` : key.startsWith('CBO_') ? `Consolidado CBO ${cbo}` : key,
+                    cns: isConsolidadoBpaC ? (cbo ? `Consolidado CBO ${cbo}` : 'BPA-C') : key,
+                    cnsDisplay: isConsolidadoBpaC ? (cbo ? `CBO ${cbo}` : 'BPA-C') : key,
                     nome,
                     cbo,
                     cboDesc,
                     membrosEquipe,
+                    vinculoConfirmado,
+                    vinculoAlerta,
                     totalQuantidade: 0,
-                    totalAtendimentos: 0,
-                    procs: new Map(),
-                    isConsolidadoBpaC: !r.cnsProfissional
+                    totalAtendimentosConsolidado: 0,
+                    atendimentosSet: new Set(),
+                    procsMap: new Map(),
+                    isConsolidadoBpaC
                 });
             }
 
             const item = profMap.get(key);
             item.totalQuantidade += qty;
-            item.totalAtendimentos += 1;
+
+            if (isConsolidadoBpaC) {
+                // No BPA-C, a quantidade expressa os atendimentos consolidados
+                item.totalAtendimentosConsolidado += qty;
+            } else {
+                // No BPA-I, o atendimento único é definido pelo paciente na data do atendimento
+                const dt = String(r.dataAtendimento || '').trim();
+                const pac = String(r.cnsPaciente || r.cpfPaciente || '').trim();
+                const folhaSeq = `${r.folha || '0'}_${r.sequencia || '0'}`;
+                const encKey = pac ? `${pac}_${dt || 'DATA_ND'}` : `${folhaSeq}_${dt || 'DATA_ND'}`;
+                item.atendimentosSet.add(encKey);
+            }
+
             if (r.procedimento) {
-                item.procs.set(r.procedimento, (item.procs.get(r.procedimento) || 0) + qty);
+                item.procsMap.set(r.procedimento, (item.procsMap.get(r.procedimento) || 0) + qty);
             }
         }
 
         const result = [];
         for (const [key, item] of profMap.entries()) {
             let totalValor = 0;
-            const procsWithValues = [...item.procs.entries()].map(([codigo, quantidade]) => {
+            const procsWithValues = [...item.procsMap.entries()].map(([codigo, quantidade]) => {
                 const sig = this.getSigtapItem(codigo);
                 const vlUnit = (sig && typeof sig.vl_sa === 'number') ? sig.vl_sa : 0;
                 const vlTot = vlUnit * quantidade;
@@ -355,10 +464,16 @@ window.ProducaoProfissionalModule = {
                 };
             }).sort((a, b) => b.quantidade - a.quantidade);
 
+            // Calcula total de atendimentos de acordo com a modalidade
+            const totalAtendimentos = item.isConsolidadoBpaC
+                ? item.totalAtendimentosConsolidado
+                : Math.max(1, item.atendimentosSet.size);
+
             result.push({
                 id: 'prof_prod_' + Math.random().toString(36).substring(2, 10),
                 producao_id: producaoId,
-                cns: item.cns || item.cnsDisplay,
+                cns: item.cns,
+                cnsDisplay: item.cnsDisplay,
                 nome: item.nome,
                 cbo: item.cbo,
                 cboDesc: item.cboDesc,
@@ -367,15 +482,67 @@ window.ProducaoProfissionalModule = {
                 competencia,
                 nome_arquivo: nomeArquivo || '',
                 totalQuantidade: item.totalQuantidade,
-                totalAtendimentos: item.totalAtendimentos,
-                totalValor,
+                totalAtendimentos,
+                totalValor: Number(totalValor.toFixed(2)),
                 procedimentos: procsWithValues,
                 membrosEquipe: item.membrosEquipe || [],
+                vinculoConfirmado: item.vinculoConfirmado,
+                vinculoAlerta: item.vinculoAlerta,
                 isConsolidadoBpaC: item.isConsolidadoBpaC,
                 criado_em: new Date().toISOString()
             });
         }
         return result;
+    },
+
+    extractProfissionaisFromRecords(records, cnes, unidade, competencia, producaoId, nomeArquivo) {
+        return this.aggregateProfissionais(records, cnes, unidade, competencia, producaoId, nomeArquivo);
+    },
+
+    /**
+     * Remove todos os registros vinculados a uma produção BPA excluída (expurgo em cascata)
+     */
+    removeProducao(producaoId) {
+        if (!producaoId) return;
+        let saved = [];
+        try {
+            saved = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+        } catch (e) {
+            saved = [];
+        }
+        saved = saved.filter(r => r.producao_id !== producaoId);
+        this.records = (this.records || []).filter(r => r.producao_id !== producaoId);
+
+        try {
+            localStorage.setItem(this.storageKey, JSON.stringify(saved));
+        } catch (e) {
+            console.error('Erro ao salvar após exclusão de produção:', e);
+        }
+
+        if (this.initialized) {
+            this.populateFilterOptions();
+            this.render();
+        }
+    },
+
+    /**
+     * Higienização completa dos dados de produtividade profissional
+     */
+    clearAllData() {
+        try {
+            localStorage.removeItem(this.storageKey);
+        } catch (e) {}
+        this.records = [];
+        this.filtros = {
+            unidade: '',
+            competencia: '',
+            ordenacao: 'maior_qtd',
+            busca: ''
+        };
+        if (this.initialized) {
+            this.populateFilterOptions();
+            this.render();
+        }
     },
 
     async loadData(forceSyncWithBpa = false) {
@@ -389,14 +556,22 @@ window.ProducaoProfissionalModule = {
 
         // Sincronização com produções do BPA (sempre verifica se há produções adicionadas)
         const existingBpa = this.getExistingBpaProductions();
+        const validBpaIds = new Set(existingBpa.map(b => b.id));
+
+        // EXPURGO ATIVO DE ÓRFÃOS: remove do Espelho registros de produções que já foram deletadas do BPA
+        if (existingBpa.length > 0) {
+            loaded = loaded.filter(r => validBpaIds.has(r.producao_id));
+        }
+
         const knownProducaoIds = new Set(loaded.map(r => r.producao_id));
+        const auditCore = (typeof window !== 'undefined' && window.BpaAuditCore) ? window.BpaAuditCore : (typeof globalThis !== 'undefined' && globalThis.BpaAuditCore ? globalThis.BpaAuditCore : null);
 
         for (const bpa of existingBpa) {
             if (bpa.conteudo_arquivo && (!knownProducaoIds.has(bpa.id) || forceSyncWithBpa)) {
                 try {
-                    if (window.BpaAuditCore) {
-                        const parsed = window.BpaAuditCore.parse(bpa.conteudo_arquivo);
-                        const extracted = this.extractProfissionaisFromRecords(
+                    if (auditCore) {
+                        const parsed = auditCore.parse(bpa.conteudo_arquivo);
+                        const extracted = this.aggregateProfissionais(
                             parsed.records,
                             bpa.cnes,
                             bpa.estabelecimento_nome,
@@ -424,23 +599,25 @@ window.ProducaoProfissionalModule = {
             if ((!item.nome || item.nome.includes('Identificado pelo CNS') || item.nome.startsWith('Equipe / CBO') || item.cns.startsWith('Consolidado CBO') || item.cns.startsWith('CBO_')) && item.cbo) {
                 const matchProfs = this.lookupProfissionaisByCbo(item.cbo, item.cnes, item.estabelecimento_nome);
                 if (matchProfs.length === 1) {
-                    item.nome = matchProfs[0].nome;
+                    item.nome = `${matchProfs[0].nome} (Consolidado CBO ${item.cbo})`;
                     item.cns = matchProfs[0].cns;
                     item.cboDesc = matchProfs[0].ocupacao || item.cboDesc;
                     item.membrosEquipe = matchProfs.map(p => ({ nome: p.nome, cns: p.cns, ocupacao: p.ocupacao }));
                 } else if (matchProfs.length > 1) {
                     const ocupLabel = matchProfs[0].ocupacao?.split('-')[1]?.trim() || 'Especializada';
-                    item.nome = `Equipe de ${ocupLabel} (${matchProfs.length} médicos/profissionais)`;
+                    item.nome = `Equipe de ${ocupLabel} (${matchProfs.length} no CNES)`;
                     item.cns = `CBO ${item.cbo} (${matchProfs.length} CNS vinculados)`;
                     item.cboDesc = matchProfs[0].ocupacao || item.cboDesc;
                     item.membrosEquipe = matchProfs.map(p => ({ nome: p.nome, cns: p.cns, ocupacao: p.ocupacao }));
                 }
             }
-            if (!item.nome || item.nome.includes('Identificado pelo CNS')) {
+            if (!item.nome || item.nome.includes('Identificado pelo CNS') || item.nome.startsWith('Profissional CNS')) {
                 const info = this.lookupProfissional(item.cns, item.cnes);
                 if (info && info.nome) {
                     item.nome = info.nome;
                     if (info.ocupacao) item.cboDesc = info.ocupacao;
+                    item.vinculoConfirmado = !!info.vinculadoUnidade;
+                    item.vinculoAlerta = !info.vinculadoUnidade;
                 }
             }
             // Enriquecer nomes de procedimentos se o cache SIGTAP foi carregado
@@ -458,7 +635,7 @@ window.ProducaoProfissionalModule = {
                     }
                 });
                 if (recalculate) {
-                    item.totalValor = item.procedimentos.reduce((sum, p) => sum + (p.valorTotal || 0), 0);
+                    item.totalValor = Number(item.procedimentos.reduce((sum, p) => sum + (p.valorTotal || 0), 0).toFixed(2));
                 }
             }
         }
@@ -585,6 +762,8 @@ window.ProducaoProfissionalModule = {
             if (r.membrosEquipe && r.membrosEquipe.length > 0 && (!agg.membrosEquipe || agg.membrosEquipe.length === 0)) {
                 agg.membrosEquipe = r.membrosEquipe;
             }
+            if (r.vinculoConfirmado) agg.vinculoConfirmado = true;
+            if (r.vinculoAlerta && !agg.vinculoConfirmado) agg.vinculoAlerta = true;
             if (r.estabelecimento_nome) agg.unidades.add(r.estabelecimento_nome);
             if (r.competencia) agg.competencias.add(r.competencia);
             agg.totalQuantidade += (r.totalQuantidade || 0);
@@ -627,9 +806,11 @@ window.ProducaoProfissionalModule = {
                 competencias: [...prof.competencias].join(', ') || '-',
                 totalQuantidade: prof.totalQuantidade,
                 totalAtendimentos: prof.totalAtendimentos,
-                totalValor: prof.totalValor,
+                totalValor: Number(prof.totalValor.toFixed(2)),
                 totalValorFormatado: prof.totalValor > 0 ? `R$ ${prof.totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00',
                 procedimentos: procsList,
+                vinculoConfirmado: prof.vinculoConfirmado,
+                vinculoAlerta: prof.vinculoAlerta,
                 isConsolidadoBpaC: prof.isConsolidadoBpaC
             };
         });
@@ -656,6 +837,8 @@ window.ProducaoProfissionalModule = {
         // 1. Atualizar KPIs
         const totalProfs = profissionais.length;
         const totalProcs = profissionais.reduce((sum, p) => sum + p.totalQuantidade, 0);
+        const totalAtends = profissionais.reduce((sum, p) => sum + p.totalAtendimentos, 0);
+        const totalValorSigtap = profissionais.reduce((sum, p) => sum + p.totalValor, 0);
         const media = totalProfs > 0 ? (totalProcs / totalProfs).toFixed(1) : '0';
         const topProdutor = profissionais.length > 0 ? profissionais.slice().sort((a, b) => b.totalQuantidade - a.totalQuantidade)[0] : null;
 
@@ -670,7 +853,7 @@ window.ProducaoProfissionalModule = {
         if (elKpiProcs) elKpiProcs.textContent = totalProcs.toLocaleString('pt-BR');
         if (elKpiMedia) elKpiMedia.textContent = Number(media).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
         if (elKpiTop) elKpiTop.textContent = topProdutor ? topProdutor.nome : '-';
-        if (elKpiTopQtd) elKpiTopQtd.textContent = topProdutor ? `${topProdutor.totalQuantidade.toLocaleString('pt-BR')} atendimentos` : '0 atendimentos';
+        if (elKpiTopQtd) elKpiTopQtd.textContent = topProdutor ? `${topProdutor.totalAtendimentos.toLocaleString('pt-BR')} atends (${topProdutor.totalQuantidade.toLocaleString('pt-BR')} procs)` : '0 atendimentos';
         if (elTotalRanking) elTotalRanking.textContent = `${totalProfs} profissional(is)`;
 
         // 2. Renderizar Ranking de Produtividade (Barras Visuais)
@@ -718,7 +901,9 @@ window.ProducaoProfissionalModule = {
                             <span style="font-size: 0.72rem; color: #64748b; font-weight: 500;">(${p.cboDesc})</span>
                         </div>
                         <div style="font-weight: 800; color: #0f172a; font-size: 0.85rem;">
-                            ${p.totalQuantidade.toLocaleString('pt-BR')} <span style="font-weight: 500; font-size: 0.72rem; color: #64748b;">atendimentos</span>
+                            <span style="color: #0369a1;">${p.totalAtendimentos.toLocaleString('pt-BR')} atends</span>
+                            <span style="margin: 0 4px; color: #cbd5e1;">•</span>
+                            <span style="color: #475569;">${p.totalQuantidade.toLocaleString('pt-BR')} procs</span>
                             ${p.totalValor > 0 ? `<span style="margin-left: 8px; font-weight: 600; color: #16a34a; font-size: 0.76rem;">• ${p.totalValorFormatado}</span>` : ''}
                         </div>
                     </div>
@@ -789,6 +974,15 @@ window.ProducaoProfissionalModule = {
                 ? `<span style="font-size: 0.72rem; background: #e0f2fe; color: #0369a1; padding: 1px 6px; border-radius: 4px; font-weight: 700;">CNS: ${p.cns}</span>`
                 : `<span style="font-size: 0.72rem; background: #ecfdf5; color: #059669; padding: 1px 6px; border-radius: 4px; font-weight: 700;"><i class="fas fa-layer-group"></i> ${p.cns || 'BPA-C'}</span>`;
 
+            let vinculoBadge = '';
+            if (p.isConsolidadoBpaC) {
+                vinculoBadge = `<span style="font-size: 0.7rem; background: #f1f5f9; color: #475569; padding: 2px 7px; border-radius: 9999px; font-weight: 700;"><i class="fas fa-layer-group"></i> Coletivo CBO</span>`;
+            } else if (p.vinculoConfirmado) {
+                vinculoBadge = `<span style="font-size: 0.7rem; background: #dcfce7; color: #166534; padding: 2px 7px; border-radius: 9999px; font-weight: 700;" title="Vínculo confirmado no CNES desta unidade na competência consultada"><i class="fas fa-check-circle"></i> CNES Regular</span>`;
+            } else if (p.vinculoAlerta) {
+                vinculoBadge = `<span style="font-size: 0.7rem; background: #fef9c3; color: #854d0e; padding: 2px 7px; border-radius: 9999px; font-weight: 700; border: 1px solid #fde047;" title="Atenção: CNS não consta cadastrado como ativo no CNES desta unidade na competência. Risco de glosa no DATASUS."><i class="fas fa-exclamation-triangle"></i> Sem Vínculo CNES</span>`;
+            }
+
             let equipeCallout = '';
             if (p.membrosEquipe && p.membrosEquipe.length > 0) {
                 const listProfs = p.membrosEquipe.map(m => `
@@ -817,6 +1011,7 @@ window.ProducaoProfissionalModule = {
                                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                     <span style="font-weight: 800; color: #0f172a; font-size: 0.95rem;">${p.nome}</span>
                                     ${cnsBadge}
+                                    ${vinculoBadge}
                                 </div>
                                 <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
                                     <span><i class="fas fa-stethoscope"></i> ${p.cboDesc}</span>
@@ -826,11 +1021,18 @@ window.ProducaoProfissionalModule = {
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 1.5rem; margin-left: auto;">
+                        <div style="display: flex; align-items: center; gap: 1.25rem; margin-left: auto; flex-wrap: wrap;">
                             <div style="text-align: right;">
-                                <div style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-weight: 600;">Total Produzido</div>
+                                <div style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-weight: 600;">Atendimentos</div>
+                                <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a;">
+                                    ${p.totalAtendimentos.toLocaleString('pt-BR')} <span style="font-size: 0.72rem; font-weight: 600; color: #64748b;">pacientes</span>
+                                </div>
+                            </div>
+
+                            <div style="text-align: right;">
+                                <div style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; font-weight: 600;">Procedimentos</div>
                                 <div style="font-size: 1.15rem; font-weight: 800; color: #0284c7;">
-                                    ${p.totalQuantidade.toLocaleString('pt-BR')} <span style="font-size: 0.72rem; font-weight: 600; color: #64748b;">exames</span>
+                                    ${p.totalQuantidade.toLocaleString('pt-BR')} <span style="font-size: 0.72rem; font-weight: 600; color: #64748b;">produzidos</span>
                                 </div>
                             </div>
 
@@ -949,7 +1151,7 @@ window.ProducaoProfissionalModule = {
 };
 
 // Precarregamento automático de bases e dados em segundo plano
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     const autoInitProducaoProf = () => {
         if (window.ProducaoProfissionalModule) {
             window.ProducaoProfissionalModule.loadBases().then(() => {
@@ -962,4 +1164,8 @@ if (typeof window !== 'undefined') {
     } else {
         autoInitProducaoProf();
     }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = window.ProducaoProfissionalModule;
 }

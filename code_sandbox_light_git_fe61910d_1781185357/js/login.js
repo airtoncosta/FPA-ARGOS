@@ -18,7 +18,7 @@ const ARGOS_USERS = [
     {
         username: 'airton',
         email: 'airton.costa@yahoo.com.br',
-        name: 'Airton Costa',
+        name: 'AIRTON/ARGOS',
         password: ARGOS_USERS_HASHES['airton'],
         role: 'ADM'
     },
@@ -54,14 +54,6 @@ const ARGOS_USERS = [
         email: 'ewerton@fpa.gov.br',
         name: 'Ewerton',
         password: ARGOS_USERS_HASHES['ewerton'],
-        role: 'GERENTE',
-        municipio_vinculado: 'Bacabal-MA'
-    },
-    {
-        username: 'marilene',
-        email: 'marilene@fpa.gov.br',
-        name: 'Marilene',
-        password: ARGOS_USERS_HASHES['marilene'],
         role: 'GERENTE',
         municipio_vinculado: 'Bacabal-MA'
     },

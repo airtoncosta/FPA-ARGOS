@@ -10,6 +10,10 @@ const { SiasusSyncService } = require('../lib/siasus-sync-service');
 console.log('🧪 Iniciando testes de SiasusSyncService...');
 
 const testBaseDir = path.join(__dirname, 'scratch_siasus_test');
+try {
+    fs.rmSync(testBaseDir, { recursive: true, force: true });
+} catch (e) {}
+
 const service = new SiasusSyncService({
     baseDir: testBaseDir,
     retentionBdsia: 6
@@ -24,6 +28,9 @@ assert.strictEqual(bpaParsed.ordem, 500);
 
 const bpaInvalido = service.parseBpaFilename('BPAMAG.exe');
 assert.strictEqual(bpaInvalido, null, 'Arquivo sem padrão deve retornar null');
+
+const bpaFicticio = service.parseBpaFilename('BPAMAG2601.exe');
+assert.strictEqual(bpaFicticio, null, 'Arquivo fictício com ano 2026 deve ser rejeitado como null');
 console.log('  ✅ Parser de BPA validado com sucesso.');
 
 // 2. Teste de Parser de Arquivo BDSIA
@@ -84,6 +91,53 @@ assert(cat.bpa && cat.bpa.length > 0, 'Deve conter arquivos BPA');
 assert(cat.bdsia && cat.bdsia.length >= 6, 'Deve conter ao menos 6 arquivos BDSIA');
 assert(cat.resumo, 'Deve conter resumo de estado');
 console.log('  ✅ Catálogo estruturado com sucesso.');
+
+// 6. Teste de Sanitização Ativa de Catálogo Contaminado (Expurgo de Versões Fictícias como BPAMAG2601)
+console.log('  [6] Testando expurgo e sanitização ativa de versões fictícias...');
+const catalogoContaminado = {
+    ultimaSincronizacao: new Date().toISOString(),
+    statusDatasus: 'espelho',
+    origem: 'teste',
+    bpa: [
+        {
+            arquivo: 'BPAMAG2601.exe',
+            tipo: 'bpa',
+            versao: '26.01',
+            titulo: 'BPA Magnético v26.01',
+            ordem: 2601,
+            isVigente: true
+        },
+        {
+            arquivo: 'BPAMAG0500.exe',
+            tipo: 'bpa',
+            versao: '05.00',
+            titulo: 'BPA Magnético v05.00',
+            ordem: 500,
+            isVigente: false
+        }
+    ],
+    bdsia: [
+        {
+            arquivo: 'BDSIA202608a.exe',
+            tipo: 'bdsia',
+            ordem: 20260800,
+            competencia: 'Agosto/2026 (rev. a)'
+        }
+    ]
+};
+
+// Grava catálogo contaminado no disco do ambiente de teste
+fs.writeFileSync(service.catalogoPath, JSON.stringify(catalogoContaminado, null, 2), 'utf8');
+
+// Chama getCatalogo e verifica se BPAMAG2601.exe foi purgado e BPAMAG0500.exe reassumiu vigência
+const catHigienizado = service.getCatalogo();
+const arquivosBpa = catHigienizado.bpa.map(b => b.arquivo);
+assert(!arquivosBpa.includes('BPAMAG2601.exe'), 'BPAMAG2601.exe DEVE ser purgado do catálogo');
+assert(arquivosBpa.includes('BPAMAG0500.exe'), 'BPAMAG0500.exe deve ser mantido');
+assert.strictEqual(catHigienizado.bpa[0].arquivo, 'BPAMAG0500.exe', 'BPAMAG0500.exe deve ser a versão vigente');
+assert.strictEqual(catHigienizado.bpa[0].isVigente, true, 'BPAMAG0500.exe deve estar marcada como vigente');
+assert.strictEqual(catHigienizado.resumo.versaoVigenteBpa, 'BPAMAG0500.exe', 'Resumo deve apontar para BPAMAG0500.exe');
+console.log('  ✅ Expurgo e sanitização de versões fictícias validados com sucesso.');
 
 // Limpeza de diretório temporário de testes
 try {

@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const publicJs = path.join(__dirname, '..', 'code_sandbox_light_git_fe61910d_1781185357', 'js');
 const moduleSource = fs.readFileSync(path.join(publicJs, 'cnes-module.js'), 'utf8');
 const diffSource = fs.readFileSync(path.join(publicJs, 'cnes-diff-engine.js'), 'utf8');
+const p134Source = fs.readFileSync(path.join(publicJs, 'cnes-portaria134-bacabal.js'), 'utf8');
 
 function loadModule(responses) {
     const view = { innerHTML: '' };
@@ -25,6 +26,7 @@ function loadModule(responses) {
             return payload ? { ok: true, json: async () => payload } : { ok: false, status: 404 };
         }
     };
+    vm.runInNewContext(p134Source, context);
     vm.runInNewContext(diffSource, context);
     vm.runInNewContext(moduleSource, context);
     return { module: context.window.CnesModule, view, requested, context };
@@ -141,7 +143,7 @@ test('mapeia código PF conhecido e não inventa contratação ausente', () => {
     );
 });
 
-test('toggleEfetivos filtra profissionais estatutários efetivos e empregados públicos celetistas na tabela', async () => {
+test('toggleEfetivos filtra profissionais estatutários efetivos e empregados públicos celetistas juntos na tabela', async () => {
     const competencies = [{ codigo: '202608', label: '08/2026' }];
     const payload = published('202608', 30, competencies);
     payload.estabelecimentos[0].cnes = '2458004'; // mantida
@@ -159,7 +161,7 @@ test('toggleEfetivos filtra profissionais estatutários efetivos e empregados p�
     assert.match(view.innerHTML, /MARIA CONTRATADA/);
     assert.match(view.innerHTML, /JOAO EMPREGADO PUBLICO/);
 
-    // Ativa filtro de efetivos / celetistas públicos
+    // Ativa filtro de efetivos: estatutários e empregados públicos celetistas juntos
     module.toggleEfetivos();
     assert.match(view.innerHTML, /CARLOS EFETIVO/);
     assert.match(view.innerHTML, /JOAO EMPREGADO PUBLICO/);
@@ -233,6 +235,7 @@ test('Auditoria de movimentações exibe opção de exportar em PDF com categori
             rect() {}
             line() {}
             setPage() {}
+            addPage() {}
             setFont() {}
             setFontSize() {}
             setTextColor() {}
@@ -254,4 +257,76 @@ test('Auditoria de movimentações exibe opção de exportar em PDF com categori
 
     assert.ok(true);
 });
+
+test('toggleAlerta134 filtra estritamente profissionais com apontamento oficial da Portaria 134 (Artigo 2º)', async () => {
+    const competencies = [{ codigo: '202608', label: '08/2026' }];
+    const payload = published('202608', 40, competencies);
+    payload.coverage = { pf: true, st: true };
+    payload.estabelecimentos = [
+        {
+            cnes: '2458004',
+            nomeFantasia: 'HOSPITAL MUNICIPAL',
+            tipoGestao: 'MUNICIPAL',
+            esfera: 'MUNICIPAL',
+            dependencia: 'MANTIDA',
+            profissionais: [
+                { cns: '700000000000001', nome: 'MEDICO REGULAR', chTotal: 40, chAmb: 40 },
+                { cns: '700000000000002', nome: 'MEDICO COM SOBREPOSICAO SEM ALERTA OFICIAL', chTotal: 40, chAmb: 40 },
+                { cns: '700000000000003', nome: 'MEDICO OFICIAL ARTIGO 2', chTotal: 40, chAmb: 40, portaria134: 'Artigo 2º', portaria134Fonte: 'CNES_OFICIAL' }
+            ]
+        },
+        {
+            cnes: '2458005',
+            nomeFantasia: 'UBS CENTRAL',
+            tipoGestao: 'MUNICIPAL',
+            esfera: 'MUNICIPAL',
+            dependencia: 'MANTIDA',
+            profissionais: [
+                { cns: '700000000000002', nome: 'MEDICO COM SOBREPOSICAO SEM ALERTA OFICIAL', chTotal: 30, chAmb: 30 }
+            ]
+        }
+    ];
+
+    const { module, view } = loadModule({ active: payload });
+    await module.carregarDados();
+    module.abrirModuloProfissionais(null);
+
+    // Inicialmente todos aparecem
+    assert.match(view.innerHTML, /MEDICO REGULAR/);
+    assert.match(view.innerHTML, /MEDICO COM SOBREPOSICAO SEM ALERTA OFICIAL/);
+    assert.match(view.innerHTML, /MEDICO OFICIAL ARTIGO 2/);
+
+    // Ativa filtro Portaria 134 oficial
+    module.toggleAlerta134();
+
+    // Apenas MEDICO OFICIAL ARTIGO 2 deve aparecer
+    assert.match(view.innerHTML, /MEDICO OFICIAL ARTIGO 2/);
+    assert.doesNotMatch(view.innerHTML, /MEDICO COM SOBREPOSICAO SEM ALERTA OFICIAL/);
+    assert.doesNotMatch(view.innerHTML, /MEDICO REGULAR/);
+    assert.match(view.innerHTML, /Exibindo Portaria 134/);
+});
+
+test('resolve Portaria 134 oficial a partir do mapa DATASUS mesmo sem flag direta no snapshot', async () => {
+    const competencies = [{ codigo: '202608', label: '08/2026' }];
+    const payload = published('202608', 24, competencies);
+    payload.estabelecimentos = [
+        {
+            cnes: '2458055',
+            nomeFantasia: 'HOSPITAL MARIA SOCORRO BRANDAO',
+            profissionais: [
+                { cns: '702008307202087', nome: 'PEDRO HENRIQUE ALENCAR MALAQUIAS', cbo: '225125', chTotal: 24 }
+            ]
+        }
+    ];
+
+    const { module, view } = loadModule({ active: payload });
+    await module.carregarDados();
+    module.abrirModuloProfissionais(null);
+
+    // O profissional é resolvido com Artigo 2º pelo mapa oficial
+    assert.match(view.innerHTML, /PEDRO HENRIQUE ALENCAR MALAQUIAS/);
+    assert.match(view.innerHTML, /Artigo 2/);
+    assert.match(view.innerHTML, /Auditoria Portaria 134 \(1\)/);
+});
+
 

@@ -24,6 +24,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- SheetJS for Excel export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- ExcelJS for Styled Corporate Excel Export -->
+    <script src="vendor/exceljs.min.js"></script>
     <!-- jsPDF for PDF export -->
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.6.0/dist/jspdf.plugin.autotable.min.js"></script>
@@ -126,7 +128,7 @@
                 <i class="fas fa-book-medical"></i><span>SIGTAP</span>
             </li>
             <li class="nav-item" data-section="cbo">
-                <i class="fas fa-user-md"></i><span>Profissionais</span>
+                <i class="fas fa-users"></i><span>Produtividade CBO</span>
             </li>
             <li class="nav-item" data-section="glosas">
                 <i class="fas fa-exclamation-triangle"></i><span>Glosas</span>
@@ -144,7 +146,7 @@
                 <i class="fas fa-file-medical-alt"></i><span>Produções BPA</span>
             </li>
             <li class="nav-item" data-section="producao-profissional-cns">
-                <i class="fas fa-user-md"></i><span>Produção Profissional CNS</span>
+                <i class="fas fa-id-card-alt"></i><span>Espelho de Produção</span>
             </li>
             <li class="nav-item" data-section="cnes">
                 <i class="fas fa-hospital-user"></i><span>CNES & Vínculos</span>
@@ -1246,10 +1248,10 @@
             </div>
         </section>
 
-        <!-- ======================== SEÇÃO CBO (PROFISSÕES) ======================== -->
+        <!-- ======================== SEÇÃO PRODUTIVIDADE CBO ======================== -->
         <section id="section-cbo" class="content-section">
             <div class="section-header">
-                <h2><i class="fas fa-user-md"></i> Ocupações e Profissões (CBO)</h2>
+                <h2><i class="fas fa-users"></i> Produtividade CBO (Ocupações e Profissões)</h2>
             </div>
             <div class="table-container">
                 <div class="table-header-bar">
@@ -1818,6 +1820,9 @@
                     <button class="btn-secondary" id="btnGerenciarResponsaveisBpa" style="display: none; border-color: rgba(56, 189, 248, 0.4); color: #0284c7;" title="Definir os digitadores responsáveis por cada unidade (Exclusivo ADM e Francileide)">
                         <i class="fas fa-users-cog"></i> Atribuir Responsáveis
                     </button>
+                    <button class="btn-secondary" id="btnHigienizarDadosBpa" style="display: none; border-color: rgba(239, 68, 68, 0.4); color: #ef4444;" title="Higienização: zerar produções e atribuições para reenviar do zero (Exclusivo ADM e Francileide)">
+                        <i class="fas fa-broom"></i> Zerar Dados & Produções
+                    </button>
                 </div>
             </div>
 
@@ -1964,13 +1969,13 @@
             </div>
         </section>
 
-        <!-- ======================== SEÇÃO PRODUÇÃO PROFISSIONAL CNS ======================== -->
+        <!-- ======================== SEÇÃO ESPELHO DE PRODUÇÃO ======================== -->
         <section id="section-producao-profissional-cns" class="content-section">
             <div class="section-header" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem;">
                 <div>
                     <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem;">
                         <h2 style="font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0;">
-                            <i class="fas fa-user-md" style="color: #0284c7;"></i> Produção Profissional CNS
+                            <i class="fas fa-id-card-alt" style="color: #0284c7;"></i> Espelho de Produção
                         </h2>
                         <span class="section-badge" style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Auditoria SUS & Produtividade</span>
                     </div>
@@ -2038,7 +2043,7 @@
             </div>
 
             <!-- KPIS EXECUTIVOS -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="bpa-card" style="background: #ffffff; border-radius: 0.75rem; padding: 1.25rem; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 1rem;">
                     <div style="width: 48px; height: 48px; border-radius: 12px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
                         <i class="fas fa-user-md"></i>
@@ -2051,13 +2056,24 @@
                 </div>
 
                 <div class="bpa-card" style="background: #ffffff; border-radius: 0.75rem; padding: 1.25rem; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: #dbeafe; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase;">Atendimentos Clínicos</div>
+                        <div id="kpiProfTotalAtendimentos" style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">0</div>
+                        <div style="font-size: 0.72rem; color: #2563eb;">pacientes atendidos</div>
+                    </div>
+                </div>
+
+                <div class="bpa-card" style="background: #ffffff; border-radius: 0.75rem; padding: 1.25rem; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 1rem;">
                     <div style="width: 48px; height: 48px; border-radius: 12px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
                         <i class="fas fa-stethoscope"></i>
                     </div>
                     <div>
-                        <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase;">Total de Atendimentos</div>
+                        <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase;">Procedimentos Totais</div>
                         <div id="kpiProfTotalProcedimentos" style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">0</div>
-                        <div style="font-size: 0.72rem; color: #16a34a;">procedimentos executados</div>
+                        <div style="font-size: 0.72rem; color: #16a34a;">volume faturado SUS</div>
                     </div>
                 </div>
 
@@ -2068,7 +2084,7 @@
                     <div>
                         <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase;">Média por Profissional</div>
                         <div id="kpiProfMediaPorProf" style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">0</div>
-                        <div style="font-size: 0.72rem; color: #d97706;">atendimentos / médico</div>
+                        <div style="font-size: 0.72rem; color: #d97706;">procedimentos / médico</div>
                     </div>
                 </div>
 
@@ -2160,115 +2176,150 @@
 
     <!-- ===== MODAL DE UPLOAD DE PRODUÇÃO BPA ===== -->
     <div id="modalUploadBpa" class="modal-overlay hidden">
-        <div class="modal-box modal-medium" style="max-width: 38rem;">
-            <div class="modal-header" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem; border-radius: 1.1rem 1.1rem 0 0;">
-                <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.15rem;">
-                    <i class="fas fa-file-upload"></i> Enviar Produção BPA
-                </h3>
-                <button class="modal-close" id="btnCloseModalUploadBpa" style="background: none; border: none; color: rgba(255,255,255,0.85); cursor: pointer; font-size: 1.2rem;">
+        <div class="modal-box bpa-modal-landscape">
+            <div class="modal-header" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.4rem; border-radius: 1rem 1rem 0 0;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: #fff;">
+                        <i class="fas fa-file-upload"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.12rem; font-weight: 700; color: #fff; letter-spacing: -0.01em;">Enviar Produção BPA</h3>
+                        <span style="font-size: 0.75rem; color: rgba(255,255,255,0.88); font-weight: 400;">Auditoria automatizada, validação de vínculos CNES e alimentação do Espelho de Produção</span>
+                    </div>
+                </div>
+                <button class="modal-close" id="btnCloseModalUploadBpa" style="background: rgba(255,255,255,0.15); border: none; color: #fff; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1rem; transition: background 0.15s ease;">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="modal-body" style="padding: 1.5rem;">
-                <!-- DROPZONE -->
-                <div class="bpa-dropzone" id="bpaDropzone">
-                    <input type="file" id="bpaFileInput" style="display: none;" accept=".txt,.jan,.fev,.mar,.abr,.mai,.jun,.jul,.ago,.set,.out,.nov,.dez">
-                    <div id="bpaDropPrompt">
-                        <i class="fas fa-cloud-upload-alt bpa-drop-icon"></i>
-                        <h4>Arraste e solte o arquivo de produção aqui</h4>
-                        <p>Padrão DATASUS (ex: <code>PATOMO7-.JUL</code>, <code>PAHMSO07-.JUL</code>, etc.)</p>
-                        <button type="button" class="btn-select-file">Procurar no Computador</button>
-                    </div>
+            <div class="modal-body bpa-modal-body">
+                <div class="bpa-modal-landscape-grid">
+                    <!-- COLUNA ESQUERDA: INSPEÇÃO & RAIO-X DO ARQUIVO -->
+                    <div class="bpa-modal-col-inspect">
+                        <!-- DROPZONE -->
+                        <div class="bpa-dropzone" id="bpaDropzone">
+                            <input type="file" id="bpaFileInput" style="display: none;" accept=".txt,.jan,.fev,.mar,.abr,.mai,.jun,.jul,.ago,.set,.out,.nov,.dez">
+                            <div id="bpaDropPrompt">
+                                <i class="fas fa-cloud-upload-alt bpa-drop-icon"></i>
+                                <h4>Arraste e solte o arquivo de produção aqui</h4>
+                                <p>Padrão DATASUS (ex: <code>PATOMO7-.JUL</code>, <code>PAHMSO07-.JUL</code>, etc.)</p>
+                                <button type="button" class="btn-select-file">Procurar no Computador</button>
+                            </div>
 
-                    <!-- CARD DO ARQUIVO RECONHECIDO (RAIO-X DETALHADO) -->
-                    <div id="bpaFileInfoCard" style="display: none;" class="bpa-file-detected-card">
-                        <div class="bpa-detected-top">
-                            <i class="fas fa-file-code" id="bpaDetectedIcon"></i>
-                            <div class="bpa-detected-details">
-                                <strong id="inputBpaFileName">PATOMO7-.JUL</strong>
-                                <div>
-                                    <span id="inputBpaFileSize">124K</span> · 
-                                    <span id="inputBpaLinesCount">0 linhas</span> ·
-                                    <span id="inputBpaProcedimentosCount" style="color: #0284c7; font-weight: 700;">0 atendimentos</span> ·
-                                    <span id="inputBpaValorTotal" style="color: #16a34a; font-weight: 700;">R$ 0,00 (SIGTAP)</span>
+                            <!-- CARD DO ARQUIVO RECONHECIDO (RAIO-X DETALHADO) -->
+                            <div id="bpaFileInfoCard" style="display: none;" class="bpa-file-detected-card">
+                                <div class="bpa-detected-top">
+                                    <div class="bpa-file-icon-wrap">
+                                        <i class="fas fa-file-code" id="bpaDetectedIcon"></i>
+                                    </div>
+                                    <div class="bpa-detected-details">
+                                        <div class="bpa-file-name-title" id="inputBpaFileName">PATOMO7-.JUL</div>
+                                        <div class="bpa-file-badges-row">
+                                            <span class="bpa-mini-chip" id="inputBpaFileSize"><i class="fas fa-hdd"></i> 124K</span>
+                                            <span class="bpa-mini-chip" id="inputBpaLinesCount"><i class="fas fa-align-left"></i> 0 linhas</span>
+                                            <span class="bpa-mini-chip primary" id="inputBpaProcedimentosCount"><i class="fas fa-clipboard-check"></i> 0 atendimentos</span>
+                                            <span class="bpa-mini-chip success" id="inputBpaValorTotal"><i class="fas fa-coins"></i> R$ 0,00 (SIGTAP)</span>
+                                        </div>
+                                    </div>
+                                    <div class="bpa-detected-status">
+                                        <span class="bpa-detected-badge" id="badgeDetectedTipo"><i class="fas fa-check-circle"></i> BPA-C</span>
+                                        <span style="font-size: 0.72rem; color: #10b981; font-weight: 600; white-space: nowrap;"><i class="fas fa-file-invoice"></i> Leitura Completa</span>
+                                        <button type="button" id="btnTrocarArquivoBpa" class="bpa-btn-trocar-arquivo">
+                                            <i class="fas fa-sync-alt"></i> Substituir Arquivo
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Detalhes da Leitura e Amostra de Procedimentos -->
+                                <div id="bpaRaioXContent" class="bpa-raiox-box">
+                                    <div id="bpaTipoExplicacao" class="bpa-tipo-alerta"></div>
+                                    <div id="bpaProcedimentosAmostra"></div>
+                                    <div id="bpaProfissionaisAmostra" class="bpa-profissionais-scroll-box" style="display: none;"></div>
+                                </div>
+
+                                <!-- Botão de Ação Imediata da Malha Fina -->
+                                <div style="margin-top: 0.75rem;">
+                                    <button type="button" onclick="window.MalhaFinaEngine.executar(BpaModule.filePendingUpload)" style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #818cf8; color: #c7d2fe; font-weight: 700; width: 100%; padding: 0.65rem; border-radius: 0.55rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(49, 46, 129, 0.35); transition: all 0.2s ease;">
+                                        <i class="fas fa-shield-alt" style="color: #a5b4fc;"></i> Auditar Agora com a Malha Fina Anti-Glosa
+                                    </button>
                                 </div>
                             </div>
-                            <div style="margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
-                                <span class="bpa-detected-badge" id="badgeDetectedTipo"><i class="fas fa-check-circle"></i> BPA-C</span>
-                                <span style="font-size: 0.72rem; color: #10b981; font-weight: 600;"><i class="fas fa-file-invoice"></i> Leitura Completa</span>
+                        </div>
+                    </div>
+
+                    <!-- COLUNA DIREITA: PARÂMETROS DE ENVIO -->
+                    <div class="bpa-modal-col-form">
+                        <div class="bpa-form-panel-header">
+                            <div class="bpa-form-panel-title">
+                                <i class="fas fa-sliders-h" style="color: #0284c7;"></i>
+                                <span>Parâmetros do Envio</span>
+                            </div>
+                            <span style="font-size: 0.72rem; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; padding: 2px 8px; border-radius: 9999px; font-weight: 500;">
+                                <i class="fas fa-shield-alt" style="color: #10b981;"></i> Validação Automática
+                            </span>
+                        </div>
+
+                        <!-- Estabelecimento de Saúde -->
+                        <div class="bpa-field-group">
+                            <label class="bpa-field-label" for="inputBpaEstabelecimento">
+                                <i class="fas fa-hospital" style="color: #0284c7;"></i> Estabelecimento de Saúde:
+                            </label>
+                            <input type="text" id="inputBpaEstabelecimento" list="datalistUnidadesBpa" class="bpa-input" placeholder="Selecione a unidade da produção...">
+                            <datalist id="datalistUnidadesBpa"></datalist>
+                            <span class="bpa-input-help"><i class="fas fa-info-circle"></i> O CNES do arquivo será conferido com a unidade antes da gravação final.</span>
+                        </div>
+
+                        <!-- Competência & Tipo -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem;">
+                            <div class="bpa-field-group">
+                                <label class="bpa-field-label" for="inputBpaCompetencia">
+                                    <i class="fas fa-calendar-alt" style="color: #0284c7;"></i> Competência (Mês/Ano):
+                                </label>
+                                <input type="text" id="inputBpaCompetencia" class="bpa-input" placeholder="07/2026">
+                            </div>
+                            <div class="bpa-field-group">
+                                <label class="bpa-field-label" for="selectBpaTipo">
+                                    <i class="fas fa-tag" style="color: #0284c7;"></i> Tipo de Produção:
+                                </label>
+                                <select id="selectBpaTipo" class="bpa-input">
+                                    <option value="AMBOS">BPA-C + BPA-I (arquivo misto)</option>
+                                    <option value="BPA-C">BPA-C (Consolidado)</option>
+                                    <option value="BPA-I">BPA-I (Individualizado)</option>
+                                </select>
                             </div>
                         </div>
 
-                        <!-- Detalhes da Leitura e Amostra de Procedimentos -->
-                        <div id="bpaRaioXContent" class="bpa-raiox-box" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1; font-size: 0.8rem; text-align: left;">
-                            <div id="bpaTipoExplicacao" style="font-weight: 600; color: #1e293b; margin-bottom: 0.4rem;"></div>
-                            <div id="bpaProcedimentosAmostra" style="color: #475569; line-height: 1.4;"></div>
-                            <div id="bpaProfissionaisAmostra" style="margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dotted #cbd5e1; font-size: 0.78rem; display: none;"></div>
-                        </div>
-
-                        <!-- Botão de Ação Imediata da Malha Fina -->
-                        <div style="margin-top: 0.75rem;">
-                            <button type="button" onclick="window.MalhaFinaEngine.executar(BpaModule.filePendingUpload)" style="background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #818cf8; color: #c7d2fe; font-weight: 700; width: 100%; padding: 0.6rem; border-radius: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(49, 46, 129, 0.3); transition: all 0.2s ease;">
-                                <i class="fas fa-shield-alt" style="color: #818cf8;"></i> Auditar Agora com a Malha Fina Anti-Glosa
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- FORMULÁRIO DE CONFIRMAÇÃO AUTO-PREENCHIDO -->
-                <div class="bpa-upload-form" style="margin-top: 1.2rem;">
-                    <div style="margin-bottom: 1rem;">
-                        <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem; color: #334155;">
-                            <i class="fas fa-hospital"></i> Estabelecimento de Saúde:
-                        </label>
-                        <input type="text" id="inputBpaEstabelecimento" list="datalistUnidadesBpa" class="bpa-input" placeholder="Selecione a unidade da produção...">
-                        <datalist id="datalistUnidadesBpa"></datalist>
-                        <span class="bpa-input-help"><i class="fas fa-info-circle"></i> Selecione uma das suas unidades. O CNES do arquivo será conferido antes do envio.</span>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                        <div>
-                            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem; color: #334155;">
-                                <i class="fas fa-calendar-alt"></i> Competência (Mês/Ano):
+                        <!-- Observações -->
+                        <div class="bpa-field-group">
+                            <label class="bpa-field-label" for="inputBpaObservacoes">
+                                <i class="fas fa-comment-alt" style="color: #0284c7;"></i> Observações da Produção (Opcional):
                             </label>
-                            <input type="text" id="inputBpaCompetencia" class="bpa-input" placeholder="07/2026">
+                            <textarea id="inputBpaObservacoes" class="bpa-input" rows="2" placeholder="Ex: Produção validada no BPA Mag sem erros..."></textarea>
                         </div>
-                        <div>
-                            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem; color: #334155;">
-                                <i class="fas fa-tag"></i> Tipo de Produção (Auto-detectado):
+
+                        <!-- Checkbox de e-mail -->
+                        <div class="bpa-email-box">
+                            <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; margin: 0; font-size: 0.84rem; font-weight: 600; color: #166534;">
+                                <input type="checkbox" id="checkEnviarEmailAposUpload" checked style="width: 17px; height: 17px; accent-color: #16a34a; cursor: pointer;">
+                                <span><i class="fas fa-paper-plane" style="color: #16a34a;"></i> Preparar envio por e-mail com anexo para auditoriabacabal@gmail.com</span>
                             </label>
-                            <select id="selectBpaTipo" class="bpa-input">
-                                <option value="AMBOS">BPA-C + BPA-I (arquivo misto)</option>
-                                <option value="BPA-C">BPA-C (Consolidado)</option>
-                                <option value="BPA-I">BPA-I (Individualizado)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem; color: #334155;">
-                            <i class="fas fa-comment-alt"></i> Observações da Produção (Opcional):
-                        </label>
-                        <textarea id="inputBpaObservacoes" class="bpa-input" rows="2" placeholder="Ex: Produção validada no BPA Mag sem erros..."></textarea>
-                    </div>
-
-                    <!-- OPÇÃO DE ENVIO AUTOMÁTICO DE E-MAIL COM ANEXO -->
-                    <div style="margin-top: 1rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 0.5rem; padding: 0.75rem 1rem;">
-                        <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; margin: 0; font-size: 0.86rem; font-weight: 600; color: #166534;">
-                            <input type="checkbox" id="checkEnviarEmailAposUpload" checked style="width: 17px; height: 17px; accent-color: #16a34a;">
-                            <span><i class="fas fa-paper-plane" style="color: #16a34a;"></i> Preparar envio por e-mail com anexo para auditoriabacabal@gmail.com</span>
-                        </label>
-                        <div style="font-size: 0.75rem; color: #15803d; margin-top: 0.25rem; margin-left: 1.7rem;">
-                            Ao salvar a produção, abre imediatamente o despachante com o arquivo anexo pronto para a auditoria.
+                            <div style="font-size: 0.74rem; color: #15803d; margin-top: 0.25rem; margin-left: 1.7rem;">
+                                Ao salvar a produção, abre imediatamente o despachante com o arquivo anexo pronto para a auditoria.
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer" style="padding: 1rem 1.5rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.75rem; border-radius: 0 0 1.1rem 1.1rem;">
-                <button type="button" class="btn-secondary" id="btnCancelUploadBpa">Cancelar</button>
-                <button type="button" class="btn-primary" id="btnConfirmarUploadBpa" disabled>
-                    <i class="fas fa-check"></i> Confirmar e Enviar Produção
-                </button>
+            <div class="modal-footer" style="padding: 0.9rem 1.5rem; background: #ffffff; border-top: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; border-radius: 0 0 1rem 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; color: #64748b; font-size: 0.78rem;">
+                    <i class="fas fa-info-circle" style="color: #0284c7;"></i>
+                    <span>Alimenta automaticamente o <strong>Espelho de Produção</strong> e os relatórios de produtividade.</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <button type="button" class="btn-secondary" id="btnCancelUploadBpa">Cancelar</button>
+                    <button type="button" class="btn-primary" id="btnConfirmarUploadBpa" disabled>
+                        <i class="fas fa-check"></i> Confirmar e Enviar Produção
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2304,11 +2355,16 @@
                     </table>
                 </div>
             </div>
-            <div class="modal-footer" style="padding: 1rem 1.4rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.75rem; border-radius: 0 0 1.1rem 1.1rem;">
-                <button type="button" class="btn-secondary" id="btnCancelResponsaveisBpa">Cancelar</button>
-                <button type="button" class="btn-primary" id="btnSalvarResponsaveisBpa">
-                    <i class="fas fa-save"></i> Salvar Atribuições
+            <div class="modal-footer" style="padding: 1rem 1.4rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; border-radius: 0 0 1.1rem 1.1rem;">
+                <button type="button" class="btn-secondary" id="btnZerarAtribuicoesBpa" style="color: #dc2626; border-color: #fca5a5;" title="Deixar todas as 21 unidades como Não Atribuído">
+                    <i class="fas fa-trash-alt"></i> Deixar Todas Zeradas
                 </button>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" class="btn-secondary" id="btnCancelResponsaveisBpa">Cancelar</button>
+                    <button type="button" class="btn-primary" id="btnSalvarResponsaveisBpa">
+                        <i class="fas fa-save"></i> Salvar Atribuições
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2815,6 +2871,7 @@
     <script src="js/cnes-metadata-bacabal.js"></script>
     <script src="js/cnes-dt-atribuicao-bacabal.js"></script>
     <script src="js/cnes-vinculos-bacabal.js"></script>
+    <script src="js/cnes-portaria134-bacabal.js"></script>
     <script src="js/cnes-diff-engine.js"></script>
     <script src="js/cnes-module.js"></script>
     <script src="js/bpa-audit-core.js"></script>

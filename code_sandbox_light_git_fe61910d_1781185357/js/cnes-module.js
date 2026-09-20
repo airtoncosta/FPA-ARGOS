@@ -162,12 +162,21 @@ window.CnesModule = (function () {
         const onSuccess = () => {
             if (btnEl) {
                 btnEl.classList.add('cnes-copied');
+                const valSpan = btnEl.querySelector('.cnes-cns-val, span');
                 const icon = btnEl.querySelector('i');
+                const oldText = valSpan ? valSpan.textContent : cleanCnes;
+                if (valSpan) valSpan.textContent = 'Copiado!';
                 if (icon) {
                     const oldClass = icon.className;
                     icon.className = 'fas fa-check';
                     setTimeout(() => {
-                        icon.className = oldClass;
+                        if (valSpan) valSpan.textContent = oldText;
+                        if (icon) icon.className = oldClass;
+                        btnEl.classList.remove('cnes-copied');
+                    }, 1500);
+                } else {
+                    setTimeout(() => {
+                        if (valSpan) valSpan.textContent = oldText;
                         btnEl.classList.remove('cnes-copied');
                     }, 1500);
                 }
@@ -333,6 +342,43 @@ window.CnesModule = (function () {
             || null;
     }
 
+    let mapaPortaria134Local = null;
+
+    async function carregarMapaPortaria134Oficial() {
+        if (mapaPortaria134Local) return mapaPortaria134Local;
+        if (typeof window !== 'undefined' && window.DATASUS_PORTARIA134_BACABAL) {
+            mapaPortaria134Local = window.DATASUS_PORTARIA134_BACABAL;
+            return mapaPortaria134Local;
+        }
+        try {
+            const resp = await fetch('/cnes_data/datasus_portaria134.json');
+            if (resp.ok) {
+                mapaPortaria134Local = await resp.json();
+                if (typeof window !== 'undefined') window.DATASUS_PORTARIA134_BACABAL = mapaPortaria134Local;
+                return mapaPortaria134Local;
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function resolverPortaria134Oficial(cnes, cns, nome, cbo) {
+        const map = mapaPortaria134Local || (typeof window !== 'undefined' && window.DATASUS_PORTARIA134_BACABAL) || null;
+        if (!map) return null;
+        const cnesStr = String(cnes || '').trim();
+        const cnsClean = String(cns || '').replace(/\D/g, '');
+        const cboClean = String(cbo || '').split(' ')[0].replace(/\D/g, '');
+        const nomeClean = String(nome || '').toUpperCase().replace(/\s+/g, ' ').trim();
+
+        return (cnesStr && cnsClean && cboClean && map[`${cnesStr}_${cnsClean}_${cboClean}`])
+            || (cnesStr && cnsClean && map[`${cnesStr}_${cnsClean}`])
+            || (cnesStr && nomeClean && cboClean && map[`${cnesStr}_${nomeClean}_${cboClean}`])
+            || (cnesStr && nomeClean && map[`${cnesStr}_${nomeClean}`])
+            || (cnsClean && cboClean && (map[`cns_${cnsClean}_${cboClean}`] || map[`${cnsClean}_${cboClean}`]))
+            || (cnsClean && (map[`cns_${cnsClean}`] || map[cnsClean]))
+            || (nomeClean && (map[`nome_${nomeClean}`] || map[nomeClean]))
+            || null;
+    }
+
     function formatarTipoVinculo(p) {
         if (!p) return '-';
 
@@ -406,6 +452,22 @@ window.CnesModule = (function () {
         let s = String(ocupacao).trim();
         s = s.replace(/^\d+[\s\-_]*/, '');
         return s ? s.toUpperCase() : '';
+    }
+
+    function isProfissionalEfetivo(p) {
+        if (!p) return false;
+        const tipo = String(formatarTipoVinculo(p) || p.tipoVinculo || p.vinculacao || '').toUpperCase().trim();
+        const codigo = String(p.codigoVinculacao || p.codigo_vinculacao || p.codigoVinculo || p.codigo_vinculo || '').trim();
+        const isEstatutario = tipo === 'ESTATUTARIO EFETIVO' || 
+               tipo === 'ESTATUTÁRIO EFETIVO' || 
+               (tipo.includes('ESTATUT') && !tipo.includes('TEMPORAR') && !tipo.includes('COMISSION')) ||
+               codigo === '010101' ||
+               codigo === '01';
+        const isEmpregadoPublico = tipo.includes('EMPREGADO PUBLICO') ||
+               tipo.includes('EMPREGADO PÚBLICO') ||
+               codigo === '020101' ||
+               codigo === '02';
+        return isEstatutario || isEmpregadoPublico;
     }
 
     let mapaDtAtribuicaoLocal = null;
@@ -496,6 +558,7 @@ window.CnesModule = (function () {
         if (!coverage || typeof coverage !== 'object') return false;
         return coverage.completa === true || coverage.complete === true ||
             coverage.profissionaisCompleto === true || coverage.allProfessionals === true ||
+            coverage.pf === true ||
             String(coverage.status || '').toUpperCase() === 'COMPLETE';
     }
 
@@ -517,16 +580,24 @@ window.CnesModule = (function () {
         const chItem = Number(p.chTotal || ((p.chAmb || 0) + (p.chHosp || 0) + (p.chOutros || 0))) || 0;
         const horasRede = mapaHoras && mapaHoras.has(key) ? Number(mapaHoras.get(key)) || 0 : chItem;
         const qtdVinculos = mapaVinculos && mapaVinculos.has(key) ? Number(mapaVinculos.get(key)) || 0 : 1;
-        const p134Str = String(p.portaria134 || '').trim();
-        const fonte = String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase();
+        let p134Str = String(p.portaria134 || '').trim();
+        let fonte = String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase();
+        if (!p134Str || p134Str === '-' || p134Str.toLowerCase() === 'null') {
+            const oficialP134 = resolverPortaria134Oficial(p.cnes, p.cnsMaster || p.cns, p.nome, p.cbo);
+            if (oficialP134 && oficialP134.portaria134) {
+                p134Str = oficialP134.portaria134;
+                fonte = oficialP134.portaria134Fonte || 'CNES_OFICIAL';
+            }
+        }
         const temFlagOficial = (fonte === 'CNES_OFICIAL' || p134Str.includes('Artigo')) &&
             p134Str.length > 0 && p134Str !== '-' && p134Str.toLowerCase() !== 'null' &&
             !p134Str.toUpperCase().includes('SOBREPOSIÇÃO');
         const artigoOficial = temFlagOficial ? (p134Str.includes('Artigo') ? p134Str : `Artigo 2º (${p134Str})`) : '';
         const coberturaCompleta = options.coberturaCompleta === true ||
             coberturaPortaria134Completa(options.coverage) ||
+            coberturaPortaria134Completa(state.coverage) ||
             (mapaHoras && mapaHoras.coberturaCompleta === true);
-        const temExcessoTriagem = Boolean(coberturaCompleta && qtdVinculos > 1 && horasRede > 60);
+        const temExcessoTriagem = Boolean(coberturaCompleta && (horasRede > 60 || (qtdVinculos > 1 && horasRede > 44)));
 
         const oficial = {
             alerta: temFlagOficial,
@@ -536,7 +607,7 @@ window.CnesModule = (function () {
         };
         const triagem = {
             alerta: temExcessoTriagem,
-            motivo: temExcessoTriagem ? 'Carga horária municipal superior a 60h; requer conferência oficial' : '',
+            motivo: temExcessoTriagem ? `Carga horária acumulada na rede superior a 60h (${horasRede}h em ${qtdVinculos} vínculo(s)); requer conferência oficial` : '',
             proveniencia: temExcessoTriagem ? 'ARGOS_TRIAGEM' : '',
             horasRede,
             qtdVinculos
@@ -575,9 +646,7 @@ window.CnesModule = (function () {
             oficial,
             triagem,
             html: '',
-            triagemHtml: triagem.alerta
-                ? `<span class="cnes-p134-triage" title="${triagem.motivo}">Triagem ARGOS: CH &gt;60h</span>`
-                : ''
+            triagemHtml: triagem.alerta ? `<span class="cnes-p134-triage" title="${triagem.motivo}">Triagem ARGOS: CH &gt;60h (${horasRede}h)</span>` : ''
         };
     }
 
@@ -750,8 +819,9 @@ window.CnesModule = (function () {
         const chOutros = Number(p.chOutros || p.carga_horaria_outros || 0);
         const chTotal = Number(p.chTotal || p.carga_horaria_total || (chAmb + chHosp + chOutros) || (allowSynthetic ? 40 : 0));
 
-        const portaria134 = String(p.portaria134 || '').trim();
-        const portaria134Fonte = portaria134 ? 'CNES_OFICIAL' : String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase();
+        const oficialP134 = resolverPortaria134Oficial(cnes, cns, nome, cbo);
+        const portaria134 = (oficialP134 && oficialP134.portaria134) || String(p.portaria134 || '').trim();
+        const portaria134Fonte = (oficialP134 && oficialP134.portaria134Fonte) || (portaria134 ? 'CNES_OFICIAL' : String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase());
 
         // Auditoria Oficial DATASUS CNESNet para Vínculos e Subtipos
         const oficialVinculo = resolverVinculoOficial(cnes, cns, nome, cbo);
@@ -874,6 +944,7 @@ window.CnesModule = (function () {
 
         await carregarMapaDtAtribuicaoOficial();
         await carregarMapaVinculosOficial();
+        await carregarMapaPortaria134Oficial();
 
         const isBacabal = state.ibge === '210120' || (state.municipio && state.municipio.toUpperCase().includes('BACABAL'));
         const cacheKey = `argos_cnes_${state.ibge}`;
@@ -1284,17 +1355,9 @@ window.CnesModule = (function () {
             });
         }
 
-        // Filtro de profissionais efetivos (ESTATUTARIO EFETIVO e EMPREGADO PUBLICO CELETISTA)
+        // Filtro de profissionais efetivos (estatutários efetivos concursados)
         if (state.tableFilter.apenasEfetivos) {
-            list = list.filter(p => {
-                const tipo = formatarTipoVinculo(p);
-                return tipo === 'ESTATUTARIO EFETIVO' || 
-                       tipo === 'EMPREGADO PUBLICO CELETISTA' || 
-                       tipo.includes('ESTATUT') || 
-                       tipo.includes('EFETIVO') ||
-                       tipo.includes('EMPREGADO PUBLICO') ||
-                       tipo.includes('EMPREGO PUBLICO');
-            });
+            list = list.filter(p => isProfissionalEfetivo(p));
         }
 
         // Filtro de desligados vs ativos
@@ -1304,13 +1367,13 @@ window.CnesModule = (function () {
             list = list.filter(p => p.ativo !== false && p.situacao !== 'Desligado');
         }
 
-        // Filtro da Auditoria de Carga Horária e Vínculos (Portaria 134)
+        // Filtro da Auditoria de Carga Horária e Vínculos (Portaria 134 - Oficial CNES)
         if (state.tableFilter.apenasAlerta134) {
             const { mapaHoras, mapaVinculos } = criarMapasVinculos();
 
             list = list.filter(p => {
                 const status = obterStatusPortaria134(p, mapaHoras, mapaVinculos);
-                return status.oficial.alerta === true;
+                return Boolean(status && status.alerta === true);
             });
         }
 
@@ -1546,70 +1609,487 @@ window.CnesModule = (function () {
     }
 
     /**
-     * Exportar XLS Oficial via SheetJS
+     * Exportar XLS Oficial Multi-Aba (Mesmo Layout e Abas da Referência Oficial)
+     * Aba 1: Colaboradores & Vínculos (16 colunas, cabeçalho #1E3A8A, zebrado #F8FAFC, alerta Portaria 134)
+     * Aba 2: Estabelecimentos (8 colunas, cabeçalho #1E3A8A, quantitativo de profissionais)
+     * Aba 3: Auditoria Portaria 134 (7 colunas, cabeçalho #991B1B, auditoria de sobreposição e >60h)
      */
-    function exportarXls() {
-        if (typeof XLSX === 'undefined') {
-            if (typeof showToast === 'function') showToast('⚠️ Biblioteca SheetJS não carregada.', 'warn');
-            return;
-        }
-
+    async function exportarXls() {
         const u = getSelectedUnidade();
         const profs = getProfissionaisList();
 
-        if (profs.length === 0) {
+        if (!profs || profs.length === 0) {
             if (typeof showToast === 'function') showToast('ℹ️ Nenhum registro para exportar com os filtros atuais.', 'info');
             return;
         }
 
-        const headers = [
-            "Nome do Profissional", "CNS Master/Principal", "Dt. Atribuição",
-            "CBO", "Ocupação", "CH Outros", "CH Amb.", "CH Hosp.", "Total CH", "SUS",
-            "Tipo", "Subtipo", "Situação", "Portaria 134", "Estabelecimento"
-        ];
+        // Competência formatada (ex: '08/2026' para rótulo e '202608' para nome de arquivo)
+        const compAtiva = String(state.competenciaAtiva || '08/2026').trim();
+        let compLabel = compAtiva;
+        let compFile = compAtiva.replace(/\D/g, '');
+        if (compAtiva.includes('/')) {
+            const parts = compAtiva.split('/');
+            if (parts.length === 2) {
+                compLabel = `${parts[0].padStart(2, '0')}/${parts[1]}`;
+                compFile = `${parts[1]}${parts[0].padStart(2, '0')}`;
+            }
+        } else if (compAtiva.length === 6) {
+            // YYYYMM -> MM/YYYY
+            const y = compAtiva.slice(0, 4);
+            const m = compAtiva.slice(4, 6);
+            compLabel = `${m}/${y}`;
+            compFile = compAtiva;
+        }
 
-        const rows = profs.map(p => {
-            const chTot = Number(p.chTotal || ((p.chOutros || 0) + (p.chAmb || 0) + (p.chHosp || 0))) || 0;
-            const status134 = obterStatusPortaria134(p);
-            const statusTxt = status134.alerta ? 'Artigo 2º' : '';
-            return [
-                p.nome || '',
-                p.cnsMaster || p.cns || '',
-                obterDataAtribuicao(p, false),
-                formatarCboOficial(p),
-                p.ocupacao || '',
-                (p.chOutros || 0) + 'h',
-                (p.chAmb || 0) + 'h',
-                (p.chHosp || 0) + 'h',
-                chTot + 'h',
-                p.atendimentoSus || 'SIM',
-                formatarTipoVinculo(p),
-                formatarSubtipoVinculo(p),
-                p.situacao || (p.ativo ? 'Ativo' : 'Desligado'),
-                statusTxt,
-                p.unidadeNome || (u ? u.nomeFantasia : state.municipio)
-            ];
+        const munClean = String(state.municipio || 'BACABAL')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, '_');
+
+        const cnesLabel = state.selectedCnes ? `_${state.selectedCnes}` : '';
+        const filename = `CNES_Profissionais_${munClean}${cnesLabel}_${compFile}.xlsx`;
+
+        // 1. Preparação dos dados para Aba 1 (Colaboradores & Vínculos)
+        const { mapaHoras, mapaVinculos } = criarMapasVinculos();
+        const sortedColabs = profs.slice().sort((a, b) => {
+            const estA = String(a.unidadeNome || (u ? u.nomeFantasia : '') || '').toUpperCase();
+            const estB = String(b.unidadeNome || (u ? u.nomeFantasia : '') || '').toUpperCase();
+            if (estA !== estB) return estA.localeCompare(estB);
+            const nomeA = String(a.nome || '').toUpperCase();
+            const nomeB = String(b.nome || '').toUpperCase();
+            return nomeA.localeCompare(nomeB);
         });
 
-        const wsData = [headers, ...rows];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        // 2. Preparação dos dados para Aba 2 (Estabelecimentos)
+        let estsParaListar = (state.estabelecimentos || []).slice();
+        if (state.filterEscopo === 'mantidos') {
+            estsParaListar = estsParaListar.filter(est => isUnidadeMantidaMunicipal(est));
+        } else if (state.filterEscopo === 'privados') {
+            estsParaListar = estsParaListar.filter(est => !isUnidadeMantidaMunicipal(est));
+        }
+        estsParaListar.sort((a, b) => String(a.nomeFantasia || '').localeCompare(String(b.nomeFantasia || '')));
 
-        ws['!cols'] = [
-            { wch: 35 }, { wch: 18 }, { wch: 14 },
-            { wch: 12 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
-            { wch: 8 }, { wch: 38 }, { wch: 18 },
-            { wch: 10 }, { wch: 18 }, { wch: 35 }
-        ];
+        // 3. Preparação dos dados para Aba 3 (Auditoria Portaria 134)
+        const cnsGrouped = new Map();
+        // Agrupa todos os colaboradores da rede para auditar sobreposição
+        const todosProfissionaisRede = [];
+        (state.estabelecimentos || []).forEach(est => {
+            (est.profissionais || []).forEach(p => {
+                todosProfissionaisRede.push({
+                    ...p,
+                    cnes: est.cnes,
+                    unidadeNome: est.nomeFantasia
+                });
+            });
+        });
 
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Profissionais");
+        const baseAuditoria = todosProfissionaisRede.length > 0 ? todosProfissionaisRede : sortedColabs;
+        baseAuditoria.forEach(colab => {
+            const cns = String(colab.cnsMaster || colab.cns || '').replace(/\D/g, '');
+            if (!cns) return;
+            if (!cnsGrouped.has(cns)) {
+                cnsGrouped.set(cns, {
+                    cns: cns,
+                    nome: String(colab.nome || '').trim().toUpperCase(),
+                    vinculos: 0,
+                    chTotal: 0,
+                    estabelecimentos: new Set(),
+                    ocupacoes: new Set()
+                });
+            }
+            const info = cnsGrouped.get(cns);
+            info.vinculos += 1;
+            const ch = Number(colab.chTotal != null ? colab.chTotal : ((Number(colab.chAmb) || 0) + (Number(colab.chHosp) || 0) + (Number(colab.chOutros) || 0))) || 0;
+            info.chTotal += ch;
+            const estNome = String(colab.unidadeNome || colab.estabelecimento || '').trim();
+            if (estNome) info.estabelecimentos.add(estNome);
+            const cboCode = String(colab.cbo || colab.ocupacao || '').split(' - ')[0].replace(/\D/g, '');
+            if (cboCode) info.ocupacoes.add(cboCode);
+        });
 
-        const cnesLabel = state.selectedCnes ? state.selectedCnes : 'REDE_MUNICIPAL';
-        const filename = `CNES_Profissionais_${state.municipio}_${cnesLabel}_${state.competenciaAtiva}.xlsx`;
-        XLSX.writeFile(wb, filename);
+        const auditados = [];
+        cnsGrouped.forEach(info => {
+            if (info.vinculos > 1 || info.chTotal > 60) {
+                let parecer = '';
+                if (info.vinculos > 1 && info.chTotal > 60) {
+                    parecer = `Sobreposição de ${info.vinculos} vínculos (${info.chTotal}h semanais - Art. 2º Portaria 134)`;
+                } else if (info.vinculos > 1) {
+                    parecer = `${info.vinculos} vínculos ativos na rede municipal`;
+                } else {
+                    parecer = `Carga horária acumulada excessiva (${info.chTotal}h semanais)`;
+                }
+                auditados.push({
+                    cns: info.cns,
+                    nome: info.nome,
+                    vinculos: info.vinculos,
+                    chTotal: info.chTotal,
+                    estabelecimentos: Array.from(info.estabelecimentos).sort().join(', '),
+                    ocupacoes: Array.from(info.ocupacoes).sort().join(', '),
+                    parecer: parecer
+                });
+            }
+        });
+        auditados.sort((a, b) => b.chTotal - a.chTotal || b.vinculos - a.vinculos || a.nome.localeCompare(b.nome));
+
+        // Checa se ExcelJS está carregado para exportação estilizada de alta fidelidade
+        const ExcelJSClass = (typeof ExcelJS !== 'undefined') ? ExcelJS : ((typeof window !== 'undefined' && window.ExcelJS) ? window.ExcelJS : null);
+
+        if (ExcelJSClass) {
+            try {
+                const wb = new ExcelJSClass.Workbook();
+                wb.creator = 'FPA ARGOS';
+                wb.lastModifiedBy = 'FPA ARGOS';
+                wb.created = new Date();
+                wb.modified = new Date();
+
+                const borderThin = {
+                    top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                    left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                    bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                    right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+                };
+
+                const headerNavyFill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF1E3A8A' }
+                };
+
+                const headerCrimsonFill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF991B1B' }
+                };
+
+                const zebraFill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFF8FAFC' }
+                };
+
+                const alertRedFill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFFEF2F2' }
+                };
+
+                const headerFont = {
+                    name: 'Calibri',
+                    size: 11,
+                    bold: true,
+                    color: { argb: 'FFFFFFFF' }
+                };
+
+                const regularFont = {
+                    name: 'Calibri',
+                    size: 11,
+                    bold: false
+                };
+
+                const alertFont = {
+                    name: 'Calibri',
+                    size: 10,
+                    bold: true,
+                    color: { argb: 'FFDC2626' }
+                };
+
+                // ─── ABA 1: Colaboradores & Vínculos ───
+                const ws1 = wb.addWorksheet('Colaboradores & Vínculos', {
+                    views: [{ state: 'frozen', ySplit: 1 }]
+                });
+
+                const headersWs1 = [
+                    'CNES', 'Estabelecimento de Saúde', 'Nome do Profissional', 'CNS',
+                    'CBO', 'Ocupação / Cargo', 'CH Amb', 'CH Hosp', 'CH Outros', 'CH Total',
+                    'Atende SUS', 'Tipo de Vínculo', 'Subtipo', 'Situação', 'Dt. Atribuição', 'Portaria 134/2011'
+                ];
+
+                ws1.columns = [
+                    { header: headersWs1[0], key: 'cnes', width: 12 },
+                    { header: headersWs1[1], key: 'estabelecimento', width: 48 },
+                    { header: headersWs1[2], key: 'nome', width: 48 },
+                    { header: headersWs1[3], key: 'cns', width: 18 },
+                    { header: headersWs1[4], key: 'cbo', width: 12 },
+                    { header: headersWs1[5], key: 'ocupacao', width: 48 },
+                    { header: headersWs1[6], key: 'chAmb', width: 12 },
+                    { header: headersWs1[7], key: 'chHosp', width: 12 },
+                    { header: headersWs1[8], key: 'chOutros', width: 12 },
+                    { header: headersWs1[9], key: 'chTotal', width: 12 },
+                    { header: headersWs1[10], key: 'atendimentoSus', width: 13 },
+                    { header: headersWs1[11], key: 'tipoVinculo', width: 48 },
+                    { header: headersWs1[12], key: 'subtipo', width: 37 },
+                    { header: headersWs1[13], key: 'situacao', width: 12 },
+                    { header: headersWs1[14], key: 'dtAtribuicao', width: 22 },
+                    { header: headersWs1[15], key: 'portaria134', width: 45 }
+                ];
+
+                const headerRow1 = ws1.getRow(1);
+                headerRow1.height = 24;
+                headerRow1.eachCell((cell) => {
+                    cell.fill = headerNavyFill;
+                    cell.font = headerFont;
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                });
+
+                sortedColabs.forEach((p, idx) => {
+                    const chAmb = Number(p.chAmb) || 0;
+                    const chHosp = Number(p.chHosp) || 0;
+                    const chOutros = Number(p.chOutros) || 0;
+                    const chTot = Number(p.chTotal != null ? p.chTotal : (chAmb + chHosp + chOutros)) || 0;
+                    const st134 = obterStatusPortaria134(p, mapaHoras, mapaVinculos);
+                    let portariaTxt = null;
+                    if (st134 && st134.alerta) {
+                        portariaTxt = st134.artigo || 'Artigo 2º';
+                    } else if (p.portaria134 && p.portaria134 !== '-' && p.portaria134.toLowerCase() !== 'null') {
+                        portariaTxt = p.portaria134;
+                    }
+
+                    const cboCode = String(p.cbo || p.co_cbo || '').replace(/\D/g, '');
+                    const row = ws1.addRow({
+                        cnes: String(p.cnes || (u ? u.cnes : '') || '').trim(),
+                        estabelecimento: String(p.unidadeNome || (u ? u.nomeFantasia : '') || state.municipio || '').trim().toUpperCase(),
+                        nome: String(p.nome || '').trim().toUpperCase(),
+                        cns: String(p.cnsMaster || p.cns || '').replace(/\D/g, ''),
+                        cbo: cboCode,
+                        ocupacao: formatarCboOficial(p),
+                        chAmb: chAmb,
+                        chHosp: chHosp,
+                        chOutros: chOutros,
+                        chTotal: chTot,
+                        atendimentoSus: String(p.atendimentoSus || (p.atendimento_prestado_sus === false ? 'NÃO' : 'SIM')).toUpperCase(),
+                        tipoVinculo: formatarTipoVinculo(p),
+                        subtipo: formatarSubtipoVinculo(p),
+                        situacao: String(p.situacao || (p.ativo !== false ? 'Ativo' : 'Desligado')),
+                        dtAtribuicao: obterDataAtribuicao(p, false) || '',
+                        portaria134: portariaTxt
+                    });
+
+                    const isEven = (idx % 2 === 0);
+                    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                        cell.border = borderThin;
+                        cell.font = regularFont;
+                        if (isEven) {
+                            cell.fill = zebraFill;
+                        }
+                        if ([1, 4, 5, 7, 8, 9, 10, 11, 14, 15].includes(colNumber)) {
+                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                        } else {
+                            cell.alignment = { horizontal: 'left', vertical: 'middle' };
+                        }
+
+                        // Destaca célula da Portaria 134 caso haja apontamento
+                        if (colNumber === 16 && portariaTxt) {
+                            cell.fill = alertRedFill;
+                            cell.font = alertFont;
+                        }
+                    });
+                });
+
+                // ─── ABA 2: Estabelecimentos ───
+                const ws2 = wb.addWorksheet('Estabelecimentos', {
+                    views: [{ state: 'frozen', ySplit: 1 }]
+                });
+
+                const headersWs2 = [
+                    'CNES', 'Nome Fantasia', 'Razão Social', 'Tipo de Unidade',
+                    'Gestão', 'Município', 'UF', `Qtd Profissionais (${compLabel})`
+                ];
+
+                ws2.columns = [
+                    { header: headersWs2[0], key: 'cnes', width: 12 },
+                    { header: headersWs2[1], key: 'nomeFantasia', width: 50 },
+                    { header: headersWs2[2], key: 'razaoSocial', width: 50 },
+                    { header: headersWs2[3], key: 'tipoUnidade', width: 50 },
+                    { header: headersWs2[4], key: 'tipoGestao', width: 12 },
+                    { header: headersWs2[5], key: 'municipio', width: 31 },
+                    { header: headersWs2[6], key: 'uf', width: 12 },
+                    { header: headersWs2[7], key: 'qtdProfissionais', width: 30 }
+                ];
+
+                const headerRow2 = ws2.getRow(1);
+                headerRow2.height = 24;
+                headerRow2.eachCell((cell) => {
+                    cell.fill = headerNavyFill;
+                    cell.font = headerFont;
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                });
+
+                estsParaListar.forEach((est, idx) => {
+                    const row = ws2.addRow({
+                        cnes: String(est.cnes || '').trim(),
+                        nomeFantasia: String(est.nomeFantasia || est.nome_fantasia || '').trim().toUpperCase(),
+                        razaoSocial: String(est.razaoSocial || est.razao_social || est.nomeFantasia || '').trim().toUpperCase(),
+                        tipoUnidade: String(est.tipoUnidade || est.tipo_unidade || '').trim().toUpperCase(),
+                        tipoGestao: String(est.tipoGestao || est.tipo_gestao || 'MUNICIPAL').trim().toUpperCase(),
+                        municipio: String(state.municipio || 'BACABAL').trim().toUpperCase(),
+                        uf: String(state.uf || 'MA').trim().toUpperCase(),
+                        qtdProfissionais: Number((est.profissionais || []).length)
+                    });
+
+                    const isEven = (idx % 2 === 0);
+                    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                        cell.border = borderThin;
+                        cell.font = regularFont;
+                        if (isEven) {
+                            cell.fill = zebraFill;
+                        }
+                        if ([1, 5, 7, 8].includes(colNumber)) {
+                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                        } else {
+                            cell.alignment = { horizontal: 'left', vertical: 'middle' };
+                        }
+                    });
+                });
+
+                // ─── ABA 3: Auditoria Portaria 134 ───
+                const ws3 = wb.addWorksheet('Auditoria Portaria 134', {
+                    views: [{ state: 'frozen', ySplit: 1 }]
+                });
+
+                const headersWs3 = [
+                    'CNS', 'Nome do Profissional', 'Vínculos na Rede',
+                    'CH Semanal Total', 'Estabelecimentos', 'Ocupações', 'Parecer de Auditoria'
+                ];
+
+                ws3.columns = [
+                    { header: headersWs3[0], key: 'cns', width: 18 },
+                    { header: headersWs3[1], key: 'nome', width: 41 },
+                    { header: headersWs3[2], key: 'vinculos', width: 19 },
+                    { header: headersWs3[3], key: 'chTotal', width: 19 },
+                    { header: headersWs3[4], key: 'estabelecimentos', width: 52 },
+                    { header: headersWs3[5], key: 'ocupacoes', width: 25 },
+                    { header: headersWs3[6], key: 'parecer', width: 52 }
+                ];
+
+                const headerRow3 = ws3.getRow(1);
+                headerRow3.height = 24;
+                headerRow3.eachCell((cell) => {
+                    cell.fill = headerCrimsonFill;
+                    cell.font = headerFont;
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                });
+
+                auditados.forEach((item) => {
+                    const row = ws3.addRow({
+                        cns: item.cns,
+                        nome: item.nome,
+                        vinculos: item.vinculos,
+                        chTotal: item.chTotal,
+                        estabelecimentos: item.estabelecimentos,
+                        ocupacoes: item.ocupacoes,
+                        parecer: item.parecer
+                    });
+
+                    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                        cell.border = borderThin;
+                        cell.font = regularFont;
+                        cell.fill = alertRedFill;
+                        if ([1, 3, 4].includes(colNumber)) {
+                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                        } else {
+                            cell.alignment = { horizontal: 'left', vertical: 'middle' };
+                        }
+                    });
+                });
+
+                // Grava o arquivo via buffer e dispara o download no navegador
+                const buffer = await wb.xlsx.writeBuffer();
+                const blob = new Blob([buffer], {
+                    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                });
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+
+                if (typeof showToast === 'function') {
+                    showToast(`✅ Planilha ${filename} exportada com sucesso (3 abas oficiais)!`, 'success');
+                }
+                return;
+            } catch (errExcel) {
+                console.error('Erro na exportação via ExcelJS, tentando fallback SheetJS:', errExcel);
+            }
+        }
+
+        // Fallback para SheetJS caso ExcelJS não esteja disponível
+        if (typeof XLSX !== 'undefined') {
+            const wb = XLSX.utils.book_new();
+
+            // Aba 1
+            const rows1 = sortedColabs.map(p => {
+                const chAmb = Number(p.chAmb) || 0;
+                const chHosp = Number(p.chHosp) || 0;
+                const chOutros = Number(p.chOutros) || 0;
+                const chTot = Number(p.chTotal != null ? p.chTotal : (chAmb + chHosp + chOutros)) || 0;
+                const st134 = obterStatusPortaria134(p, mapaHoras, mapaVinculos);
+                const statusTxt = st134.alerta ? (st134.artigo || 'Artigo 2º') : (p.portaria134 || '');
+                return [
+                    String(p.cnes || (u ? u.cnes : '') || ''),
+                    String(p.unidadeNome || (u ? u.nomeFantasia : '') || state.municipio || ''),
+                    String(p.nome || ''),
+                    String(p.cnsMaster || p.cns || ''),
+                    String(p.cbo || p.co_cbo || '').replace(/\D/g, ''),
+                    formatarCboOficial(p),
+                    chAmb,
+                    chHosp,
+                    chOutros,
+                    chTot,
+                    String(p.atendimentoSus || 'SIM'),
+                    formatarTipoVinculo(p),
+                    formatarSubtipoVinculo(p),
+                    String(p.situacao || (p.ativo ? 'Ativo' : 'Desligado')),
+                    obterDataAtribuicao(p, false),
+                    statusTxt
+                ];
+            });
+            const ws1 = XLSX.utils.aoa_to_sheet([
+                ['CNES', 'Estabelecimento de Saúde', 'Nome do Profissional', 'CNS', 'CBO', 'Ocupação / Cargo', 'CH Amb', 'CH Hosp', 'CH Outros', 'CH Total', 'Atende SUS', 'Tipo de Vínculo', 'Subtipo', 'Situação', 'Dt. Atribuição', 'Portaria 134/2011'],
+                ...rows1
+            ]);
+            XLSX.utils.book_append_sheet(wb, ws1, "Colaboradores & Vínculos");
+
+            // Aba 2
+            const rows2 = estsParaListar.map(est => [
+                est.cnes || '',
+                est.nomeFantasia || '',
+                est.razaoSocial || est.nomeFantasia || '',
+                est.tipoUnidade || '',
+                est.tipoGestao || 'MUNICIPAL',
+                state.municipio || 'BACABAL',
+                state.uf || 'MA',
+                Number((est.profissionais || []).length)
+            ]);
+            const ws2 = XLSX.utils.aoa_to_sheet([
+                ['CNES', 'Nome Fantasia', 'Razão Social', 'Tipo de Unidade', 'Gestão', 'Município', 'UF', `Qtd Profissionais (${compLabel})`],
+                ...rows2
+            ]);
+            XLSX.utils.book_append_sheet(wb, ws2, "Estabelecimentos");
+
+            // Aba 3
+            const rows3 = auditados.map(a => [
+                a.cns, a.nome, a.vinculos, a.chTotal, a.estabelecimentos, a.ocupacoes, a.parecer
+            ]);
+            const ws3 = XLSX.utils.aoa_to_sheet([
+                ['CNS', 'Nome do Profissional', 'Vínculos na Rede', 'CH Semanal Total', 'Estabelecimentos', 'Ocupações', 'Parecer de Auditoria'],
+                ...rows3
+            ]);
+            XLSX.utils.book_append_sheet(wb, ws3, "Auditoria Portaria 134");
+
+            XLSX.writeFile(wb, filename);
+            if (typeof showToast === 'function') {
+                showToast(`✅ Planilha ${filename} exportada com sucesso (3 abas)!`, 'success');
+            }
+            return;
+        }
 
         if (typeof showToast === 'function') {
-            showToast(`✅ Planilha ${filename} exportada com sucesso!`, 'success');
+            showToast('⚠️ Nenhuma biblioteca de exportação Excel disponível no navegador.', 'warn');
         }
     }
 
@@ -2130,13 +2610,13 @@ window.CnesModule = (function () {
                                 </tr>
                             ` : unidadesFiltradas.map(u => `
                                 <tr>
-                                    <td style="font-family: 'Roboto Mono', monospace; font-weight: 700; color: #dc2626;">
-                                        <div class="cnes-copyable-code">
-                                            <span>${u.cnes}</span>
-                                            <button type="button" class="cnes-btn-copy" onclick="window.CnesModule.copiarCnes('${u.cnes}', event)" title="Copiar código CNES ${u.cnes}">
-                                                <i class="far fa-copy"></i>
-                                            </button>
-                                        </div>
+                                    <td class="td-est-cnes">
+                                        <button type="button" class="cnes-cns-btn" 
+                                                onclick="window.CnesModule.copiarCnes('${u.cnes}', event)" 
+                                                title="Clique para copiar o código CNES ${u.cnes}">
+                                            <span class="cnes-cns-val">${u.cnes}</span>
+                                            <i class="far fa-copy"></i>
+                                        </button>
                                     </td>
                                     <td><strong>${u.nomeFantasia}</strong></td>
                                     <td style="color: #64748b; font-size: 0.78rem;">${u.razaoSocial}</td>
@@ -2326,6 +2806,24 @@ window.CnesModule = (function () {
         const totalGeral = state.estabelecimentos.length;
         const totalPrivados = totalGeral - totalMantidos;
 
+        let baseListParaContagem = [];
+        if (state.selectedCnes && u && u.profissionais) {
+            baseListParaContagem = u.profissionais.map(p => ({ ...p, cnes: u.cnes }));
+        } else {
+            let ests = state.estabelecimentos;
+            if (state.filterEscopo === 'mantidos') {
+                ests = state.estabelecimentos.filter(est => isUnidadeMantidaMunicipal(est));
+            } else if (state.filterEscopo === 'privados') {
+                ests = state.estabelecimentos.filter(est => !isUnidadeMantidaMunicipal(est));
+            }
+            ests.forEach(est => (est.profissionais || []).forEach(p => baseListParaContagem.push({ ...p, cnes: est.cnes })));
+        }
+        const totalP134Oficial = baseListParaContagem.filter(p => {
+            const st = obterStatusPortaria134(p, mapaHorasRede, mapaVinculosRede);
+            return Boolean(st && st.alerta);
+        }).length;
+        const totalEfetivosOficial = baseListParaContagem.filter(p => isProfissionalEfetivo(p)).length;
+
         let tituloUnidade = '';
         if (state.selectedCnes && u) {
             tituloUnidade = `${u.nomeFantasia} (CNES: ${u.cnes})`;
@@ -2374,17 +2872,17 @@ window.CnesModule = (function () {
                         <!-- Filtro de Auditoria Portaria 134 -->
                         <button class="cnes-filter-btn-alert ${state.tableFilter.apenasAlerta134 ? 'active' : ''}"
                                 onclick="window.CnesModule.toggleAlerta134()"
-                                title="Filtrar profissionais com acúmulo incompatível de cargos ou carga horária superior a 60h (Portaria 134)">
+                                title="Filtrar profissionais com apontamento oficial da Portaria 134 no CNES (Artigo 2º)">
                             <i class="fas fa-exclamation-triangle"></i>
-                            ${state.tableFilter.apenasAlerta134 ? 'Exibindo Alertas (Portaria 134)' : 'Auditoria de Vínculos (Portaria 134)'}
+                            ${state.tableFilter.apenasAlerta134 ? 'Exibindo Portaria 134' : 'Auditoria Portaria 134'} (${totalP134Oficial})
                         </button>
 
                         <!-- Filtro Profissionais Efetivos -->
                         <button class="cnes-filter-btn-efetivo ${state.tableFilter.apenasEfetivos ? 'active' : ''}" 
                                 onclick="window.CnesModule.toggleEfetivos()"
-                                title="Filtrar colaboradores efetivos permanentes (Estatutário Efetivo e Empregado Público Celetista)">
+                                title="Filtrar colaboradores estatutários efetivos (concursados)">
                             <i class="fas fa-id-badge"></i> 
-                            ${state.tableFilter.apenasEfetivos ? 'Exibindo Efetivos' : 'Profissionais Efetivos'}
+                            ${state.tableFilter.apenasEfetivos ? 'Exibindo Efetivos' : 'Profissionais Efetivos'} (${totalEfetivosOficial})
                         </button>
 
                         <button class="cnes-btn-outline" onclick="window.CnesModule.abrirModalCompetencia()" title="Trocar Competência">
@@ -2519,7 +3017,7 @@ window.CnesModule = (function () {
 
                             const subVal = formatarSubtipoVinculo(p);
                             const tipoVal = formatarTipoVinculo(p);
-                            const p134Content = status134.html || status134.triagemHtml || '<span class="cnes-p134-none">—</span>';
+                            const p134Content = (status134 && status134.alerta && status134.html) ? status134.html : '<span class="cnes-p134-none">—</span>';
 
                             return `
                                 <tr>
@@ -3040,14 +3538,15 @@ window.CnesModule = (function () {
         if (filtro.tipo === 'ENTRADA') itens = mov.detalhes.entradas || [];
         else if (filtro.tipo === 'SAIDA') itens = mov.detalhes.saidas || [];
         else if (filtro.tipo === 'ALTERACAO_CH') itens = mov.detalhes.alteracoesCargaHoraria || [];
-        else if (filtro.tipo === 'PORTARIA134') itens = itens.filter(it => Boolean(it.portaria134));
+        else if (filtro.tipo === 'PORTARIA134') itens = mov.detalhes.alertasPortaria134 || [];
         if (filtro.cnes) itens = itens.filter(it => String(it.cnes) === String(filtro.cnes));
         if (filtro.search) {
             itens = itens.filter(it =>
                 (it.nome && it.nome.toLowerCase().includes(filtro.search)) ||
                 (it.cns && it.cns.includes(filtro.search)) ||
                 (it.cbo && it.cbo.includes(filtro.search)) ||
-                (it.ocupacao && it.ocupacao.toLowerCase().includes(filtro.search))
+                (it.ocupacao && it.ocupacao.toLowerCase().includes(filtro.search)) ||
+                (it.estabNome && it.estabNome.toLowerCase().includes(filtro.search))
             );
         }
         return itens;
@@ -3300,12 +3799,12 @@ window.CnesModule = (function () {
                         border: [233, 213, 255]    // #e9d5ff
                     },
                     {
-                        titulo: 'TRIAGEM CH',
-                        sub: 'CH Semanal >60h',
+                        titulo: 'PORTARIA 134',
+                        sub: 'Oficial CNES Net',
                         valor: `${fmtNum(res.alertasPortaria134 || 0)}`,
-                        color: [217, 119, 6],      // #d97706
-                        bg: [255, 251, 235],       // #fffbeb
-                        border: [253, 230, 138]    // #fde68a
+                        color: [220, 38, 38],      // #dc2626
+                        bg: [254, 242, 242],       // #fef2f2
+                        border: [254, 202, 202]    // #fecaca
                     }
                 ];
 
@@ -3525,7 +4024,53 @@ window.CnesModule = (function () {
                 });
 
                 // ═════════════════════════════════════════════════════════════
-                // 4. CABEÇALHO CONTÍNUO (PÁGINAS > 1) E RODAPÉ OFICIAL ARGOS
+                // SEÇÃO 4: APONTAMENTOS OFICIAIS PORTARIA 134 (CNESNET / MS)
+                // ═════════════════════════════════════════════════════════════
+                const alertas134 = filtrarPorContexto(mov.detalhes.alertasPortaria134);
+                if (alertas134 && alertas134.length > 0) {
+                    currentY = doc.lastAutoTable.finalY + 7;
+                    desenharCabecalhoSecao('Categoria 4: Apontamentos Oficiais Portaria 134 (Artigo 2º)', alertas134.length, [185, 28, 28], '[ ! ]', true);
+
+                    const bodyAlertas = alertas134.map(item => [
+                        'PORTARIA 134',
+                        `${item.nome || ''}\nCNS: ${item.cns || ''}`,
+                        formatarCboPdf(item),
+                        `${item.estabNome || ''}\nCNES: ${item.cnes || ''}`,
+                        `${item.chAtual || 0}h`,
+                        item.portaria134 || 'Artigo 2º',
+                        'CONFLITO OFICIAL'
+                    ]);
+
+                    doc.autoTable({
+                        startY: currentY,
+                        margin: { left: margin, right: margin },
+                        head: [['Tipo', 'Profissional / CNS', 'CBO / Especialidade', 'Estabelecimento de Saúde / CNES', 'Carga Horária', 'Apontamento Oficial', 'Situação']],
+                        body: bodyAlertas,
+                        styles: { fontSize: 7.2, cellPadding: 2, lineWidth: 0.1, lineColor: [226, 232, 240], textColor: [15, 23, 42], valign: 'middle' },
+                        headStyles: { fillColor: [185, 28, 28], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, halign: 'center', valign: 'middle' },
+                        columnStyles: {
+                            0: { halign: 'center', cellWidth: 28, fontStyle: 'bold', textColor: [185, 28, 28] },
+                            1: { halign: 'left', cellWidth: 63 },
+                            2: { halign: 'left', cellWidth: 54 },
+                            3: { halign: 'left', cellWidth: 64 },
+                            4: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
+                            5: { halign: 'center', cellWidth: 25, fontStyle: 'bold', textColor: [185, 28, 28] },
+                            6: { halign: 'center', cellWidth: 19, fontSize: 6.5, textColor: [185, 28, 28], fontStyle: 'bold' }
+                        },
+                        alternateRowStyles: { fillColor: [254, 242, 242] },
+                        didParseCell: data => {
+                            if (data.section === 'body') {
+                                data.cell.styles.valign = 'middle';
+                                if (data.column.index === 0) {
+                                    data.cell.styles.fillColor = [254, 226, 226];
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // ═════════════════════════════════════════════════════════════
+                // 5. CABEÇALHO CONTÍNUO (PÁGINAS > 1) E RODAPÉ OFICIAL ARGOS
                 // ═════════════════════════════════════════════════════════════
                 const totalPages = doc.internal.getNumberOfPages();
                 let userSession = null;
@@ -3679,7 +4224,7 @@ window.CnesModule = (function () {
                         <div class="cnes-mov-kpi-icon alerta"><i class="fas fa-exclamation-triangle"></i></div>
                         <div>
                             <div class="cnes-mov-kpi-val" style="color: #d97706;">${fmtNum(res.alertasPortaria134 || 0)}</div>
-                            <div class="cnes-mov-kpi-lbl">CNS com CH municipal >60h</div>
+                            <div class="cnes-mov-kpi-lbl">Portaria 134 (Oficial CNES)</div>
                         </div>
                     </div>
 
@@ -3711,7 +4256,7 @@ window.CnesModule = (function () {
                                 🟡 Alt. Carga Horária (${fmtNum(res.alteracoesCargaHoraria || 0)})
                             </button>
                             <button class="cnes-mov-filter-btn ${f.tipo === 'PORTARIA134' ? 'active' : ''}" onclick="window.CnesModule.setFiltroMovimentacao('PORTARIA134')">
-                                ⚠️ Triagem de carga horária (${fmtNum(res.alertasPortaria134 || 0)})
+                                ⚠️ Portaria 134 (${fmtNum(res.alertasPortaria134 || 0)})
                             </button>
                         </div>
 
@@ -3742,7 +4287,7 @@ window.CnesModule = (function () {
                                     <th style="padding: 0.65rem 0.85rem;">CBO / Especialidade</th>
                                     <th style="padding: 0.65rem 0.85rem;">Estabelecimento de Saúde</th>
                                     <th style="padding: 0.65rem 0.85rem; width: 150px; text-align: center;">Carga Horária Semanal</th>
-                                    <th style="padding: 0.65rem 0.85rem; width: 140px; text-align: center;">Triagem de carga horária</th>
+                                    <th style="padding: 0.65rem 0.85rem; width: 150px; text-align: center;">Portaria 134 / Conformidade</th>
                                     <th style="padding: 0.65rem 0.85rem; width: 80px; text-align: center;">Ações</th>
                                 </tr>
                             </thead>
@@ -3764,6 +4309,11 @@ window.CnesModule = (function () {
                                     } else if (item.tipo === 'SAIDA') {
                                         badgeHtml = `<span class="cnes-mov-badge badge-saida"><i class="fas fa-arrow-circle-down"></i> AUSENTE NO MÊS</span>`;
                                         chHtml = `<span style="font-weight: 700; color: #b91c1c;">${item.chAnterior}h ➔ 0h</span>`;
+                                    } else if (item.tipo === 'PORTARIA134') {
+                                        badgeHtml = `<span class="cnes-mov-badge badge-p134" style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; font-weight: 700;">
+                                            <i class="fas fa-exclamation-triangle"></i> PORTARIA 134
+                                        </span>`;
+                                        chHtml = `<span>${item.chAtual}h</span>`;
                                     } else {
                                         const isUp = item.diferencaCh > 0;
                                         badgeHtml = `<span class="cnes-mov-badge ${isUp ? 'badge-ch-aumento' : 'badge-ch-reducao'}">
@@ -3772,12 +4322,12 @@ window.CnesModule = (function () {
                                         chHtml = `<span>${item.chAnterior}h ➔ <strong>${item.chAtual}h</strong></span>`;
                                     }
 
-                                    const isRisk = (item.chAtual > 60) || (item.portaria134 && item.portaria134.includes('SOBREPOSIÇÃO'));
-                                    const portariaBadge = isRisk ? 
-                                        `<span class="cnes-ch-badge-danger"><i class="fas fa-exclamation-triangle"></i> REVISAR CH (>60h)</span>` :
-                                        (item.chAtual > 40 ? 
-                                            `<span class="cnes-ch-badge-alert"><i class="fas fa-info-circle"></i> REVISAR CH (>40h)</span>` :
-                                            `<span class="cnes-ch-badge-normal"><i class="fas fa-check"></i> SEM ALERTA CH</span>`);
+                                    const isP134Oficial = Boolean(item.portaria134 && item.portaria134 !== '-' && !item.portaria134.includes('>40') && !item.portaria134.includes('>60'));
+                                    const portariaBadge = isP134Oficial ? 
+                                        `<span class="cnes-ch-badge-danger" title="Apontamento oficial CNES: ${escaparTextoHtml(item.portaria134)}"><i class="fas fa-exclamation-triangle"></i> ${escaparTextoHtml(item.portaria134)}</span>` :
+                                        (item.chAtual > 60 ? 
+                                            `<span class="cnes-ch-badge-alert" title="Carga horária acumulada >60h"><i class="fas fa-info-circle"></i> CH &gt;60h</span>` :
+                                            `<span class="cnes-ch-badge-normal"><i class="fas fa-check"></i> REGULAR</span>`);
 
                                     const bgRow = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
 

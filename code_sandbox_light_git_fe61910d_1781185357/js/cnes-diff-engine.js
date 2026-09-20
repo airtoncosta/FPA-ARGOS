@@ -27,11 +27,29 @@
             const identity = (cnes, cns, cbo, p) => p.linkIdentity ||
                 [cnes, cns, cbo, p.codigoVinculacao || '', p.codigoVinculo || '', p.codigoSubVinculo || ''].join('_');
             const observacaoOficial = p => {
-                const fonte = String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase();
-                const competencia = String(p.portaria134Competencia || p.competencia || '').trim();
-                return fonte === 'CNES_OFICIAL' && competencia && String(p.portaria134 || '').trim()
-                    ? String(p.portaria134).trim()
-                    : '';
+                let fonte = String(p.portaria134Fonte || p.portaria134_fonte || '').trim().toUpperCase();
+                let texto = String(p.portaria134 || '').trim();
+                if ((!texto || texto === '-') && typeof window !== 'undefined' && window.DATASUS_PORTARIA134_BACABAL) {
+                    const map = window.DATASUS_PORTARIA134_BACABAL;
+                    const cnesStr = String(p.cnes || '').trim();
+                    const cnsClean = String(p.cns || p.cnsMaster || '').replace(/\D/g, '');
+                    const cboClean = String(p.cbo || '').split(' ')[0].replace(/\D/g, '');
+                    const nomeClean = String(p.nome || '').toUpperCase().replace(/\s+/g, ' ').trim();
+                    const found = (cnesStr && cnsClean && cboClean && map[`${cnesStr}_${cnsClean}_${cboClean}`])
+                        || (cnesStr && cnsClean && map[`${cnesStr}_${cnsClean}`])
+                        || (cnesStr && nomeClean && cboClean && map[`${cnesStr}_${nomeClean}_${cboClean}`])
+                        || (cnesStr && nomeClean && map[`${cnesStr}_${nomeClean}`])
+                        || (cnsClean && map[`cns_${cnsClean}`])
+                        || null;
+                    if (found && found.portaria134) {
+                        texto = found.portaria134;
+                        fonte = found.portaria134Fonte || 'CNES_OFICIAL';
+                    }
+                }
+                const isOficial = (fonte === 'CNES_OFICIAL' || texto.includes('Artigo')) &&
+                    texto.length > 0 && texto !== '-' && texto.toLowerCase() !== 'null' &&
+                    !texto.toUpperCase().includes('SOBREPOSIÇÃO');
+                return isOficial ? (texto.includes('Artigo') ? texto : 'Artigo 2º') : '';
             };
             const mapaAnterior = new Map();
             const profsPorCnsAnt = new Map(); // Para rastrear trocas de unidade
@@ -150,18 +168,30 @@
                 // CH/counting from ST/PF is only a local triage signal. It is
                 // never promoted to an official Portaria 134 observation.
                 const oficial = observacaoOficial(pAtual);
-                if (oficial && !alertasPortaria134.some(a => a.cns === pAtual.cns)) {
+                if (oficial && !alertasPortaria134.some(a => a.cns === pAtual.cns && a.cnes === pAtual.cnes && a.cbo === pAtual.cbo)) {
                     const vinculosAtuaisCns = profsPorCnsAtu.get(pAtual.cns) || [];
+                    const pAnt = mapaAnterior.get(key);
                     alertasPortaria134.push({
+                        tipo: 'PORTARIA134',
+                        tipoBadge: 'badge-p134',
+                        descricaoTipo: 'Portaria 134 / Artigo 2º (Oficial CNES)',
+                        cnes: pAtual.cnes,
+                        estabNome: pAtual.estabNome,
                         cns: pAtual.cns,
-                        nome: pAtual.nome,
                         cbo: pAtual.cbo,
-                        ocupacao: pAtual.ocupacao,
+                        nome: pAtual.nome,
+                        ocupacao: pAtual.ocupacao || `${pAtual.cbo} - PROFISSIONAL DE SAÚDE`,
+                        chAmb: pAtual.chAmb || 0,
+                        chHosp: pAtual.chHosp || 0,
+                        chOutros: pAtual.chOutros || 0,
+                        chAtual: pAtual.chTotal,
+                        chAnterior: pAnt ? pAnt.chTotal : null,
+                        diferencaCh: pAnt ? (pAtual.chTotal - pAnt.chTotal) : 0,
                         totalHoras: vinculosAtuaisCns.reduce((acc, v) => acc + (v.chTotal || 0), 0),
                         vinculos: vinculosAtuaisCns.map(v => `${v.estabNome} (${v.chTotal}h)`).join(' + '),
                         portaria134: oficial,
                         fonte: 'CNES_OFICIAL',
-                        competencia: pAtual.portaria134Competencia || pAtual.competencia,
+                        competencia: compAtu,
                         alerta: oficial,
                         grauRisco: 'OBSERVAÇÃO OFICIAL CNES'
                     });

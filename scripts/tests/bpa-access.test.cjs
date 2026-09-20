@@ -5,7 +5,16 @@ const vm = require('node:vm');
 const path = require('node:path');
 const source=fs.readFileSync(path.join(__dirname, '../../code_sandbox_light_git_fe61910d_1781185357/js/bpa-module.js'),'utf8');
 function setup(user={username:'jessica',name:'Jéssica',role:'DIGITADOR'}) {
- const store=new Map(); const session=new Map([['argos_user',JSON.stringify(user)]]);
+ const store=new Map();
+ store.set('argos_bpa_responsaveis', JSON.stringify({
+  '2387439': 'Jéssica',
+  'HOSPITAL MATERNO INFANTIL': 'Jéssica',
+  '2389114': 'Jéssica',
+  'LABORATORIO CENTRAL DR COELHO DIAS': 'Jéssica',
+  '0000001': 'Ewerton',
+  'UNIDADE DE TRATAMENTO FORA DO DOMIC': 'Ewerton'
+ }));
+ const session=new Map([['argos_user',JSON.stringify(user)]]);
  const storage=m=>({getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)});
  const ctx={window:{},document:{getElementById:()=>null,querySelectorAll:()=>[]},localStorage:storage(store),sessionStorage:storage(session),console:{error(){},warn(){}},alert(){},confirm:()=>true,crypto:require('node:crypto').webcrypto};
  ctx.window.BpaAuditCore=require('../../code_sandbox_light_git_fe61910d_1781185357/js/bpa-audit-core.js');

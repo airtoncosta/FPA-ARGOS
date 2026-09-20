@@ -1,28 +1,16 @@
 {
-  "ultimaSincronizacao": "2026-09-19T02:07:50.484Z",
+  "ultimaSincronizacao": "2026-09-20T16:07:24.399Z",
   "statusDatasus": "espelho",
   "origem": "espelho_contingencia",
   "bpa": [
-    {
-      "arquivo": "BPAMAG2601.exe",
-      "tipo": "bpa",
-      "versao": "26.01",
-      "titulo": "BPA Magnético v26.01",
-      "descricao": "Instalador oficial do Boletim de Produção Ambulatorial do SUS (Versão Vigente)",
-      "ordem": 2601,
-      "isVigente": true,
-      "urlDatasus": "http://ftp.datasus.gov.br/siasus/BPA/BPAMAG2601.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bpa/BPAMAG2601.exe",
-      "disponivelLocal": false
-    },
     {
       "arquivo": "BPAMAG0500.exe",
       "tipo": "bpa",
       "versao": "05.00",
       "titulo": "BPA Magnético v05.00",
-      "descricao": "Instalador oficial do Boletim de Produção Ambulatorial do SUS (Versão Anterior - Arquivo Histórico)",
+      "descricao": "Instalador oficial do Boletim de Produção Ambulatorial do SUS (Versão Vigente)",
       "ordem": 500,
-      "isVigente": false,
+      "isVigente": true,
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/BPA/BPAMAG0500.exe",
       "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bpa/BPAMAG0500.exe",
       "disponivelLocal": false
@@ -238,7 +226,7 @@
     "totalArquivosLocais": 0,
     "espacoOcupadoBytes": 0,
     "espacoOcupadoFormatado": "0 B",
-    "versaoVigenteBpa": "BPAMAG2601.exe",
+    "versaoVigenteBpa": "BPAMAG0500.exe",
     "versaoVigenteBdsia": "Agosto/2026 (rev. a)",
     "ultimaNotaTecnica": "Setembro/2026",
     "totalNotasDisponiveis": 6
