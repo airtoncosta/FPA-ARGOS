@@ -233,16 +233,20 @@ const BpaModule = {
         }
     },
 
-    async loadCnesBase() {
+    async loadCnesBase(compStr = '') {
+        const rawComp = String(compStr || this.currentCompetenciaFiltro || '202608').replace(/\D/g, '');
+        const normComp = rawComp.length === 6 ? rawComp : (rawComp.length === 6 ? rawComp : '202608');
         if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos) && this.cnesBaseCache.estabelecimentos.length > 0) {
-            return this.cnesBaseCache;
+            if (!this.cnesBaseCache.competencia || this.cnesBaseCache.competencia === normComp) {
+                return this.cnesBaseCache;
+            }
         }
         if (typeof window !== 'undefined' && window.ArgosCnesBase && Array.isArray(window.ArgosCnesBase.estabelecimentos)) {
             this.cnesBaseCache = window.ArgosCnesBase;
             return this.cnesBaseCache;
         }
         if (typeof window !== 'undefined' && window.CnesModule?.state && Array.isArray(window.CnesModule.state.estabelecimentos) && window.CnesModule.state.estabelecimentos.length > 0) {
-            this.cnesBaseCache = { estabelecimentos: window.CnesModule.state.estabelecimentos };
+            this.cnesBaseCache = { estabelecimentos: window.CnesModule.state.estabelecimentos, competencia: normComp };
             window.ArgosCnesBase = this.cnesBaseCache;
             return this.cnesBaseCache;
         }
@@ -269,10 +273,22 @@ const BpaModule = {
                         if (anon) headers.Authorization = `Bearer ${anon}`;
                     }
                 }
-                const res = await fetch('/api/cnes/bacabal', { headers }).catch(() => null);
+                const res = await fetch(`/api/cnes/bacabal?competencia=${normComp}`, { headers }).catch(() => null);
                 if (res && res.ok) {
                     const txt = await res.text();
                     this.cnesBaseCache = JSON.parse(txt.replace(/^\uFEFF/, ''));
+                    this.cnesBaseCache.competencia = normComp;
+                    if (typeof window !== 'undefined') window.ArgosCnesBase = this.cnesBaseCache;
+                    return this.cnesBaseCache;
+                }
+
+                // Fallback para arquivo JSON estático da competência
+                const fallbackUrl = `cnes_data/cnes_210120_${normComp}.json`;
+                const resFb = await fetch(fallbackUrl).catch(() => null);
+                if (resFb && resFb.ok) {
+                    const txtFb = await resFb.text();
+                    this.cnesBaseCache = JSON.parse(txtFb.replace(/^\uFEFF/, ''));
+                    this.cnesBaseCache.competencia = normComp;
                     if (typeof window !== 'undefined') window.ArgosCnesBase = this.cnesBaseCache;
                     return this.cnesBaseCache;
                 }
@@ -1058,39 +1074,41 @@ const BpaModule = {
             const cboCode = prof.cbo || '';
             const cboLabel = prof.cboDesc || (cboCode ? (typeof CBO_DICTIONARY !== 'undefined' && CBO_DICTIONARY[cboCode] ? `${cboCode} - ${CBO_DICTIONARY[cboCode]}` : `CBO ${cboCode}`) : '');
 
-            // Identificação do profissional
+            // Identificação do profissional com CNS desmascarado (15 dígitos visíveis)
             let headerProfHtml = '';
             if (temNome) {
                 headerProfHtml = '<strong style="color: #0f172a; font-size: 0.86rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fas fa-user-md" style="color: #0284c7;"></i> ' + prof.nome + '</strong> ' +
-                    '<code class="bpa-prof-badge-cns" data-cns="' + prof.cns + '">CNS ' + this.mascararCns(prof.cns) + '</code>';
+                    '<code class="bpa-prof-badge-cns" data-cns="' + prof.cns + '" style="font-family: monospace; font-weight: 700; letter-spacing: 0.02em;">CNS ' + prof.cns + '</code>';
             } else {
-                headerProfHtml = '<code class="bpa-prof-badge-cns" data-cns="' + prof.cns + '" style="background: #f1f5f9; color: #334155;">CNS ' + this.mascararCns(prof.cns) + '</code> ' +
-                    '<span style="color: #dc2626; font-size: 0.74rem; font-style: italic;">(Profissional sem vínculo localizado nesta unidade)</span>';
+                headerProfHtml = '<code class="bpa-prof-badge-cns" data-cns="' + prof.cns + '" style="background: #fef2f2; color: #991b1b; font-family: monospace; font-weight: 700; border: 1px solid #fecaca;">CNS ' + prof.cns + '</code> ' +
+                    '<span style="color: #dc2626; font-size: 0.74rem; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> Glosa: Profissional sem vínculo nesta unidade</span>';
             }
 
             const cboStr = cboLabel ? '<span class="bpa-prof-cbo-text"><i class="fas fa-id-badge" style="color: #94a3b8;"></i> ' + cboLabel + '</span>' : '';
 
-            // Badge de vínculo CNES
+            // Badge de vínculo CNES ou Glosa
             let badgeVinculo = '';
-            if (temNome && prof.vinculadoUnidade !== false) {
-                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; padding: 1px 6px; font-size: 0.70rem; font-weight: 600; white-space: nowrap;" title="Vínculo confirmado no CNES e DATASUS"><i class="fas fa-check-circle"></i> Vínculo Confirmado no CNES</span>';
-            } else if (temNome && prof.vinculadoUnidade === false) {
-                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #fffbeb; color: #b45309; border: 1px solid #fde68a; border-radius: 4px; padding: 1px 6px; font-size: 0.70rem; font-weight: 600; white-space: nowrap;" title="Profissional cadastrado em outro CNES do município"><i class="fas fa-exclamation-circle"></i> Vínculo em outra Unidade</span>';
+            if (prof.vinculadoUnidade !== false && temNome) {
+                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; padding: 2px 7px; font-size: 0.70rem; font-weight: 600; white-space: nowrap;" title="Vínculo confirmado no CNES e DATASUS"><i class="fas fa-check-circle"></i> Vínculo Confirmado no CNES</span>';
+            } else if (prof.vinculadoUnidade === false && temNome) {
+                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 7px; font-size: 0.70rem; font-weight: 700; white-space: nowrap;" title="Profissional cadastrado em outro CNES ou sem vínculo nesta unidade na competência (Glosa)"><i class="fas fa-times-circle"></i> Glosa: Sem Vínculo nesta Unidade</span>';
+            } else {
+                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 7px; font-size: 0.70rem; font-weight: 700; white-space: nowrap;" title="Profissional não cadastrado no CNES da competência (Glosa)"><i class="fas fa-times-circle"></i> Glosa: Não Cadastrado no CNES</span>';
             }
 
             let procsHtml = '';
             if (prof.procedimentos && prof.procedimentos.length > 0) {
-                const badges = prof.procedimentos.slice(0, 5).map(p => 
-                    '<span class="bpa-proc-pill-item" style="background: #ffffff; border: 1px solid #e2e8f0; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem; white-space: nowrap;">' +
-                    '<code style="font-family: monospace; color: #334155;">' + p.codigo + '</code>: <strong style="color: #0284c7;">' + p.quantidade + '</strong>' +
+                const badges = prof.procedimentos.map(p => 
+                    '<span class="bpa-proc-pill-item" style="background: #ffffff; border: 1px solid #cbd5e1; padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; white-space: nowrap;">' +
+                    '<code style="font-family: monospace; color: #1e293b; font-weight: 700;">' + p.codigo + '</code>: <strong style="color: #0284c7;">' + p.quantidade + '</strong>' +
                     '</span>'
                 ).join(' ');
-                procsHtml = '<div class="bpa-prof-procs-row"><span style="font-size: 0.70rem; color: #64748b; font-weight: 600; margin-right: 2px;">Procedimentos:</span> ' + badges + '</div>';
+                procsHtml = '<div class="bpa-prof-procs-row" style="margin-top: 0.35rem; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;"><span style="font-size: 0.70rem; color: #475569; font-weight: 700; margin-right: 2px;">Procedimentos:</span> ' + badges + '</div>';
             }
 
             let equipeHtml = '';
             if (prof.membrosEquipe && prof.membrosEquipe.length > 0) {
-                const nomesEquipe = prof.membrosEquipe.map(m => m.nome.split(' ')[0] + ' (' + this.mascararCns(m.cns).slice(-4) + ')').join(' • ');
+                const nomesEquipe = prof.membrosEquipe.map(m => m.nome.split(' ')[0] + ' (' + m.cns.slice(-4) + ')').join(' • ');
                 equipeHtml = '<div style="margin-top: 0.25rem; font-size: 0.72rem; color: #0369a1;"><i class="fas fa-users" style="margin-right: 3px;"></i> Médicos vinculados: ' + nomesEquipe + '</div>';
             }
 
@@ -1126,12 +1144,22 @@ const BpaModule = {
             estabs.push(...window.ProducaoProfissionalModule.cnesCache.estabelecimentos);
         }
 
+        const matchesUnitCnes = (est, target) => {
+            if (!est || !target) return false;
+            const c = String(est.cnes || '').replace(/\D/g, '');
+            if (c && c === target) return true;
+            if (Array.isArray(est.aliases)) {
+                return est.aliases.some(a => String(a).replace(/\D/g, '') === target);
+            }
+            return false;
+        };
+
         let found = null;
         let unitFound = null;
 
-        // 1. Tentar buscar primeiro na unidade específica (cleanCnes)
+        // 1. Tentar buscar primeiro na unidade específica (cleanCnes ou seus aliases)
         if (cleanCnes) {
-            const targetUnit = estabs.find(est => String(est.cnes || '').replace(/\D/g, '') === cleanCnes);
+            const targetUnit = estabs.find(est => matchesUnitCnes(est, cleanCnes));
             if (targetUnit && Array.isArray(targetUnit.profissionais)) {
                 const p = targetUnit.profissionais.find(x => String(x.cns || x.cnsMaster || '').replace(/\D/g, '') === cleanCns);
                 if (p) {
@@ -1157,7 +1185,7 @@ const BpaModule = {
 
         // Se encontrou no catálogo de estabelecimentos
         if (found) {
-            const vinculadoUnidade = !cleanCnes || (unitFound && String(unitFound.cnes || '').replace(/\D/g, '') === cleanCnes);
+            const vinculadoUnidade = !cleanCnes || (unitFound && matchesUnitCnes(unitFound, cleanCnes));
             const cboCode = String(found.cbo || '').trim();
             const cboDescDict = (typeof CBO_DICTIONARY !== 'undefined' && CBO_DICTIONARY[cboCode])
                 || (typeof window !== 'undefined' && window.CBO_DICTIONARY && window.CBO_DICTIONARY[cboCode])

@@ -21,15 +21,18 @@
 
 ---
 
-### Task 1: Resolução de Vínculos com Aliases, CNS Desmascarado (15 dígitos) e Procedimentos por Profissional
+### Task 1: Resolução Dinâmica de Vínculos de TODOS os Profissionais por Unidade e Competência (com Glosa se Ausente), CNS Desmascarado (15 dígitos) e Procedimentos
 
 **Files:**
 - Create: `scripts/tests/bpa-recepcao-integrada.test.cjs`
 - Modify: `code_sandbox_light_git_fe61910d_1781185357/js/bpa-module.js:1054-1265`
 
 **Interfaces:**
-- Consumes: `bpaModule.lookupProfissional(cns, cnes)` e `bpaModule.formatProfissionaisAmostra(profissionaisDetalhados)`.
-- Produces: `bpaModule.formatProfissionaisAmostra` contendo CNS de 15 dígitos sem asteriscos, badge de `Vínculo Confirmado no CNES` quando o CNES bate com `cnes` ou `aliases`, e lista de procedimentos por profissional.
+- Consumes: `bpaModule.lookupProfissional(cns, cnes, competencia)` e `bpaModule.formatProfissionaisAmostra(profissionaisDetalhados)`.
+- Produces: `bpaModule.lookupProfissional` genérico para qualquer arquivo e profissional de qualquer estabelecimento e competência.
+  - Se o profissional está cadastrado na unidade naquela competência (considerando CNES e aliases): `vinculadoUnidade = true` (Selo Verde de Vínculo Confirmado).
+  - Se o profissional NÃO está cadastrado naquela unidade naquela competência: `vinculadoUnidade = false` (Alerta Vermelho de Glosa por Falta de Vínculo).
+  - `formatProfissionaisAmostra`: renderiza todos os 15 dígitos do CNS sem máscara de asteriscos, exibe o status de vínculo ou glosa, e lista todos os procedimentos individuais com suas quantidades e o total do profissional.
 
 - [ ] **Step 1: Escrever testes que falham para resolução com aliases e CNS completo**
 
