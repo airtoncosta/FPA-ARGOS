@@ -738,8 +738,13 @@
                         </div>
                         
                         <div class="premium-input-group">
-                            <input type="email" id="userEmail" class="premium-input" placeholder=" " required>
-                            <label for="userEmail"><i class="fas fa-envelope"></i> E-mail / Login</label>
+                            <input type="text" id="userLogin" class="premium-input" placeholder=" " required autocomplete="off" autocapitalize="none" spellcheck="false">
+                            <label for="userLogin"><i class="fas fa-user-circle"></i> Login / Nome de Acesso</label>
+                        </div>
+                        
+                        <div class="premium-input-group" id="divUserEmailOptional" style="display: none;">
+                            <input type="email" id="userEmail" class="premium-input" placeholder=" ">
+                            <label for="userEmail"><i class="fas fa-envelope"></i> E-mail (Opcional)</label>
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 1.7143rem;">

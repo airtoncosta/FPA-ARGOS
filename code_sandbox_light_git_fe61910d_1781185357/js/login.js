@@ -411,10 +411,11 @@ const LoginModule = {
         try { dbUsers = JSON.parse(localStorage.getItem('argos_users_db') || '[]'); } catch (e) { }
         if (dbUsers.length === 0) dbUsers = ARGOS_USERS; // fallback
 
-        // Buscar o usuário pelo username ou pelo e-mail
+        // Buscar o usuário pelo username, login de fato ou pelo e-mail
         const user = dbUsers.find(u =>
             u.username.toLowerCase() === loginVal ||
-            u.email.toLowerCase() === loginVal
+            (u.username && u.username.toLowerCase().split('@')[0] === loginVal) ||
+            (u.email && u.email.toLowerCase() === loginVal)
         );
 
         if (!user) {

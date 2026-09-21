@@ -55,11 +55,15 @@ const UsersModule = {
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
-                const filtered = this.users.filter(u => 
-                    u.name.toLowerCase().includes(term) || 
-                    u.username.toLowerCase().includes(term) ||
-                    (u.email && u.email.toLowerCase().includes(term))
-                );
+                const filtered = this.users.filter(u => {
+                    const clean = (u.username || '').includes('@') ? u.username.split('@')[0] : (u.username || '');
+                    return (
+                        (u.name && u.name.toLowerCase().includes(term)) || 
+                        (u.username && u.username.toLowerCase().includes(term)) ||
+                        clean.toLowerCase().includes(term) ||
+                        (u.email && u.email.toLowerCase().includes(term))
+                    );
+                });
                 this.renderTable(filtered);
             });
         }
@@ -132,9 +136,14 @@ const UsersModule = {
             // Data último login
             const lastLogin = this.getLastLogin(u.username);
             
-            const isMe = currentUser && currentUser.username === u.username;
+            // Login de fato (apenas o nome de acesso que vai logar, sem exigir e-mail)
+            const cleanLogin = (u.username || '').includes('@') 
+                ? u.username.split('@')[0] 
+                : (u.username || (u.email ? u.email.split('@')[0] : ''));
+            const safeLogin = CryptoUtils.escapeHtml(cleanLogin);
+
+            const isMe = currentUser && (currentUser.username === u.username || currentUser.username === cleanLogin);
             const safeName = CryptoUtils.escapeHtml(u.name);
-            const safeEmail = CryptoUtils.escapeHtml(u.email);
             const nameSpan = `<span class="clickable-user-name" onclick="UsersModule.viewUserHistory('${CryptoUtils.escapeHtml(u.username)}', '${safeName}')" style="color: var(--sus-blue); cursor: pointer; font-weight: 700; transition: color 0.2s;" onmouseover="this.style.color='var(--sus-blue-light)'; this.style.textDecoration='underline';" onmouseout="this.style.color='var(--sus-blue)'; this.style.textDecoration='none';">${safeName}</span>`;
             const nameHtml = isMe ? `${nameSpan} <span style="background:#e0f2f1;color:#00796b;font-size:0.6rem;padding:2px 6px;border-radius:10px;margin-left:5px;">Você</span>` : nameSpan;
 
@@ -142,7 +151,7 @@ const UsersModule = {
 
             tr.innerHTML = `
                 <td style="font-weight:600;">${nameHtml}</td>
-                <td>${safeEmail}</td>
+                <td style="font-family: var(--font-mono, monospace); font-weight: 600; color: var(--gray-700);">${safeLogin}</td>
                 <td>${roleBadge}</td>
                 <td>${statusBadge}${failedHtml}</td>
                 <td>${registerDate}</td>
@@ -282,7 +291,12 @@ const UsersModule = {
             title.textContent = 'Editar Usuário';
             document.getElementById('userOriginalLogin').value = user.username;
             document.getElementById('userName').value = user.name;
-            document.getElementById('userEmail').value = user.email;
+            const inputLogin = document.getElementById('userLogin');
+            if (inputLogin) {
+                inputLogin.value = (user.username || '').includes('@') ? user.username.split('@')[0] : (user.username || '');
+            }
+            const inputEmail = document.getElementById('userEmail');
+            if (inputEmail) inputEmail.value = user.email || '';
             if(roleSelect) roleSelect.value = user.role || 'GERENTE';
             
             // v4.0: Preencher campos multi-município e permissões
@@ -302,6 +316,10 @@ const UsersModule = {
         } else {
             title.textContent = 'Novo Usuário';
             document.getElementById('userOriginalLogin').value = '';
+            const inputLogin = document.getElementById('userLogin');
+            if (inputLogin) inputLogin.value = '';
+            const inputEmail = document.getElementById('userEmail');
+            if (inputEmail) inputEmail.value = '';
             divPassword.style.display = 'block';
             passInput.setAttribute('required', 'true');
             
@@ -330,11 +348,25 @@ const UsersModule = {
         
         const originalLogin = document.getElementById('userOriginalLogin').value;
         const name = document.getElementById('userName').value.trim();
-        const email = document.getElementById('userEmail').value.trim();
-        const role = document.getElementById('userRole').value;
+        const loginEl = document.getElementById('userLogin');
+        const emailEl = document.getElementById('userEmail');
         
-        // O username será baseado no email para novos usuários, mas preservado na edição
-        const username = originalLogin ? originalLogin : email;
+        let loginVal = (loginEl ? loginEl.value : (emailEl ? emailEl.value : '')).trim().toLowerCase();
+        // Limpar qualquer @ digitado para garantir apenas o nome de fato de login
+        if (loginVal.includes('@')) {
+            loginVal = loginVal.split('@')[0];
+        }
+
+        if (!loginVal) {
+            alert('Por favor, informe o nome de acesso/login do usuário.');
+            return;
+        }
+
+        const username = loginVal;
+        const emailVal = emailEl && emailEl.value.trim() 
+            ? emailEl.value.trim().toLowerCase() 
+            : `${username}@argos.local`;
+        const role = document.getElementById('userRole').value;
 
         const isOnline = window.SupabaseConfig && window.SupabaseConfig.isConnected();
         const loggedUser = this.getCurrentUser();
@@ -343,17 +375,20 @@ const UsersModule = {
             // --- EDIÇÃO ---
             const userIndex = this.users.findIndex(u => u.username === originalLogin);
             if (userIndex > -1) {
-                // Verificar se novo email já existe em outro user
-                const emailExists = this.users.find(u => u.username === username && u.username !== originalLogin);
-                if (emailExists) {
-                    alert('Este E-mail/Login já está sendo usado por outro usuário!');
+                // Verificar se novo login já existe em outro usuário
+                const loginExists = this.users.find(u => {
+                    const uClean = (u.username || '').includes('@') ? u.username.split('@')[0] : u.username;
+                    return (u.username.toLowerCase() === username || uClean.toLowerCase() === username) && u.username !== originalLogin;
+                });
+                if (loginExists) {
+                    alert('Este Login já está sendo usado por outro usuário!');
                     return;
                 }
 
                 const updatedUser = {
                     ...this.users[userIndex],
                     name: name,
-                    email: email,
+                    email: emailVal,
                     username: username,
                     role: role,
                     acesso_multi_municipio: document.getElementById('userMultiMunicipio')?.checked || false,
@@ -367,6 +402,13 @@ const UsersModule = {
                 if (isOnline) {
                     try {
                         await window.SupabaseService.upsertUser(updatedUser);
+                        if (originalLogin !== username) {
+                            try {
+                                await window.SupabaseService.deleteUser(originalLogin);
+                            } catch (delErr) {
+                                console.warn('Aviso ao remover login antigo no Supabase:', delErr);
+                            }
+                        }
                         if (loggedUser) {
                             await window.SupabaseService.logAction(loggedUser.username, 'USUARIOS', 'EDICAO_USUARIO', `Usuário ${name} (${username}) editado.`);
                         }
@@ -380,7 +422,7 @@ const UsersModule = {
                 }
 
                 // Se o usuário editou a si mesmo, atualizar a sessão ativa no navegador
-                if (loggedUser && loggedUser.username === username) {
+                if (loggedUser && (loggedUser.username === originalLogin || loggedUser.username === username)) {
                     if (sessionStorage.getItem('argos_user')) {
                         sessionStorage.setItem('argos_user', JSON.stringify(updatedUser));
                     }
@@ -403,9 +445,12 @@ const UsersModule = {
                 return;
             }
 
-            const emailExists = this.users.find(u => u.username === username);
-            if (emailExists) {
-                alert('Este E-mail/Login já está cadastrado!');
+            const loginExists = this.users.find(u => {
+                const uClean = (u.username || '').includes('@') ? u.username.split('@')[0] : u.username;
+                return u.username.toLowerCase() === username || uClean.toLowerCase() === username;
+            });
+            if (loginExists) {
+                alert('Este Login já está cadastrado!');
                 return;
             }
 
@@ -417,7 +462,7 @@ const UsersModule = {
 
             const newUser = {
                 username: username,
-                email: email,
+                email: emailVal,
                 name: name,
                 password: passwordHash,
                 role: role,
