@@ -150,9 +150,19 @@ window.ProducaoProfissionalModule = {
         let unitFound = null;
         let vinculadoUnidade = true;
 
-        // 1. Tenta buscar primeiro na própria unidade (cnes) informada
+        const matchesUnitCnes = (est, target) => {
+            if (!est || !target) return false;
+            const c = String(est.cnes || '').replace(/\D/g, '');
+            if (c && c === target) return true;
+            if (Array.isArray(est.aliases)) {
+                return est.aliases.some(a => String(a).replace(/\D/g, '') === target);
+            }
+            return false;
+        };
+
+        // 1. Tenta buscar primeiro na própria unidade (cnes ou aliases) informada
         if (cleanCnes) {
-            const unit = estabs.find(est => String(est.cnes || '').replace(/\D/g, '') === cleanCnes);
+            const unit = estabs.find(est => matchesUnitCnes(est, cleanCnes));
             if (unit && Array.isArray(unit.profissionais)) {
                 const p = unit.profissionais.find(x => String(x.cns || x.cnsMaster || '').replace(/\D/g, '') === cleanCns);
                 if (p) {

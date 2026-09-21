@@ -61,11 +61,47 @@ const BpaModule = {
     canSubmitPendingUpload() {
         if (!this.filePendingUpload) return false;
         const approval = this.auditApproval;
-        if (!approval || !approval.podeEnviarSemGlosa) return false;
+        if (!approval) return false;
         if (this.filePendingUpload.fingerprint && approval.fingerprint && approval.fingerprint !== this.filePendingUpload.fingerprint) {
             return false;
         }
         return true;
+    },
+
+    setAuditResult(computed) {
+        if (!computed) return;
+        this.auditApproval = {
+            fingerprint: computed.fingerprint,
+            approvedAt: Date.now(),
+            podeEnviarSemGlosa: computed.podeEnviarSemGlosa === true,
+            status: computed.podeEnviarSemGlosa ? 'CONFORME' : 'COM_APONTAMENTOS',
+            totalApontamentos: computed.naoConformidades || computed.totalGlosas || (computed.achados?.length || 0),
+            detalhes: computed
+        };
+        this.atualizarEstadoBotaoEnvio();
+    },
+
+    atualizarEstadoBotaoEnvio() {
+        const btnUpload = typeof document !== 'undefined' ? document.getElementById('btnConfirmarUploadBpa') : null;
+        if (!btnUpload) return;
+        const podeEnviar = this.canSubmitPendingUpload();
+        btnUpload.disabled = !podeEnviar;
+        if (podeEnviar) {
+            const approval = this.auditApproval;
+            if (approval && !approval.podeEnviarSemGlosa) {
+                btnUpload.classList.add('bpa-btn-com-apontamentos');
+                btnUpload.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Confirmar Envio com Apontamentos (${approval.totalApontamentos})`;
+                btnUpload.title = 'Auditoria realizada: lote com apontamentos de risco registrado para rastreabilidade';
+            } else {
+                btnUpload.classList.remove('bpa-btn-com-apontamentos');
+                btnUpload.innerHTML = '<i class="fas fa-check-circle"></i> Confirmar e Enviar Produção';
+                btnUpload.title = 'Auditoria concluída: lote 100% conforme';
+            }
+        } else {
+            btnUpload.classList.remove('bpa-btn-com-apontamentos');
+            btnUpload.innerHTML = '<i class="fas fa-lock"></i> Aguardando Diagnóstico Pente Fino';
+            btnUpload.title = 'Execute a auditoria do Pente Fino para liberar o envio';
+        }
     },
 
     mesesExtenso: {
@@ -235,25 +271,54 @@ const BpaModule = {
 
     async loadCnesBase(compStr = '') {
         const rawComp = String(compStr || this.currentCompetenciaFiltro || '202608').replace(/\D/g, '');
-        const normComp = rawComp.length === 6 ? rawComp : (rawComp.length === 6 ? rawComp : '202608');
+        const normComp = rawComp.length === 6 ? rawComp : '202608';
+        this.cnesBasesByComp = this.cnesBasesByComp || {};
+
+        if (this.cnesBasesByComp[normComp] && Array.isArray(this.cnesBasesByComp[normComp].estabelecimentos)) {
+            this.cnesBaseCache = this.cnesBasesByComp[normComp];
+            return this.cnesBaseCache;
+        }
+
         if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos) && this.cnesBaseCache.estabelecimentos.length > 0) {
-            if (!this.cnesBaseCache.competencia || this.cnesBaseCache.competencia === normComp) {
+            if (this.cnesBaseCache.competencia === normComp) {
+                this.cnesBasesByComp[normComp] = this.cnesBaseCache;
                 return this.cnesBaseCache;
             }
         }
         if (typeof window !== 'undefined' && window.ArgosCnesBase && Array.isArray(window.ArgosCnesBase.estabelecimentos)) {
-            this.cnesBaseCache = window.ArgosCnesBase;
-            return this.cnesBaseCache;
+            if (!window.ArgosCnesBase.competencia || window.ArgosCnesBase.competencia === normComp) {
+                this.cnesBaseCache = window.ArgosCnesBase;
+                this.cnesBasesByComp[normComp] = this.cnesBaseCache;
+                return this.cnesBaseCache;
+            }
         }
         if (typeof window !== 'undefined' && window.CnesModule?.state && Array.isArray(window.CnesModule.state.estabelecimentos) && window.CnesModule.state.estabelecimentos.length > 0) {
             this.cnesBaseCache = { estabelecimentos: window.CnesModule.state.estabelecimentos, competencia: normComp };
             window.ArgosCnesBase = this.cnesBaseCache;
+            this.cnesBasesByComp[normComp] = this.cnesBaseCache;
             return this.cnesBaseCache;
         }
         if (typeof window !== 'undefined' && window.ProducaoProfissionalModule?.cnesCache && Array.isArray(window.ProducaoProfissionalModule.cnesCache.estabelecimentos) && window.ProducaoProfissionalModule.cnesCache.estabelecimentos.length > 0) {
             this.cnesBaseCache = window.ProducaoProfissionalModule.cnesCache;
             window.ArgosCnesBase = this.cnesBaseCache;
+            this.cnesBasesByComp[normComp] = this.cnesBaseCache;
             return this.cnesBaseCache;
+        }
+
+        // Fallback direto via fs para execução em ambiente Node.js / testes automatizados
+        if (typeof require === 'function') {
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const p = path.resolve(__dirname, `../cnes_data/cnes_210120_${normComp}.json`);
+                if (fs.existsSync(p)) {
+                    const txt = fs.readFileSync(p, 'utf8');
+                    this.cnesBaseCache = JSON.parse(txt.replace(/^\uFEFF/, ''));
+                    this.cnesBaseCache.competencia = normComp;
+                    this.cnesBasesByComp[normComp] = this.cnesBaseCache;
+                    return this.cnesBaseCache;
+                }
+            } catch (_e) {}
         }
 
         if (typeof fetch === 'function') {
@@ -278,6 +343,7 @@ const BpaModule = {
                     const txt = await res.text();
                     this.cnesBaseCache = JSON.parse(txt.replace(/^\uFEFF/, ''));
                     this.cnesBaseCache.competencia = normComp;
+                    this.cnesBasesByComp[normComp] = this.cnesBaseCache;
                     if (typeof window !== 'undefined') window.ArgosCnesBase = this.cnesBaseCache;
                     return this.cnesBaseCache;
                 }
@@ -289,6 +355,7 @@ const BpaModule = {
                     const txtFb = await resFb.text();
                     this.cnesBaseCache = JSON.parse(txtFb.replace(/^\uFEFF/, ''));
                     this.cnesBaseCache.competencia = normComp;
+                    this.cnesBasesByComp[normComp] = this.cnesBaseCache;
                     if (typeof window !== 'undefined') window.ArgosCnesBase = this.cnesBaseCache;
                     return this.cnesBaseCache;
                 }
@@ -962,60 +1029,32 @@ const BpaModule = {
         // contribute to the list of identified professionals.
         const profMap = new Map();
         for (const r of records) {
-            if (r.tipo !== 'BPA-I' || !/^\d{15}$/.test(String(r.cnsProfissional || '').trim())) continue;
-            let cns = String(r.cnsProfissional || '').trim();
+            if (r.tipo !== 'BPA-I') continue;
+            const rawCns = String(r.cnsProfissional || '').trim();
+            const cleanCns = rawCns.replace(/\D/g, '');
+            if (!cleanCns && !rawCns) continue;
             const cbo = String(r.cbo || '').trim();
             const qty = /^\d+$/.test(r.quantidade) ? Number(r.quantidade) : 1;
-
-            let key = cns;
-            let resolvedProfs = [];
-            if (!key && cbo) {
-                resolvedProfs = this.lookupProfissionaisByCbo(cbo, cnes, unit?.nome);
-                if (resolvedProfs.length === 1) {
-                    key = resolvedProfs[0].cns || `CBO_${cbo}`;
-                } else if (resolvedProfs.length > 1) {
-                    key = `EQUIPE_${cbo}`;
-                } else {
-                    key = `CBO_${cbo}`;
-                }
-            }
-
-            if (!key && !cbo) continue;
-            if (!key) key = `CBO_${cbo}`;
+            const key = cleanCns || rawCns;
 
             if (!profMap.has(key)) {
                 let nome = '';
                 let cboDesc = '';
-                let membrosEquipe = [];
-
-                if (resolvedProfs.length === 1) {
-                    nome = resolvedProfs[0].nome || '';
-                    cboDesc = resolvedProfs[0].ocupacao || (cbo ? `CBO ${cbo}` : '');
-                } else if (resolvedProfs.length > 1) {
-                    const ocupLabel = resolvedProfs[0].ocupacao?.split('-')[1]?.trim() || 'Especializada';
-                    nome = `Equipe de ${ocupLabel} (${resolvedProfs.length} médicos/profissionais)`;
-                    cboDesc = resolvedProfs[0].ocupacao || (`CBO ${cbo}`);
-                    membrosEquipe = resolvedProfs.map(p => ({ nome: p.nome, cns: p.cns, ocupacao: p.ocupacao }));
-                } else if (!key.startsWith('CBO_') && !key.startsWith('EQUIPE_')) {
-                    const info = this.lookupProfissional ? this.lookupProfissional(key, cnes) : null;
-                    nome = info?.nome || '';
-                    cboDesc = info?.ocupacao || (cbo ? `CBO ${cbo}` : '');
-                } else {
-                    nome = `Equipe Especializada (CBO ${cbo})`;
-                    cboDesc = `CBO ${cbo}`;
-                }
+                const info = this.lookupProfissional ? this.lookupProfissional(key, cnes, comp) : null;
+                nome = info?.nome || '';
+                cboDesc = info?.ocupacao || (cbo ? `CBO ${cbo}` : '');
 
                 profMap.set(key, {
-                    cns: key.startsWith('EQUIPE_') ? `CBO ${cbo} (${resolvedProfs.length} CNS)` : key.startsWith('CBO_') ? `Consolidado CBO ${cbo}` : key,
-                    cnsReal: (key.startsWith('EQUIPE_') || key.startsWith('CBO_')) ? '' : key,
+                    cns: key,
+                    cnsReal: key,
                     nome,
                     cbo,
                     cboDesc,
-                    membrosEquipe,
+                    membrosEquipe: [],
                     totalQuantidade: 0,
                     totalAtendimentos: 0,
                     procedimentosMap: new Map(),
-                    isConsolidadoBpaC: !r.cnsProfissional
+                    isConsolidadoBpaC: false
                 });
             }
 
@@ -1030,12 +1069,13 @@ const BpaModule = {
         }
 
         const profissionaisDetalhados = [...profMap.values()].map(prof => {
-            const info = prof.cnsReal && this.lookupProfissional ? this.lookupProfissional(prof.cnsReal, cnes) : null;
+            const info = prof.cnsReal && this.lookupProfissional ? this.lookupProfissional(prof.cnsReal, cnes, comp) : null;
             const nome = prof.nome || info?.nome || '';
             const cboDesc = prof.cboDesc || info?.ocupacao || (prof.cbo ? ('CBO ' + prof.cbo) : '');
             const procedimentos = [...prof.procedimentosMap.entries()]
                 .sort((a, b) => b[1] - a[1])
                 .map(([codigo, quantidade]) => ({ codigo, quantidade }));
+            const isGlosa = info ? info.isGlosa : (!prof.cnsReal ? false : true);
             return {
                 cns: prof.cns,
                 cnsReal: prof.cnsReal,
@@ -1046,7 +1086,14 @@ const BpaModule = {
                 quantidade: prof.totalQuantidade,
                 atendimentos: prof.totalAtendimentos,
                 procedimentos,
-                isConsolidadoBpaC: prof.isConsolidadoBpaC
+                isConsolidadoBpaC: prof.isConsolidadoBpaC,
+                vinculadoUnidade: info ? info.vinculadoUnidade : false,
+                vinculadoCompetencia: info ? info.vinculadoCompetencia : false,
+                isGlosa: isGlosa,
+                motivoGlosa: info?.motivoGlosa || (isGlosa ? 'Glosa: Profissional sem vínculo nesta unidade de saúde na competência' : ''),
+                cnesUnidade: info ? info.cnesUnidade : '',
+                nomeUnidade: info ? info.nomeUnidade : '',
+                vinculoOficial: info ? info.vinculoOficial : null
             };
         }).sort((a, b) => b.quantidade - a.quantidade);
 
@@ -1133,19 +1180,18 @@ const BpaModule = {
                     '<code class="bpa-prof-badge-cns" data-cns="' + prof.cns + '" style="font-family: monospace; font-weight: 700; letter-spacing: 0.02em;">CNS ' + prof.cns + '</code>';
             } else {
                 headerProfHtml = '<code class="bpa-prof-badge-cns" data-cns="' + prof.cns + '" style="background: #fef2f2; color: #991b1b; font-family: monospace; font-weight: 700; border: 1px solid #fecaca;">CNS ' + prof.cns + '</code> ' +
-                    '<span style="color: #dc2626; font-size: 0.74rem; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> Glosa: Profissional sem vínculo nesta unidade</span>';
+                    '<span style="color: #dc2626; font-size: 0.74rem; font-weight: 600;"><i class="fas fa-exclamation-triangle"></i> ' + (prof.motivoGlosa || 'Glosa: Profissional sem vínculo nesta unidade') + '</span>';
             }
 
             const cboStr = cboLabel ? '<span class="bpa-prof-cbo-text"><i class="fas fa-id-badge" style="color: #94a3b8;"></i> ' + cboLabel + '</span>' : '';
 
             // Badge de vínculo CNES ou Glosa
             let badgeVinculo = '';
-            if (prof.vinculadoUnidade !== false && temNome) {
-                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; padding: 2px 7px; font-size: 0.70rem; font-weight: 600; white-space: nowrap;" title="Vínculo confirmado no CNES e DATASUS"><i class="fas fa-check-circle"></i> Vínculo Confirmado no CNES</span>';
-            } else if (prof.vinculadoUnidade === false && temNome) {
-                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 7px; font-size: 0.70rem; font-weight: 700; white-space: nowrap;" title="Profissional cadastrado em outro CNES ou sem vínculo nesta unidade na competência (Glosa)"><i class="fas fa-times-circle"></i> Glosa: Sem Vínculo nesta Unidade</span>';
+            if (!prof.isGlosa && prof.vinculadoUnidade && prof.vinculadoCompetencia !== false) {
+                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; padding: 2px 7px; font-size: 0.70rem; font-weight: 600; white-space: nowrap;" title="Vínculo confirmado no CNES da unidade e na competência"><i class="fas fa-check-circle"></i> Vínculo Confirmado no CNES</span>';
             } else {
-                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 7px; font-size: 0.70rem; font-weight: 700; white-space: nowrap;" title="Profissional não cadastrado no CNES da competência (Glosa)"><i class="fas fa-times-circle"></i> Glosa: Não Cadastrado no CNES</span>';
+                const labelGlosa = prof.motivoGlosa || (prof.vinculadoUnidade === false ? 'Glosa: Sem Vínculo nesta Unidade' : 'Glosa: Fora da Competência');
+                badgeVinculo = '<span style="display: inline-flex; align-items: center; gap: 3px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 4px; padding: 2px 7px; font-size: 0.70rem; font-weight: 700; white-space: nowrap;" title="' + labelGlosa + '"><i class="fas fa-times-circle"></i> ' + labelGlosa + '</span>';
             }
 
             let procsHtml = '';
@@ -1164,7 +1210,7 @@ const BpaModule = {
                 equipeHtml = '<div style="margin-top: 0.25rem; font-size: 0.72rem; color: #0369a1;"><i class="fas fa-users" style="margin-right: 3px;"></i> Médicos vinculados: ' + nomesEquipe + '</div>';
             }
 
-            return '<div class="bpa-prof-card">' +
+            return '<div class="bpa-prof-card" style="border-left: 3px solid ' + (prof.isGlosa ? '#ef4444' : '#10b981') + '; ' + (prof.isGlosa ? 'background: #fffbfb;' : '') + '">' +
                 '<div class="bpa-prof-card-top">' +
                     '<div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">' + headerProfHtml + '</div>' +
                     '<div style="display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;">' + badgeVinculo + ' <span class="bpa-prof-total-badge" title="quantidade total: ' + prof.quantidade + '"><i class="fas fa-clipboard-check" style="color: #0284c7; margin-right: 2px;"></i> ' + prof.quantidade + ' atendimentos</span></div>' +
@@ -1175,19 +1221,26 @@ const BpaModule = {
         });
     },
 
-    lookupProfissional(cns, cnes = '') {
+    lookupProfissional(cns, cnes = '', competencia = '') {
         const cleanCns = String(cns || '').replace(/\D/g, '');
         if (!cleanCns) return null;
         const cleanCnes = String(cnes || '').replace(/\D/g, '');
+        const cleanComp = String(competencia || '').replace(/\D/g, '');
+        const targetComp = cleanComp.length === 6 ? cleanComp : '';
 
         const estabs = [];
-        try {
-            if (typeof window !== 'undefined' && window.CnesModule?.state && Array.isArray(window.CnesModule.state.estabelecimentos)) {
-                estabs.push(...window.CnesModule.state.estabelecimentos);
-            }
-        } catch (e) {}
-        if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
+        let baseComp = '';
+        if (targetComp && this.cnesBasesByComp && this.cnesBasesByComp[targetComp]) {
+            const b = this.cnesBasesByComp[targetComp];
+            if (Array.isArray(b.estabelecimentos)) estabs.push(...b.estabelecimentos);
+            baseComp = b.competencia || targetComp;
+        } else if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
             estabs.push(...this.cnesBaseCache.estabelecimentos);
+            baseComp = this.cnesBaseCache.competencia || '';
+        }
+
+        if (typeof window !== 'undefined' && window.CnesModule?.state && Array.isArray(window.CnesModule.state.estabelecimentos)) {
+            estabs.push(...window.CnesModule.state.estabelecimentos);
         }
         if (typeof window !== 'undefined' && window.ArgosCnesBase && Array.isArray(window.ArgosCnesBase.estabelecimentos)) {
             estabs.push(...window.ArgosCnesBase.estabelecimentos);
@@ -1235,16 +1288,30 @@ const BpaModule = {
             }
         }
 
-        // Se encontrou no catálogo de estabelecimentos
+        // 3. Verificação de competência e unidade (Se não estiver na unidade ou na competência, é GLOSA)
+        const baseCompClean = String(baseComp || '').replace(/\D/g, '');
+        const compConferida = !targetComp || !baseCompClean || baseCompClean === targetComp;
+
         if (found) {
             const vinculadoUnidade = !cleanCnes || (unitFound && matchesUnitCnes(unitFound, cleanCnes));
+            const vinculadoCompetencia = compConferida;
+            const isGlosa = !vinculadoUnidade || !vinculadoCompetencia;
+
+            let motivoGlosa = '';
+            if (!vinculadoUnidade) {
+                motivoGlosa = unitFound
+                    ? `Glosa: Profissional lotado em outra unidade (${unitFound.nomeFantasia || unitFound.nome || ('CNES ' + unitFound.cnes)})`
+                    : 'Glosa: Sem Vínculo nesta Unidade';
+            } else if (!vinculadoCompetencia) {
+                motivoGlosa = `Glosa: Profissional sem vínculo ativo na competência ${targetComp.slice(4)}/${targetComp.slice(0, 4)}`;
+            }
+
             const cboCode = String(found.cbo || '').trim();
             const cboDescDict = (typeof CBO_DICTIONARY !== 'undefined' && CBO_DICTIONARY[cboCode])
                 || (typeof window !== 'undefined' && window.CBO_DICTIONARY && window.CBO_DICTIONARY[cboCode])
                 || '';
             const ocupacao = found.ocupacao || (cboDescDict ? `${cboCode} - ${cboDescDict}` : (cboCode ? `CBO ${cboCode}` : ''));
 
-            // Cruzamento com a base oficial de vínculos DATASUS
             let vinculoInfo = null;
             if (typeof window !== 'undefined' && window.DATASUS_VINCULOS_BACABAL) {
                 const map = window.DATASUS_VINCULOS_BACABAL;
@@ -1263,13 +1330,29 @@ const BpaModule = {
                 cbo: cboCode,
                 ocupacao: ocupacao,
                 vinculadoUnidade: vinculadoUnidade,
+                vinculadoCompetencia: vinculadoCompetencia,
+                isGlosa: isGlosa,
+                motivoGlosa: motivoGlosa,
                 cnesUnidade: unitFound ? String(unitFound.cnes || '').replace(/\D/g, '') : cleanCnes,
                 nomeUnidade: unitFound ? (unitFound.nomeFantasia || unitFound.nome || '') : '',
                 vinculoOficial: vinculoInfo
             };
         }
 
-        return null;
+        // Se não foi localizado no CNES da competência
+        return {
+            nome: '',
+            cns: cleanCns,
+            cbo: '',
+            ocupacao: '',
+            vinculadoUnidade: false,
+            vinculadoCompetencia: false,
+            isGlosa: true,
+            motivoGlosa: 'Glosa: Profissional não localizado no CNES da competência',
+            cnesUnidade: '',
+            nomeUnidade: '',
+            vinculoOficial: null
+        };
     },
 
     lookupProfissionaisByCbo(cbo, cnes = '', unidadeNome = '') {
@@ -3834,7 +3917,9 @@ const BpaModule = {
                             <span><i class="fas fa-user-md" style="color: #0284c7;"></i> Profissionais Identificados (${parsed.profissionaisDetalhados.length})</span>
                             <span style="font-weight: 500; color: #10b981; font-size: 0.72rem;"><i class="fas fa-shield-alt"></i> Cruzamento CNES Ativo</span>
                         </div>
-                        ${parsed.profissionaisAmostra.slice(0, 8).join('')}
+                        <div class="bpa-prof-scroll-container" style="max-height: 380px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 6px;">
+                            ${parsed.profissionaisAmostra.join('')}
+                        </div>
                     `;
                 } else {
                     elProfsAmostra.style.display = 'none';
@@ -3851,7 +3936,14 @@ const BpaModule = {
             document.getElementById('bpaDropPrompt').style.display = 'none';
             document.getElementById('bpaFileInfoCard').style.display = 'block';
             document.getElementById('bpaDropzone').classList.add('has-file');
-            document.getElementById('btnConfirmarUploadBpa').disabled = !this.canSubmitPendingUpload();
+
+            // Exibir a caixa de status e acionamento da auditoria Pente Fino
+            this.atualizarEstadoBotaoEnvio();
+            const btnAuditar = document.getElementById('btnExecutarPenteFinoUpload');
+            if (btnAuditar) {
+                btnAuditar.disabled = false;
+                btnAuditar.style.display = 'inline-flex';
+            }
         };
 
         reader.onerror = () => alert('Não foi possível ler o arquivo. Selecione-o novamente.');
@@ -3865,24 +3957,34 @@ const BpaModule = {
         }
 
         if (!this.canSubmitPendingUpload()) {
-            if (typeof alert === 'function') alert('Envio bloqueado pelo Pente Fino ARGOS. A produção precisa ser auditada e aprovada sem glosas antes do envio.');
+            if (typeof alert === 'function') alert('Para enviar a produção, execute a auditoria do Pente Fino para gerar o diagnóstico e a rastreabilidade do lote.');
             return false;
         }
 
         const btn = document.getElementById('btnConfirmarUploadBpa');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando Produção...';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando Produção...';
+        }
 
         try {
+            const approval = this.auditApproval;
+            const statusAuditoria = (approval && approval.podeEnviarSemGlosa) ? 'CONFORME' : 'COM_APONTAMENTOS';
+            const totalApontamentos = approval ? (approval.totalApontamentos || 0) : 0;
+
             const finalData = {
                 ...this.filePendingUpload,
-                estabelecimentoNome: document.getElementById('inputBpaEstabelecimento').value.trim() || this.filePendingUpload.estabelecimentoNome,
-                competencia: document.getElementById('inputBpaCompetencia').value.trim() || this.filePendingUpload.competencia,
-                tipoBpa: document.getElementById('selectBpaTipo').value,
-                observacoes: document.getElementById('inputBpaObservacoes').value.trim()
+                estabelecimentoNome: (typeof document !== 'undefined' && document.getElementById('inputBpaEstabelecimento')?.value.trim()) || this.filePendingUpload.estabelecimentoNome,
+                competencia: (typeof document !== 'undefined' && document.getElementById('inputBpaCompetencia')?.value.trim()) || this.filePendingUpload.competencia,
+                tipoBpa: (typeof document !== 'undefined' && document.getElementById('selectBpaTipo')?.value) || this.filePendingUpload.tipoBpa,
+                observacoes: (typeof document !== 'undefined' && document.getElementById('inputBpaObservacoes')?.value.trim()) || '',
+                status_auditoria: statusAuditoria,
+                total_apontamentos: totalApontamentos,
+                auditado_em: approval?.approvedAt || Date.now(),
+                fingerprint: approval?.fingerprint || ''
             };
 
-            const shouldSendEmail = document.getElementById('checkEnviarEmailAposUpload') && document.getElementById('checkEnviarEmailAposUpload').checked;
+            const shouldSendEmail = typeof document !== 'undefined' && document.getElementById('checkEnviarEmailAposUpload') && document.getElementById('checkEnviarEmailAposUpload').checked;
             const newRecord = await this.saveProducao(finalData);
             this.closeUploadModal();
             this.showToast(newRecord._localOnly ? `Produção "${finalData.nomeArquivo}" salva neste navegador. Ainda não enviada à nuvem.` : `Produção "${finalData.nomeArquivo}" salva com sucesso!`, 'success');
@@ -3894,10 +3996,12 @@ const BpaModule = {
             }
         } catch (e) {
             console.error('Erro ao salvar produção BPA:', e);
-            alert('Erro ao salvar produção: ' + (e.message || e));
+            if (typeof alert === 'function') alert('Erro ao salvar produção: ' + (e.message || e));
         } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-check"></i> Confirmar e Enviar Produção';
+            if (btn) {
+                btn.disabled = false;
+                this.atualizarEstadoBotaoEnvio();
+            }
         }
     },
 

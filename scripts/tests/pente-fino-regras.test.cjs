@@ -445,21 +445,20 @@ test('mascararCns oculta miolo de 9 dígitos preservando prefixo e sufixo de 3 d
     assert.strictEqual(bpaModule.mascararCns('700000000000005'), '700*********005');
 });
 
-test('BpaModule bloqueia envio quando auditoria não foi realizada, está inconclusiva ou reprovada', async () => {
+test('BpaModule bloqueia envio sem auditoria ou com fingerprint divergente, e libera na recepção integrada com apontamentos', async () => {
     const bpaModule = require(path.join(basePath, 'js/bpa-module.js'));
     bpaModule.filePendingUpload = { nomeArquivo: 'test.bpa', fingerprint: 'hash123' };
 
-    // 1. Sem auditoria
+    // 1. Sem auditoria executada -> Bloqueado
     bpaModule.auditApproval = null;
     assert.strictEqual(bpaModule.canSubmitPendingUpload(), false);
     assert.strictEqual(await bpaModule.handleFormSubmit(), false);
 
-    // 2. Auditoria reprovada / com glosas
-    bpaModule.auditApproval = { fingerprint: 'hash123', podeEnviarSemGlosa: false };
-    assert.strictEqual(bpaModule.canSubmitPendingUpload(), false);
-    assert.strictEqual(await bpaModule.handleFormSubmit(), false);
+    // 2. Auditoria realizada com apontamentos -> Liberado para Recepção Integrada
+    bpaModule.auditApproval = { fingerprint: 'hash123', podeEnviarSemGlosa: false, status: 'COM_APONTAMENTOS' };
+    assert.strictEqual(bpaModule.canSubmitPendingUpload(), true);
 
-    // 3. Auditoria com fingerprint divergente (arquivo alterado)
+    // 3. Auditoria com fingerprint divergente (arquivo alterado) -> Bloqueado
     bpaModule.auditApproval = { fingerprint: 'hashOutro', podeEnviarSemGlosa: true };
     assert.strictEqual(bpaModule.canSubmitPendingUpload(), false);
     assert.strictEqual(await bpaModule.handleFormSubmit(), false);

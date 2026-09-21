@@ -342,16 +342,19 @@
                 <div class="pf3d-final-panel pf3d-final-warning">
                     <div class="pf3d-final-text">
                         <h3>
-                            <i class="fas fa-ban" style="color: #f87171;"></i>
-                            GLOSAS DETECTADAS NO PENTE FINO
+                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>
+                            APONTAMENTOS DETECTADOS NO PENTE FINO
                         </h3>
                         <p>
-                            Foram identificadas não-conformidades de glosa que exigem correção antes da transmissão oficial.
+                            Foram identificados apontamentos de risco no lote. A auditoria foi registrada para rastreabilidade e você pode optar por corrigir ou enviar para recepção integrada.
                         </p>
                     </div>
-                    <div class="pf3d-actions">
+                    <div class="pf3d-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                         <button type="button" class="btn-pf3d-secondary" onclick="PenteFino3DRenderer.abrirDiagnosticoCompleto()">
                             <i class="fas fa-list-check"></i> Ver Linhas com Glosa
+                        </button>
+                        <button type="button" class="btn-pf3d-primary" style="background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); border: none;" onclick="PenteFino3DRenderer.confirmarEnvioDireto()">
+                            <i class="fas fa-shield-alt"></i> Confirmar Envio com Apontamentos
                         </button>
                     </div>
                 </div>

@@ -376,14 +376,20 @@
 
         const bpaMod = (typeof window !== 'undefined' && window.BpaModule) ? window.BpaModule : (typeof globalThis !== 'undefined' && globalThis.BpaModule ? globalThis.BpaModule : null);
         if (bpaMod) {
-            bpaMod.auditApproval = {
-                fingerprint: computed.fingerprint,
-                approvedAt: Date.now(),
-                podeEnviarSemGlosa: computed.podeEnviarSemGlosa === true
-            };
-            const btnUpload = typeof document !== 'undefined' ? document.getElementById('btnConfirmarUploadBpa') : null;
-            if (btnUpload) {
-                btnUpload.disabled = !computed.podeEnviarSemGlosa;
+            if (typeof bpaMod.setAuditResult === 'function') {
+                bpaMod.setAuditResult(computed);
+            } else {
+                bpaMod.auditApproval = {
+                    fingerprint: computed.fingerprint,
+                    approvedAt: Date.now(),
+                    podeEnviarSemGlosa: computed.podeEnviarSemGlosa === true,
+                    status: computed.podeEnviarSemGlosa ? 'CONFORME' : 'COM_APONTAMENTOS',
+                    totalApontamentos: computed.naoConformidades || computed.totalGlosas || 0,
+                    detalhes: computed
+                };
+                if (typeof bpaMod.atualizarEstadoBotaoEnvio === 'function') {
+                    bpaMod.atualizarEstadoBotaoEnvio();
+                }
             }
         }
 
