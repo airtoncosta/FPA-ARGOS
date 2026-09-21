@@ -100,3 +100,17 @@ test('formatProfissionaisAmostra sinaliza GLOSA em vermelho quando profissional 
     assert.ok(card.includes('709900000000099'), 'Deve exibir os 15 dígitos do CNS');
     assert.ok(card.includes('Glosa') || card.includes('Sem Vínculo') || card.includes('sem vínculo'), 'Deve sinalizar glosa ou sem vínculo na unidade');
 });
+
+test('parseBpaFile calcula valor financeiro estimado da produção em R$ com base no SIGTAP', () => {
+    const { file, line } = require('./bpa-audit.test.cjs');
+    // Tomografia 0206010079 com 2 quantidades (2 x 97.44 = 194.88)
+    const rawContent = file([line({ proc: '0206010079', qtd: '000002' })]);
+    const fakeFile = { name: 'PATOMO08.AGO', size: 1024 };
+
+    const parsed = bpaModule.parseBpaFile(fakeFile, rawContent);
+    assert.ok(parsed.totalAtendimentos >= 1, 'Deve ter atendimentos calculados');
+    assert.ok(typeof parsed.valorTotalEstimado === 'number' && parsed.valorTotalEstimado > 0, 'Deve calcular valor numérico estimado');
+    assert.ok(parsed.valorTotalFormatado.includes('R$'), 'Deve conter símbolo de Real formatado');
+    assert.ok(!parsed.valorTotalFormatado.includes('Disponível após auditoria'), 'Não deve postergar a exibição do valor');
+});
+
