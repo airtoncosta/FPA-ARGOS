@@ -137,8 +137,8 @@
                             <!-- Regra 4: Serviço e Classificação -->
                             <div class="pf3d-rule-item" id="pfRule4">
                                 <div class="pf3d-rule-info">
-                                    <div class="pf3d-rule-name">4. Serviço e Classificação no CNES</div>
-                                    <div class="pf3d-rule-desc">Checa se a unidade possui a habilitação de serviço exigida no CNES.</div>
+                                    <div class="pf3d-rule-name">4. Serviço e Classificação (SIGTAP)</div>
+                                    <div class="pf3d-rule-desc">Confronta se o serviço e classificação informados conferem com os habilitados no SIGTAP.</div>
                                 </div>
                                 <div class="pf3d-rule-badge badge-pending" id="pfBadge4">
                                     <i class="fas fa-clock"></i> Pendente
@@ -360,6 +360,7 @@
     }
 
     function fechar() {
+        if (typeof document === 'undefined') return;
         const modal = document.getElementById('modalPenteFino3D');
         if (modal) {
             modal.classList.add('hidden');
@@ -368,20 +369,21 @@
 
     function confirmarEnvioDireto() {
         fechar();
-        // Dispara o clique no botão oficial de envio de produção do modal BPA
-        const btnEnvio = document.getElementById('btnConfirmarEnvioBpa') || document.querySelector('button[onclick*="salvarProducao"]');
-        if (btnEnvio) {
-            btnEnvio.click();
-        } else if (window.BpaModule && typeof window.BpaModule.salvarProducao === 'function') {
-            window.BpaModule.salvarProducao();
+        const bpa = (typeof window !== 'undefined' && window.BpaModule) ? window.BpaModule : (typeof globalThis !== 'undefined' && globalThis.BpaModule ? globalThis.BpaModule : null);
+        if (bpa && typeof bpa.handleFormSubmit === 'function') {
+            return bpa.handleFormSubmit();
+        } else if (typeof document !== 'undefined') {
+            const btnEnvio = document.getElementById('btnConfirmarUploadBpa') || document.getElementById('btnConfirmarEnvioBpa');
+            if (btnEnvio) btnEnvio.click();
         }
     }
 
     function abrirDiagnosticoCompleto() {
         fechar();
-        if (window.PenteFinoEngine && typeof window.PenteFinoEngine.renderizarResultados === 'function') {
-            window.PenteFinoEngine.renderizarResultados();
-        } else if (window.PenteFinoEngine) {
+        const engine = (typeof window !== 'undefined' && window.PenteFinoEngine) ? window.PenteFinoEngine : (typeof globalThis !== 'undefined' && globalThis.PenteFinoEngine ? globalThis.PenteFinoEngine : null);
+        if (engine && typeof engine.renderizarResultados === 'function') {
+            engine.renderizarResultados();
+        } else if (typeof document !== 'undefined') {
             const box = document.getElementById('modalMalhaFinaResultados');
             if (box) box.classList.remove('hidden');
         }

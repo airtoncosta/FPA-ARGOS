@@ -3,6 +3,9 @@
 'use strict';
 const comp=v=>{const s=String(v||'').trim();return /^\d{4}(0[1-9]|1[0-2])$/.test(s)?s:/^(0[1-9]|1[0-2])\/\d{4}$/.test(s)?s.slice(3)+s.slice(0,2):'';};
 const integer=v=>/^\d+$/.test(String(v))?Number(v):null;
+const digits=value=>String(value??'').replace(/\D/g,'');
+const matchesUnit=(unit,cnes)=>String(unit.cnes)===cnes||(Array.isArray(unit.aliases)&&unit.aliases.map(String).includes(cnes));
+const matchesProfessionalCns=(professional,cns)=>[professional.cns,professional.cnsMaster].some(value=>digits(value)===cns);
 function date(v){if(!/^\d{8}$/.test(v||''))return null;const d=new Date(Date.UTC(+v.slice(0,4),+v.slice(4,6)-1,+v.slice(6)));return d.toISOString().slice(0,10).replace(/-/g,'')===v?d:null;}
 function validCns(v){return /^[12789]\d{14}$/.test(v||'')&&!/^(.)\1+$/.test(v)&&[...v].reduce((a,n,i)=>a+Number(n)*(15-i),0)%11===0;}
 function validCpf(v){if(!/^\d{11}$/.test(v||'')||/^(.)\1+$/.test(v))return false;for(let n=9;n<11;n++){let sum=0;for(let i=0;i<n;i++)sum+=Number(v[i])*(n+1-i);const digit=(sum*10%11)%10;if(digit!==Number(v[n]))return false;}return true;}
@@ -43,7 +46,7 @@ function audit(input,bases={}){
  check('PROCEDIMENTO_FORMATO',/^\d{10}$/.test(r.procedimento),'Código de procedimento inválido.','10 dígitos',r.procedimento);
  check('QUANTIDADE',qty!==null&&qty>0,'Quantidade deve ser um inteiro positivo.','Maior que zero',r.quantidade);
  check('IDADE_FORMATO',age!==null&&age<=130,'Idade ausente ou inválida.','0 a 130 anos',r.idade);
- if(!individual&&!r.cbo)mark('CBO_FORMATO','NAO_APLICAVEL','CBO consolidado não informado; a exigência será confrontada com SIGTAP.');else check('CBO_FORMATO',/^[A-Z0-9]{6}$/.test(r.cbo),'CBO ausente ou inválido.','6 caracteres CBO',r.cbo);
+ if(!individual&&!r.cbo)mark('CBO_FORMATO','NAO_APLICAVEL','CBO consolidado não informado; a exigência será confrontada com SIGTAP.');else check('CBO_FORMATO',/^\d{6}$/.test(r.cbo),'CBO ausente ou inválido.','6 dígitos numéricos',r.cbo);
  check('FOLHA_SEQUENCIA',integer(r.folha)>0&&integer(r.folha)<=999&&integer(r.sequencia)>0&&integer(r.sequencia)<=20,'Folha ou sequência fora do domínio do layout.','Folha 001..999; sequência 01..20',r.folha+'/'+r.sequencia);
  if(individual){check('SEXO_FORMATO',['M','F'].includes(r.sexo),'Sexo no BPA-I deve ser M ou F.','M ou F',r.sexo);
  if(r.cid)check('CID_FORMATO',/^[A-Z][0-9]{2}[A-Z0-9]?$/.test(r.cid),'CID informado fora do formato esperado.','Código CID sem pontuação',r.cid);
@@ -58,14 +61,15 @@ function audit(input,bases={}){
  const cnesReady=cnesBase&&comp(cnesBase.competencia)===cm&&cnesBase.oficial===true;
  let unit=null;
  if(!cnesReady)missing('BASE_CNES','Base CNES oficial da competência '+(cm||'inválida')+' indisponível; não será usada outra competência.');
- else {unit=(cnesBase.estabelecimentos||[]).find(u=>String(u.cnes)===r.cnes);
+ else {unit=(cnesBase.estabelecimentos||[]).find(u=>matchesUnit(u,r.cnes));
  if(!unit){if(cnesBase.completo===true)mark('UNIDADE_CNES','NAO_CONFORME','Unidade não localizada na base CNES da competência.',cm,r.cnes);else missing('UNIDADE_CNES','Cobertura da base CNES não permite concluir ausência da unidade.');}
- else{check('UNIDADE_CNES',unit.desabilitado!==true,'Unidade desabilitada na competência consultada.','Unidade ativa',r.cnes);
- if(!individual&&!r.cbo)mark('VINCULO_PROFISSIONAL','NAO_APLICAVEL','BPA-C sem identificação de CBO.');
+ else{
+ if(!individual)mark('VINCULO_PROFISSIONAL','NAO_APLICAVEL','BPA-C não identifica profissional por CNS.');
  else if(!Array.isArray(unit.profissionais))missing('VINCULO_PROFISSIONAL','Relação de profissionais não importada.');
- else {const links=unit.profissionais.filter(p=>(!individual||String(p.cns)===r.cnsProfissional)&&String(p.cbo)===r.cbo&&p.ativo!==false&&!/inativo|desligado/i.test(p.situacao||'')&&(!comp(p.compDesativacao)||comp(p.compDesativacao)>cm));
- if(links.length)mark('VINCULO_PROFISSIONAL','CONFORME','Vínculo CNS/CBO na unidade e competência confirmado.');
- else if(cnesBase.cobertura?.profissionais===true)mark('VINCULO_PROFISSIONAL','NAO_CONFORME',individual?'Não localizado vínculo ativo deste CNS com este CBO na unidade e competência.':'Não localizado profissional com este CBO na unidade e competência.',cm+' / '+r.cnes+' / '+r.cbo,r.cnsProfissional);
+ else {const cnsTarget=digits(r.cnsProfissional);
+ const vinculoConfirmado=cnsTarget&&unit.profissionais.some(professional=>matchesProfessionalCns(professional,cnsTarget));
+ if(vinculoConfirmado)mark('VINCULO_PROFISSIONAL','CONFORME','CNS do profissional localizado no CNES e competência da produção.');
+ else if(cnesBase.completo===true||cnesBase.cobertura?.profissionais===true)mark('VINCULO_PROFISSIONAL','NAO_CONFORME','Profissional não localizado no CNES deste estabelecimento de saúde nesta competência.',cm+' / '+r.cnes,r.cnsProfissional);
  else missing('VINCULO_PROFISSIONAL','Cadastro parcial: ausência de vínculo não pode ser confirmada.');}
  }}
  const sigReady=sig&&comp(sig.competencia)===cm&&(sig.oficial===true||sig.validada===true);
@@ -80,11 +84,8 @@ function audit(input,bases={}){
  relation('cids',values=>{if(!individual)return mark('CID','NAO_APLICAVEL','BPA-C não identifica CID individual.');if(!values.length)return mark('CID','NAO_APLICAVEL','Procedimento sem relação CID na tabela completa.');check('CID',values.includes(String(r.cid).toUpperCase().replace(/\./g,'')),'CID ausente ou incompatível com o procedimento.',values.join(', '),r.cid);});
  relation('servicos',values=>{if(!values.length)return mark('SERVICO_CLASSIFICACAO','NAO_APLICAVEL','Procedimento sem exigência nessa relação completa.');
  const pairs=values.map(x=>String(x.servico)+'/'+String(x.classificacao));
- if(individual)check('SERVICO_INFORMADO',pairs.includes(r.servico+'/'+r.classificacao),'Serviço/classificação informado incompatível com o procedimento.',pairs.join(', '),r.servico+'/'+r.classificacao);
- if(!unit||cnesBase.cobertura?.servicos!==true||!Array.isArray(unit.servicos))return missing('SERVICO_CNES','Serviços/classificações da unidade não importados integralmente nesta competência.');
- const candidates=individual?values.filter(v=>v.servico===r.servico&&v.classificacao===r.classificacao):values;
- check('SERVICO_CNES',candidates.some(v=>unit.servicos.some(u=>String(u.codigo||u.servico)===v.servico&&String(u.classificacao)===v.classificacao)),'Serviço e classificação não encontrados juntos no CNES da unidade.',pairs.join(', '),r.servico+'/'+r.classificacao);});
- relation('habilitacoes',values=>{if(!values.length)return mark('HABILITACAO','NAO_APLICAVEL','Sem exigência nesta relação completa.');if(!unit||cnesBase.cobertura?.habilitacoes!==true||!Array.isArray(unit.habilitacoes))return missing('HABILITACAO','Habilitações da unidade não importadas para a competência.');check('HABILITACAO',values.some(v=>unit.habilitacoes.includes(v)),'Nenhuma habilitação exigida consta no CNES da unidade.',values.join(', '),unit.habilitacoes.join(', '));});
+ if(individual){const infPair=(r.servico&&r.classificacao)?(String(r.servico).trim()+'/'+String(r.classificacao).trim()):'';const ok=pairs.includes(infPair);check('SERVICO_INFORMADO',ok,ok?'Serviço/classificação informado confere com os habilitados no SIGTAP.':'Serviço/classificação informado incompatível com o procedimento no SIGTAP.',pairs.join(', '),infPair||'NÃO INFORMADO');}
+ });
  if(individual){if(!['M','F','I','N'].includes(proc.sexo))missing('SEXO','Restrição de sexo não disponível no SIGTAP.');else if(proc.sexo==='M'||proc.sexo==='F')check('SEXO',r.sexo===proc.sexo,'Sexo incompatível com o procedimento.',proc.sexo,r.sexo);else mark('SEXO','NAO_APLICAVEL','Sem restrição de sexo.');}else mark('SEXO','NAO_APLICAVEL','BPA-C não identifica sexo individual.');
  if(!proc.idade||!['anos','meses'].includes(proc.idade.unidade)||!Number.isFinite(proc.idade.min)||!Number.isFinite(proc.idade.max))missing('FAIXA_ETARIA','Faixa etária com unidade conhecida não importada.');
  else {let low=age,high=age;if(proc.idade.unidade==='meses'){const dn=date(r.nascimento),dt=date(r.dataAtendimento);if(individual&&dn&&dt){low=(dt.getUTCFullYear()-dn.getUTCFullYear())*12+dt.getUTCMonth()-dn.getUTCMonth()-(dt.getUTCDate()<dn.getUTCDate()?1:0);high=low;}else {low=age===null?null:age*12;high=low===null?null:low+11;}}

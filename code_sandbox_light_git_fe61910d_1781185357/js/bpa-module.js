@@ -18,13 +18,55 @@ const BpaModule = {
     localProducoesKey: 'argos_producoes_bpa',
     responsaveisKey: 'argos_bpa_responsaveis',
     modalidadesKey: 'argos_bpa_modalidades',
+    unidadesManuaisKey: 'argos_bpa_unidades_manuais',
     producoes: [],
+
+    getUnidadesManuais() {
+        try {
+            const str = localStorage.getItem(this.unidadesManuaisKey);
+            if (str) {
+                const parsed = JSON.parse(str);
+                if (Array.isArray(parsed)) return parsed;
+            }
+        } catch(e) {}
+        return [];
+    },
+
+    saveUnidadesManuais(list) {
+        try {
+            localStorage.setItem(this.unidadesManuaisKey, JSON.stringify(list || []));
+        } catch(e) {}
+    },
     currentCompetenciaFiltro: '',
     currentStatusFilter: '', // '' (todos), 'delivered' (enviadas), 'pending' (faltam enviar)
     currentResponsavelFiltro: '', // '' (todos) ou nome do profissional responsável
     currentTipoFiltro: '', // '' (todos), 'BPA-C', 'BPA-I', 'AMBOS', 'PARCIAL'
     currentSearchTerm: '',
     filePendingUpload: null,
+    auditApproval: null,
+
+    mascararCns(cns) {
+        const s = String(cns ?? '').trim();
+        if (!s) return '—';
+        const num = s.replace(/\D/g, '');
+        if (num.length === 15) {
+            return num.slice(0, 3) + '*********' + num.slice(-3);
+        }
+        if (s.length > 6) {
+            return s.slice(0, 3) + '*'.repeat(s.length - 6) + s.slice(-3);
+        }
+        return s;
+    },
+
+    canSubmitPendingUpload() {
+        if (!this.filePendingUpload) return false;
+        const approval = this.auditApproval;
+        if (!approval || !approval.podeEnviarSemGlosa) return false;
+        if (this.filePendingUpload.fingerprint && approval.fingerprint && approval.fingerprint !== this.filePendingUpload.fingerprint) {
+            return false;
+        }
+        return true;
+    },
 
     mesesExtenso: {
         '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
@@ -274,6 +316,25 @@ const BpaModule = {
 
         let unidades = unidadesOficiais.map(u => ({ ...u }));
 
+        // Incluir unidades manuais cadastradas pela gestão (ADM / Francileide)
+        const manuais = this.getUnidadesManuais();
+        manuais.forEach(m => {
+            const cleanCnesM = (m.cnes || '').replace(/\D/g, '');
+            const exists = unidades.some(u =>
+                (cleanCnesM && u.cnes && u.cnes.replace(/\D/g, '') === cleanCnesM) ||
+                this.normalizeIdentity(u.nome) === this.normalizeIdentity(m.nome)
+            );
+            if (!exists) {
+                unidades.push({
+                    id: m.id || ('man_' + Math.random().toString(36).substring(2, 7)),
+                    nome: (m.nome || '').trim().toUpperCase(),
+                    cnes: m.cnes ? m.cnes.trim() : '',
+                    isManual: true,
+                    isIsolado: false
+                });
+            }
+        });
+
         // Incluir unidades de produções já enviadas que sejam casos isolados (exceto exames SADT como Tomografia)
         if (Array.isArray(this.producoes)) {
             this.producoes.forEach(p => {
@@ -306,8 +367,12 @@ const BpaModule = {
             const keys = [cleanCnes, u.cnes, u.nome, u.id].filter(Boolean);
             const key = keys.find(k => Object.prototype.hasOwnProperty.call(respMap, k))
                 ?? Object.keys(respMap).find(k => this.normalizeIdentity(k) === this.normalizeIdentity(u.nome));
-            u.responsavel = key !== undefined ? respMap[key] : '';
-            if (!u.responsavel) u.responsavel = 'Não atribuído';
+            let rawResp = key !== undefined ? respMap[key] : '';
+            const respNorm = (rawResp || '').toLowerCase();
+            if (respNorm.includes('mateus') || respNorm.includes('altair') || respNorm.includes('yvanna') || respNorm.includes('carvalhal') || respNorm.includes('mariline') || respNorm.includes('marilene')) {
+                rawResp = '';
+            }
+            u.responsavel = rawResp || 'Não atribuído';
 
             // Modalidade esperada: 'AMBOS' (BPA-C + BPA-I), 'BPA-C' ou 'BPA-I'
             u.modalidade = modalMap[cleanCnes] || modalMap[u.cnes] || modalMap[u.nome] || modalMap[u.id];
@@ -344,6 +409,14 @@ const BpaModule = {
         const uname = (user.username || '').toLowerCase();
         const role = (user.role || '').toUpperCase();
         return !!uname && (uname.trim() === 'francileide' || role.trim() === 'ADM');
+    },
+
+    isFrancileide(user) {
+        if (!user) user = this.getCurrentUser();
+        if (!user) return false;
+        const uname = (user.username || '').toLowerCase().trim();
+        const name = (user.name || '').toLowerCase().trim();
+        return uname === 'francileide' || name === 'francileide';
     },
 
     normalizeIdentity(value) {
@@ -417,9 +490,15 @@ const BpaModule = {
 
         const filtered = baseUsers
             .filter(u => {
-                const un = (u.username || '').toLowerCase();
-                const nm = (u.name || '').toLowerCase();
-                return un !== 'mariline' && un !== 'marilene' && !nm.includes('mariline') && !nm.includes('marilene');
+                const un = (u.username || '').toLowerCase().trim();
+                const nm = (u.name || '').toLowerCase().trim();
+                // Excluir Mariline/Marilene
+                if (un === 'mariline' || un === 'marilene' || nm.includes('mariline') || nm.includes('marilene')) return false;
+                // Excluir Mateus Altair
+                if (un === 'mateus' || nm.includes('mateus') || nm.includes('altair')) return false;
+                // Excluir Yvanna Carvalhal
+                if (un === 'yvanna' || nm.includes('yvanna') || nm.includes('carvalhal')) return false;
+                return true;
             })
             .map(u => {
                 if ((u.username || '').toLowerCase() === 'airton') {
@@ -438,7 +517,21 @@ const BpaModule = {
     getResponsaveisMap() {
         try {
             const str = localStorage.getItem(this.responsaveisKey);
-            if (str) return JSON.parse(str);
+            if (str) {
+                const map = JSON.parse(str);
+                let altered = false;
+                for (const k of Object.keys(map)) {
+                    const v = String(map[k] || '').toLowerCase();
+                    if (v.includes('mateus') || v.includes('altair') || v.includes('yvanna') || v.includes('carvalhal') || v.includes('mariline') || v.includes('marilene')) {
+                        delete map[k];
+                        altered = true;
+                    }
+                }
+                if (altered) {
+                    try { localStorage.setItem(this.responsaveisKey, JSON.stringify(map)); } catch(e){}
+                }
+                return map;
+            }
         } catch(e){}
         return {};
     },
@@ -493,7 +586,7 @@ const BpaModule = {
         };
     },
 
-    openAssignResponsaveisModal() {
+    openAssignResponsaveisModal(focusInput = false) {
         if (!this.isAdminOrFrancileide()) {
             alert('Apenas o Administrador e a Francileide podem definir ou alterar os responsáveis pelas unidades.');
             return;
@@ -508,21 +601,40 @@ const BpaModule = {
         const currentMap = this.getResponsaveisMap();
         const modalMap = this.getModalidadesMap();
 
+        // Preencher o select de digitadores do form de adicionar nova unidade manual
+        const selectNovaResp = document.getElementById('selectNovaUnidadeResp');
+        if (selectNovaResp) {
+            let optionsNova = `<option value="">-- Não Atribuído --</option>`;
+            users.forEach(usr => {
+                optionsNova += `<option value="${usr.name}">${usr.name} (@${usr.username})</option>`;
+            });
+            selectNovaResp.innerHTML = optionsNova;
+        }
+
         let html = '';
         unidades.forEach(u => {
-            const currentResp = currentMap[u.cnes] || currentMap[u.nome] || currentMap[u.id] || '';
+            let currentResp = currentMap[u.cnes] || currentMap[u.nome] || currentMap[u.id] || u.responsavel || '';
+            const respNorm = (currentResp || '').toLowerCase();
+            if (respNorm.includes('mateus') || respNorm.includes('altair') || respNorm.includes('yvanna') || respNorm.includes('carvalhal') || respNorm.includes('mariline') || respNorm.includes('marilene') || respNorm === 'não atribuído') {
+                currentResp = '';
+            }
             const currentModal = modalMap[u.cnes] || modalMap[u.nome] || modalMap[u.id] || u.modalidade || 'AMBOS';
 
             let options = `<option value="">-- Não Atribuído --</option>`;
             users.forEach(usr => {
-                const isSelected = (usr.name.toLowerCase() === currentResp.toLowerCase() || usr.username.toLowerCase() === currentResp.toLowerCase());
+                const isSelected = currentResp && (usr.name.toLowerCase() === currentResp.toLowerCase() || usr.username.toLowerCase() === currentResp.toLowerCase());
                 options += `<option value="${usr.name}" ${isSelected ? 'selected' : ''}>${usr.name} (@${usr.username})</option>`;
             });
 
+            const actionBtn = u.isManual
+                ? `<button type="button" onclick="BpaModule.removerUnidadeManual('${u.id}')" title="Excluir esta unidade manual" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px 6px; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'"><i class="fas fa-trash-alt"></i></button>`
+                : `<span style="color: #cbd5e1; font-size: 0.72rem;" title="Unidade oficial do município"><i class="fas fa-lock"></i></span>`;
+
             html += `
-                <tr style="border-bottom: 1px solid #e2e8f0;">
+                <tr style="border-bottom: 1px solid #e2e8f0; ${u.isManual ? 'background: #fffdf5;' : ''}">
                     <td style="padding: 0.65rem 1rem; font-weight: 600; color: #1e293b;">
                         ${u.nome}
+                        ${u.isManual ? '<span style="font-size: 0.68rem; background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 700; border: 1px solid #fde68a;"><i class="fas fa-hand-paper"></i> Manual</span>' : ''}
                         ${u.isIsolado ? '<span style="font-size: 0.68rem; background: #e0f2fe; color: #0284c7; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">Caso Isolado</span>' : ''}
                     </td>
                     <td style="padding: 0.65rem 1rem; color: #64748b; font-family: monospace;">${u.cnes || '-'}</td>
@@ -538,6 +650,9 @@ const BpaModule = {
                             <option value="BPA-I" ${currentModal === 'BPA-I' ? 'selected' : ''}>Apenas BPA-I (Individualizado)</option>
                         </select>
                     </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center;">
+                        ${actionBtn}
+                    </td>
                 </tr>
             `;
         });
@@ -547,7 +662,7 @@ const BpaModule = {
         const btnZerar = document.getElementById('btnZerarAtribuicoesBpa');
         if (btnZerar) {
             btnZerar.onclick = () => {
-                if (confirm('Deseja realmente deixar todas as 21 unidades zeradas (Não Atribuído)?')) {
+                if (confirm('Deseja realmente deixar todas as unidades zeradas (Não Atribuído)?')) {
                     tbody.querySelectorAll('.bpa-select-resp-row').forEach(sel => sel.value = '');
                     this.showToast('Todas as unidades marcadas como Não Atribuído. Clique em "Salvar Atribuições" para confirmar.', 'info');
                 }
@@ -555,11 +670,123 @@ const BpaModule = {
         }
 
         modal.classList.remove('hidden');
+
+        if (focusInput) {
+            setTimeout(() => {
+                const inp = document.getElementById('inputNovaUnidadeNome');
+                if (inp) {
+                    inp.focus();
+                    inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 120);
+        }
     },
 
     closeAssignResponsaveisModal() {
         const modal = document.getElementById('modalGerenciarResponsaveisBpa');
         if (modal) modal.classList.add('hidden');
+    },
+
+    adicionarNovaUnidadeManual() {
+        if (!this.isAdminOrFrancileide()) {
+            this.showToast('Apenas Administrador e Francileide podem cadastrar novas unidades.', 'warning');
+            return;
+        }
+
+        const inputNome = document.getElementById('inputNovaUnidadeNome');
+        const inputCnes = document.getElementById('inputNovaUnidadeCnes');
+        const selectModal = document.getElementById('selectNovaUnidadeModal');
+        const selectResp = document.getElementById('selectNovaUnidadeResp');
+
+        const nome = (inputNome ? inputNome.value : '').trim().toUpperCase();
+        const cnes = (inputCnes ? inputCnes.value : '').trim().replace(/\D/g, '');
+        const modalidade = (selectModal ? selectModal.value : 'AMBOS') || 'AMBOS';
+        const responsavel = (selectResp ? selectResp.value : '') || '';
+
+        if (!nome || nome.length < 3) {
+            this.showToast('Informe o nome da unidade de saúde (mínimo 3 caracteres).', 'warning');
+            if (inputNome) inputNome.focus();
+            return;
+        }
+
+        // Verificar se já existe uma unidade com este nome ou CNES
+        const unidadesAtuais = this.getUnidadesSistema();
+        const jaExiste = unidadesAtuais.some(u => {
+            const mesmoNome = this.normalizeIdentity(u.nome) === this.normalizeIdentity(nome);
+            const mesmoCnes = cnes && u.cnes && u.cnes.replace(/\D/g, '') === cnes;
+            return mesmoNome || mesmoCnes;
+        });
+
+        if (jaExiste) {
+            this.showToast('Esta unidade ou CNES já está cadastrada no sistema.', 'warning');
+            return;
+        }
+
+        const novaUnidade = {
+            id: 'manual_' + Date.now(),
+            nome: nome,
+            cnes: cnes,
+            isManual: true,
+            criado_em: new Date().toISOString()
+        };
+
+        const manuais = this.getUnidadesManuais();
+        manuais.push(novaUnidade);
+        this.saveUnidadesManuais(manuais);
+
+        // Salvar a modalidade da nova unidade
+        const modalMap = this.getModalidadesMap();
+        if (cnes) modalMap[cnes] = modalidade;
+        modalMap[nome] = modalidade;
+        modalMap[novaUnidade.id] = modalidade;
+        try {
+            localStorage.setItem(this.modalidadesKey, JSON.stringify(modalMap));
+        } catch(e) {}
+
+        // Salvar o responsável se atribuído
+        if (responsavel) {
+            const respMap = this.getResponsaveisMap();
+            if (cnes) respMap[cnes] = responsavel;
+            respMap[nome] = responsavel;
+            respMap[novaUnidade.id] = responsavel;
+            try {
+                localStorage.setItem(this.responsaveisKey, JSON.stringify(respMap));
+            } catch(e) {}
+        }
+
+        // Limpar os campos do formulário
+        if (inputNome) inputNome.value = '';
+        if (inputCnes) inputCnes.value = '';
+        if (selectResp) selectResp.value = '';
+        if (selectModal) selectModal.value = 'AMBOS';
+
+        // Re-renderizar o modal e atualizar o restante do sistema
+        this.openAssignResponsaveisModal();
+        this.renderAll();
+        this.showToast(`Unidade "${nome}" cadastrada com sucesso!`, 'success');
+    },
+
+    removerUnidadeManual(id) {
+        if (!this.isAdminOrFrancileide()) return;
+        const manuais = this.getUnidadesManuais();
+        const target = manuais.find(m => m.id === id);
+        if (!target) return;
+
+        if (!confirm(`Deseja realmente remover a unidade manual "${target.nome}"?`)) return;
+
+        const updated = manuais.filter(m => m.id !== id);
+        this.saveUnidadesManuais(updated);
+
+        // Remover do respMap e modalMap se necessário
+        const respMap = this.getResponsaveisMap();
+        if (target.cnes) delete respMap[target.cnes];
+        delete respMap[target.nome];
+        delete respMap[target.id];
+        try { localStorage.setItem(this.responsaveisKey, JSON.stringify(respMap)); } catch(e){}
+
+        this.openAssignResponsaveisModal();
+        this.renderAll();
+        this.showToast(`Unidade "${target.nome}" removida.`, 'info');
     },
 
     async saveResponsaveis() {
@@ -835,9 +1062,9 @@ const BpaModule = {
             let headerProfHtml = '';
             if (temNome) {
                 headerProfHtml = '<strong style="color: #0f172a; font-size: 0.86rem; display: inline-flex; align-items: center; gap: 0.35rem;"><i class="fas fa-user-md" style="color: #0284c7;"></i> ' + prof.nome + '</strong> ' +
-                    '<code class="bpa-prof-badge-cns">CNS ' + prof.cns + '</code>';
+                    '<code class="bpa-prof-badge-cns" data-cns="' + prof.cns + '">CNS ' + this.mascararCns(prof.cns) + '</code>';
             } else {
-                headerProfHtml = '<code class="bpa-prof-badge-cns" style="background: #f1f5f9; color: #334155;">CNS ' + prof.cns + '</code> ' +
+                headerProfHtml = '<code class="bpa-prof-badge-cns" data-cns="' + prof.cns + '" style="background: #f1f5f9; color: #334155;">CNS ' + this.mascararCns(prof.cns) + '</code> ' +
                     '<span style="color: #dc2626; font-size: 0.74rem; font-style: italic;">(Profissional sem vínculo localizado nesta unidade)</span>';
             }
 
@@ -863,7 +1090,7 @@ const BpaModule = {
 
             let equipeHtml = '';
             if (prof.membrosEquipe && prof.membrosEquipe.length > 0) {
-                const nomesEquipe = prof.membrosEquipe.map(m => m.nome.split(' ')[0] + ' (' + m.cns.slice(-4) + ')').join(' • ');
+                const nomesEquipe = prof.membrosEquipe.map(m => m.nome.split(' ')[0] + ' (' + this.mascararCns(m.cns).slice(-4) + ')').join(' • ');
                 equipeHtml = '<div style="margin-top: 0.25rem; font-size: 0.72rem; color: #0369a1;"><i class="fas fa-users" style="margin-right: 3px;"></i> Médicos vinculados: ' + nomesEquipe + '</div>';
             }
 
@@ -2222,24 +2449,55 @@ const BpaModule = {
         if (scope && !this.accessLoadError && this.persistenceMode === 'local') scope.textContent += ' • Arquivos salvos neste navegador';
         const upload = document.getElementById('btnNovoEnvioBpa');
         if (upload) upload.disabled = !!this.accessLoadError || (!privileged && !units.length);
+
+        // Controle de visibilidade nos perfis de Gerentes vs Gestão (ADM/Francileide)
+        const respGroup = document.getElementById('bpaGroupResponsavelFilter');
+        if (respGroup) respGroup.style.display = privileged ? 'flex' : 'none';
         const respSelect = document.getElementById('selectBpaResponsavel');
         if (respSelect) respSelect.disabled = !privileged;
+        const chipsWrapper = document.getElementById('bpaSmartChipsWrapper');
+        if (chipsWrapper) chipsWrapper.style.display = privileged ? 'flex' : 'none';
         const chips = document.getElementById('bpaSmartChipsContainer');
         if (chips) chips.style.display = privileged ? '' : 'none';
-        // Controlar visibilidade do botão de atribuição de responsáveis e higienização
+
+        // Baixar Pacote da Competência oculto nos perfis de gerentes
+        const btnLote = document.getElementById('btnBaixarLoteBpa');
+        if (btnLote) btnLote.style.display = privileged ? 'inline-flex' : 'none';
+
+        // Controlar visibilidade do botão de atribuição de responsáveis, cadastrar unidade e higienização
+        const btnNova = document.getElementById('btnNovaUnidadeManualBpa');
+        if (btnNova) {
+            btnNova.style.display = privileged ? 'inline-flex' : 'none';
+        }
         const btnResp = document.getElementById('btnGerenciarResponsaveisBpa');
         if (btnResp) {
-            btnResp.style.display = this.isAdminOrFrancileide() ? 'inline-flex' : 'none';
+            btnResp.style.display = privileged ? 'inline-flex' : 'none';
         }
         const btnHigiene = document.getElementById('btnHigienizarDadosBpa');
         if (btnHigiene) {
-            btnHigiene.style.display = this.isAdminOrFrancileide() ? 'inline-flex' : 'none';
+            btnHigiene.style.display = privileged ? 'inline-flex' : 'none';
+        }
+
+        // Rótulo dinâmico do primeiro KPI (Unidades Esperadas para ADM, Minhas Unidades para Gerente)
+        const kpiTotalLabel = document.getElementById('bpaKpiTotalLabel');
+        if (kpiTotalLabel) {
+            kpiTotalLabel.textContent = privileged ? 'Unidades Esperadas' : 'Minhas Unidades';
+        }
+
+        // Visibilidade dos cards (checklist de unidades)
+        // Para o perfil de Francileide, remove a exibição dos cards
+        const isFrancileideProfile = this.isFrancileide();
+        const checklistWrapper = document.getElementById('bpaChecklistWrapper');
+        if (checklistWrapper) {
+            checklistWrapper.style.display = isFrancileideProfile ? 'none' : 'block';
         }
 
         this.populateResponsaveisFilter();
         this.renderKPIs();
         this.renderActiveFiltersBar();
-        this.renderChecklistFrancileide();
+        if (!isFrancileideProfile) {
+            this.renderChecklistFrancileide();
+        }
         this.renderTable();
     },
 
@@ -2960,220 +3218,19 @@ const BpaModule = {
         const tipoFilter = this.currentTipoFiltro;
         const currentUser = this.getCurrentUser();
         const isPrivileged = this.isAdminOrFrancileide(currentUser);
+        const isFrancileideProfile = this.isFrancileide(currentUser);
         const unidades = this.getUnidadesSistema();
+        const enviadosComp = this.getAccessibleProducoes().filter(p => !comp || p.competencia === comp);
 
-        // CASO 1: SE O FILTRO DE STATUS FOR 'pending' (FALTAM ENVIAR / PENDÊNCIAS)
-        if (this.currentStatusFilter === 'pending') {
-            const enviadosComp = this.getAccessibleProducoes().filter(p => !comp || p.competencia === comp);
-            
-            // Avaliar unidades com pendências (totais ou parciais)
-            const pendingList = [];
-
-            unidades.forEach(estab => {
-                const evalRes = this.evaluateUnitDeliveries(estab, enviadosComp);
-                if (evalRes.isComplete) return; // Unidade 100% entregue não entra aqui
-
-                const nomeE = estab.nome.toLowerCase();
-                const cnesE = estab.cnes || '';
-                const respE = (estab.responsavel || '').toLowerCase();
-
-                // Filtro de Responsável
-                if (respFilter && respE !== respFilter) return;
-
-                // Filtro de Modalidade
-                if (tipoFilter === 'AMBOS' && evalRes.modalidade !== 'AMBOS') return;
-                if (tipoFilter === 'PARTIAL' && !evalRes.isPartial) return;
-                if (tipoFilter === 'BPA-C' && !evalRes.needsBpaC) return;
-                if (tipoFilter === 'BPA-I' && !evalRes.needsBpaI) return;
-
-                // Filtro de Busca
-                if (search && !nomeE.includes(search) && !cnesE.includes(search) && !respE.includes(search)) {
-                    return;
-                }
-
-                // Gerar linhas de pendência específicas:
-                if (evalRes.modalidade === 'AMBOS') {
-                    if (evalRes.needsBpaC) {
-                        pendingList.push({
-                            estab,
-                            tipoPendente: 'BPA-C',
-                            isPartial: evalRes.isPartial,
-                            descricaoTipo: 'BPA Consolidado (BPA-C)'
-                        });
-                    }
-                    if (evalRes.needsBpaI) {
-                        pendingList.push({
-                            estab,
-                            tipoPendente: 'BPA-I',
-                            isPartial: evalRes.isPartial,
-                            descricaoTipo: 'BPA Individualizado (BPA-I)'
-                        });
-                    }
-                } else if (evalRes.modalidade === 'BPA-C' && evalRes.needsBpaC) {
-                    pendingList.push({
-                        estab,
-                        tipoPendente: 'BPA-C',
-                        isPartial: false,
-                        descricaoTipo: 'BPA Consolidado (BPA-C)'
-                    });
-                } else if (evalRes.modalidade === 'BPA-I' && evalRes.needsBpaI) {
-                    pendingList.push({
-                        estab,
-                        tipoPendente: 'BPA-I',
-                        isPartial: false,
-                        descricaoTipo: 'BPA Individualizado (BPA-I)'
-                    });
-                }
-            });
-
-            if (pendingList.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="text-center" style="padding: 2.5rem 1rem; color: #10b981;">
-                            <i class="fas fa-check-circle" style="font-size: 2.2rem; margin-bottom: 0.8rem; color: #10b981; display: block;"></i>
-                            <span style="font-size: 0.95rem; font-weight: 700;">Nenhuma produção pendente encontrada!</span><br>
-                            <span style="font-size: 0.8rem; color: #64748b;">Todas as unidades correspondentes aos filtros selecionados já enviaram suas produções.</span>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            let html = '';
-            const compLabel = this.formatCompetenciaLabel(comp || '07/2026');
-
-            pendingList.forEach(item => {
-                const u = item.estab;
-                const escapedNome = (u.nome || '').replace(/'/g, "\\'");
-                const tagColor = item.tipoPendente === 'BPA-I' ? '#0284c7' : '#16a34a';
-                const tagBg = item.tipoPendente === 'BPA-I' ? '#e0f2fe' : '#dcfce7';
-
-                html += `
-                    <tr class="bpa-table-row pending-unit-row">
-                        <!-- ARQUIVO (PENDENTE) -->
-                        <td class="bpa-cell-file">
-                            <span class="bpa-file-pending-pill" style="border-color: ${item.isPartial ? '#fde68a' : '#fed7aa'}; color: ${item.isPartial ? '#b45309' : '#c2410c'};">
-                                <i class="fas fa-hourglass-half"></i> Falta ${item.tipoPendente} ${item.isPartial ? '<small style="font-weight: 700;">(Parcial)</small>' : ''}
-                            </span>
-                        </td>
-
-                        <!-- ESTABELECIMENTO -->
-                        <td class="bpa-cell-estab">
-                            <div class="estab-name" title="${u.nome}">${u.nome}</div>
-                            <div class="estab-sub">
-                                <span class="bpa-badge-tipo" style="background: ${tagBg}; color: ${tagColor}; border: 1px solid ${tagColor}40;">
-                                    ${item.tipoPendente}
-                                </span>
-                                ${u.cnes ? `<span class="cnes-code">CNES: ${u.cnes}</span>` : ''}
-                                ${u.isIsolado ? '<span style="font-size: 0.65rem; background: #e0f2fe; color: #0284c7; padding: 1px 5px; border-radius: 4px;">Isolado</span>' : ''}
-                            </div>
-                        </td>
-
-                        <!-- COMPETÊNCIA -->
-                        <td class="bpa-cell-comp">
-                            <span class="comp-text">${compLabel}</span>
-                        </td>
-
-                        <!-- DIGITADOR RESPONSÁVEL -->
-                        <td class="bpa-cell-author">
-                            <div class="author-name" style="color: #b45309;">
-                                <i class="fas fa-user-clock"></i> Resp: <strong>${u.responsavel}</strong>
-                            </div>
-                            <div class="author-date" style="color: #94a3b8;">Aguardando envio de ${item.tipoPendente}</div>
-                        </td>
-
-                        <!-- TAMANHO -->
-                        <td class="bpa-cell-size">
-                            <span class="size-text">-</span>
-                        </td>
-
-                        <!-- AÇÃO: ANEXAR PRODUÇÃO -->
-                        <td class="bpa-cell-actions">
-                            <div class="bpa-action-group">
-                                <button class="bpa-btn-upload-direct-table" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${u.cnes}', '${item.tipoPendente}')" title="Anexar ${item.tipoPendente} desta unidade">
-                                    <i class="fas fa-upload"></i>
-                                    <span>Anexar ${item.tipoPendente}</span>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            tbody.innerHTML = html;
-            return;
-        }
-
-        // CASO 2: SE O FILTRO DE STATUS FOR 'delivered' OU '' (ARQUIVOS ENVIADOS)
-        const filtered = this.getAccessibleProducoes().filter(p => {
-            const matchComp = !comp || p.competencia === comp;
-            const matchSearch = !search || 
-                (p.nome_arquivo && p.nome_arquivo.toLowerCase().includes(search)) ||
-                (p.estabelecimento_nome && p.estabelecimento_nome.toLowerCase().includes(search)) ||
-                (p.digitador_nome && p.digitador_nome.toLowerCase().includes(search)) ||
-                (p.competencia && p.competencia.toLowerCase().includes(search));
-
-            // Encontrar unidade correspondente ao arquivo
-            const u = unidades.find(unit => {
-                const cnesP = (p.cnes || '').trim();
-                const nomeP = (p.estabelecimento_nome || '').toUpperCase().trim();
-                const cnesU = (unit.cnes || '').trim();
-                const nomeU = (unit.nome || '').toUpperCase().trim();
-                if (cnesU && cnesP && cnesU.replace(/\D/g, '') === cnesP.replace(/\D/g, '')) return true;
-                if (nomeU && nomeP && (nomeP.includes(nomeU) || nomeU.includes(nomeP))) return true;
-                return false;
-            });
-
-            let matchResp = true;
-            if (respFilter) {
-                const unitResp = (u && u.responsavel) ? u.responsavel.toLowerCase() : '';
-                const pDigitador = (p.digitador_nome || '').toLowerCase();
-                matchResp = (pDigitador === respFilter || unitResp === respFilter);
-            }
-
-            let matchTipo = true;
-            if (tipoFilter) {
-                if (tipoFilter === 'BPA-C') matchTipo = (p.tipo_bpa === 'BPA-C');
-                else if (tipoFilter === 'BPA-I') matchTipo = (p.tipo_bpa === 'BPA-I');
-                else if (tipoFilter === 'AMBOS') matchTipo = (u && u.modalidade === 'AMBOS');
-                else if (tipoFilter === 'PARTIAL') {
-                    if (!u) matchTipo = false;
-                    else {
-                        const evalU = this.evaluateUnitDeliveries(u, this.getAccessibleProducoes().filter(pr => !comp || pr.competencia === comp));
-                        matchTipo = evalU.isPartial;
-                    }
-                }
-            }
-
-            return matchComp && matchSearch && matchResp && matchTipo;
-        });
-
-        if (filtered.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center" style="padding: 2.5rem 1rem; color: #94a3b8;">
-                        <i class="fas fa-folder-open" style="font-size: 2.2rem; margin-bottom: 0.8rem; color: #475569; display: block;"></i>
-                        <span style="font-size: 0.95rem; font-weight: 600;">Nenhum arquivo de produção BPA encontrado</span><br>
-                        <span style="font-size: 0.8rem; color: #64748b;">
-                            ${(this.currentResponsavelFiltro || this.currentSearchTerm || this.currentStatusFilter || this.currentTipoFiltro) ? 
-                                '<button class="btn-secondary" onclick="BpaModule.clearAllFilters()" style="margin-top: 0.6rem; padding: 0.35rem 0.75rem;"><i class="fas fa-times-circle"></i> Limpar Filtros</button>' : 
-                                'Utilize o botão "+ Enviar Produção BPA" para anexar um novo arquivo.'}
-                        </span>
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        let html = '';
-        filtered.forEach(p => {
+        // Helper para renderizar linha de arquivo recebido
+        const renderReceivedRow = (p) => {
             const compLabel = this.formatCompetenciaLabel(p.competencia);
             const canDelete = isPrivileged || (currentUser.username === p.digitador_username);
             const isBpaI = p.tipo_bpa === 'BPA-I';
             const badgeClass = isBpaI ? 'bpa-badge-tipo bpa-i' : 'bpa-badge-tipo bpa-c';
             const badgeIcon = isBpaI ? '<i class="fas fa-user-tag"></i>' : '<i class="fas fa-layer-group"></i>';
 
-            html += `
+            return `
                 <tr class="bpa-table-row">
                     <!-- ARQUIVO -->
                     <td class="bpa-cell-file">
@@ -3252,6 +3309,276 @@ const BpaModule = {
                     </td>
                 </tr>
             `;
+        };
+
+        // Helper para renderizar linha de unidade pendente
+        const renderPendingRow = (u, tipoPendente, isPartial) => {
+            const compLabel = this.formatCompetenciaLabel(comp || '07/2026');
+            const escapedNome = (u.nome || '').replace(/'/g, "\\'");
+            const tagColor = tipoPendente === 'BPA-I' ? '#0284c7' : '#16a34a';
+            const tagBg = tipoPendente === 'BPA-I' ? '#e0f2fe' : '#dcfce7';
+
+            return `
+                <tr class="bpa-table-row pending-unit-row">
+                    <!-- ARQUIVO (PENDENTE) -->
+                    <td class="bpa-cell-file">
+                        <span class="bpa-file-pending-pill" style="border-color: ${isPartial ? '#fde68a' : '#fed7aa'}; color: ${isPartial ? '#b45309' : '#c2410c'};">
+                            <i class="fas fa-hourglass-half"></i> Falta ${tipoPendente} ${isPartial ? '<small style="font-weight: 700;">(Parcial)</small>' : ''}
+                        </span>
+                    </td>
+
+                    <!-- ESTABELECIMENTO -->
+                    <td class="bpa-cell-estab">
+                        <div class="estab-name" title="${u.nome}">${u.nome}</div>
+                        <div class="estab-sub">
+                            <span class="bpa-badge-tipo" style="background: ${tagBg}; color: ${tagColor}; border: 1px solid ${tagColor}40;">
+                                ${tipoPendente} Pendente
+                            </span>
+                            ${u.cnes ? `<span class="cnes-code">CNES: ${u.cnes}</span>` : ''}
+                            ${u.isIsolado ? '<span style="font-size: 0.65rem; background: #e0f2fe; color: #0284c7; padding: 1px 5px; border-radius: 4px;">Isolado</span>' : ''}
+                        </div>
+                    </td>
+
+                    <!-- COMPETÊNCIA -->
+                    <td class="bpa-cell-comp">
+                        <span class="comp-text">${compLabel}</span>
+                    </td>
+
+                    <!-- DIGITADOR RESPONSÁVEL -->
+                    <td class="bpa-cell-author">
+                        <div class="author-name" style="color: #b45309;">
+                            <i class="fas fa-user-clock"></i> Resp: <strong>${u.responsavel}</strong>
+                        </div>
+                        <div class="author-date" style="color: #94a3b8;">Aguardando envio de ${tipoPendente}</div>
+                    </td>
+
+                    <!-- TAMANHO -->
+                    <td class="bpa-cell-size">
+                        <span class="size-text">-</span>
+                    </td>
+
+                    <!-- AÇÃO: ANEXAR PRODUÇÃO -->
+                    <td class="bpa-cell-actions">
+                        <div class="bpa-action-group">
+                            <button class="bpa-btn-upload-direct-table" onclick="BpaModule.openUploadModalFor('${escapedNome}', '${u.cnes}', '${tipoPendente}')" title="Anexar ${tipoPendente} desta unidade">
+                                <i class="fas fa-upload"></i>
+                                <span>Anexar ${tipoPendente}</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        };
+
+        // CASO 1: SE O FILTRO DE STATUS FOR 'pending' (FALTAM ENVIAR / PENDÊNCIAS)
+        if (this.currentStatusFilter === 'pending') {
+            const pendingList = [];
+            unidades.forEach(estab => {
+                const evalRes = this.evaluateUnitDeliveries(estab, enviadosComp);
+                if (evalRes.isComplete) return;
+
+                const nomeE = estab.nome.toLowerCase();
+                const cnesE = estab.cnes || '';
+                const respE = (estab.responsavel || '').toLowerCase();
+
+                if (respFilter && respE !== respFilter) return;
+                if (tipoFilter === 'AMBOS' && evalRes.modalidade !== 'AMBOS') return;
+                if (tipoFilter === 'PARTIAL' && !evalRes.isPartial) return;
+                if (tipoFilter === 'BPA-C' && !evalRes.needsBpaC) return;
+                if (tipoFilter === 'BPA-I' && !evalRes.needsBpaI) return;
+                if (search && !nomeE.includes(search) && !cnesE.includes(search) && !respE.includes(search)) return;
+
+                if (evalRes.modalidade === 'AMBOS') {
+                    if (evalRes.needsBpaC) {
+                        pendingList.push({ estab, tipoPendente: 'BPA-C', isPartial: evalRes.isPartial });
+                    }
+                    if (evalRes.needsBpaI) {
+                        pendingList.push({ estab, tipoPendente: 'BPA-I', isPartial: evalRes.isPartial });
+                    }
+                } else if (evalRes.modalidade === 'BPA-C' && evalRes.needsBpaC) {
+                    pendingList.push({ estab, tipoPendente: 'BPA-C', isPartial: false });
+                } else if (evalRes.modalidade === 'BPA-I' && evalRes.needsBpaI) {
+                    pendingList.push({ estab, tipoPendente: 'BPA-I', isPartial: false });
+                }
+            });
+
+            if (pendingList.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 2.5rem 1rem; color: #10b981;">
+                            <i class="fas fa-check-circle" style="font-size: 2.2rem; margin-bottom: 0.8rem; color: #10b981; display: block;"></i>
+                            <span style="font-size: 0.95rem; font-weight: 700;">Nenhuma produção pendente encontrada!</span><br>
+                            <span style="font-size: 0.8rem; color: #64748b;">Todas as unidades correspondentes aos filtros selecionados já enviaram suas produções.</span>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            pendingList.forEach(item => {
+                html += renderPendingRow(item.estab, item.tipoPendente, item.isPartial);
+            });
+            tbody.innerHTML = html;
+            return;
+        }
+
+        // CASO 2: SE FOR O PERFIL DE FRANCILEIDE E O FILTRO FOR 'TODOS' ('')
+        // Exibir a tabela com as produções recebidas ou não (de todas as unidades)
+        if (isFrancileideProfile && this.currentStatusFilter === '') {
+            let html = '';
+            let totalRowsCount = 0;
+
+            unidades.forEach(estab => {
+                const nomeE = estab.nome.toLowerCase();
+                const cnesE = estab.cnes || '';
+                const respE = (estab.responsavel || '').toLowerCase();
+                const evalRes = this.evaluateUnitDeliveries(estab, enviadosComp);
+
+                // Filtro de Responsável
+                if (respFilter) {
+                    const matchResp = (respE === respFilter || evalRes.prods.some(p => (p.digitador_nome || '').toLowerCase() === respFilter));
+                    if (!matchResp) return;
+                }
+
+                // Filtro de Modalidade
+                if (tipoFilter === 'AMBOS' && evalRes.modalidade !== 'AMBOS') return;
+                if (tipoFilter === 'PARTIAL' && !evalRes.isPartial) return;
+
+                // Filtro de Busca
+                if (search) {
+                    const matchSearch = nomeE.includes(search) || cnesE.includes(search) || respE.includes(search) ||
+                        evalRes.prods.some(p => (p.nome_arquivo && p.nome_arquivo.toLowerCase().includes(search)) || (p.digitador_nome && p.digitador_nome.toLowerCase().includes(search)));
+                    if (!matchSearch) return;
+                }
+
+                // 1. Renderizar arquivos já recebidos da unidade
+                if (evalRes.prods && evalRes.prods.length > 0) {
+                    evalRes.prods.forEach(p => {
+                        if (tipoFilter === 'BPA-C' && p.tipo_bpa !== 'BPA-C') return;
+                        if (tipoFilter === 'BPA-I' && p.tipo_bpa !== 'BPA-I') return;
+                        html += renderReceivedRow(p);
+                        totalRowsCount++;
+                    });
+                }
+
+                // 2. Renderizar pendências se faltar enviar
+                if (evalRes.isPending) {
+                    if (evalRes.modalidade === 'AMBOS') {
+                        if (!tipoFilter || tipoFilter === 'AMBOS' || tipoFilter === 'BPA-C') {
+                            html += renderPendingRow(estab, 'BPA-C', false);
+                            totalRowsCount++;
+                        }
+                        if (!tipoFilter || tipoFilter === 'AMBOS' || tipoFilter === 'BPA-I') {
+                            html += renderPendingRow(estab, 'BPA-I', false);
+                            totalRowsCount++;
+                        }
+                    } else if (evalRes.modalidade === 'BPA-C') {
+                        if (!tipoFilter || tipoFilter === 'BPA-C') {
+                            html += renderPendingRow(estab, 'BPA-C', false);
+                            totalRowsCount++;
+                        }
+                    } else if (evalRes.modalidade === 'BPA-I') {
+                        if (!tipoFilter || tipoFilter === 'BPA-I') {
+                            html += renderPendingRow(estab, 'BPA-I', false);
+                            totalRowsCount++;
+                        }
+                    }
+                } else if (evalRes.isPartial) {
+                    if (evalRes.needsBpaC && (!tipoFilter || tipoFilter === 'AMBOS' || tipoFilter === 'BPA-C' || tipoFilter === 'PARTIAL')) {
+                        html += renderPendingRow(estab, 'BPA-C', true);
+                        totalRowsCount++;
+                    }
+                    if (evalRes.needsBpaI && (!tipoFilter || tipoFilter === 'AMBOS' || tipoFilter === 'BPA-I' || tipoFilter === 'PARCIAL')) {
+                        html += renderPendingRow(estab, 'BPA-I', true);
+                        totalRowsCount++;
+                    }
+                }
+            });
+
+            if (totalRowsCount === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding: 2.5rem 1rem; color: #64748b;">
+                            <i class="fas fa-folder-open" style="font-size: 2.2rem; margin-bottom: 0.8rem; color: #94a3b8; display: block;"></i>
+                            <span style="font-size: 0.95rem; font-weight: 700; color: #1e293b;">Nenhuma unidade ou produção encontrada</span><br>
+                            <span style="font-size: 0.82rem; color: #64748b;">
+                                <button class="btn-secondary" onclick="BpaModule.clearAllFilters()" style="margin-top: 0.6rem; padding: 0.35rem 0.75rem;"><i class="fas fa-times-circle"></i> Limpar Filtros</button>
+                            </span>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = html;
+            return;
+        }
+
+        // CASO 3: DEMAIS PERFIS OU SE FILTRANDO POR STATUS 'delivered'
+        const filtered = this.getAccessibleProducoes().filter(p => {
+            const matchComp = !comp || p.competencia === comp;
+            const matchSearch = !search || 
+                (p.nome_arquivo && p.nome_arquivo.toLowerCase().includes(search)) ||
+                (p.estabelecimento_nome && p.estabelecimento_nome.toLowerCase().includes(search)) ||
+                (p.digitador_nome && p.digitador_nome.toLowerCase().includes(search)) ||
+                (p.competencia && p.competencia.toLowerCase().includes(search));
+
+            // Encontrar unidade correspondente ao arquivo
+            const u = unidades.find(unit => {
+                const cnesP = (p.cnes || '').trim();
+                const nomeP = (p.estabelecimento_nome || '').toUpperCase().trim();
+                const cnesU = (unit.cnes || '').trim();
+                const nomeU = (unit.nome || '').toUpperCase().trim();
+                if (cnesU && cnesP && cnesU.replace(/\D/g, '') === cnesP.replace(/\D/g, '')) return true;
+                if (nomeU && nomeP && (nomeP.includes(nomeU) || nomeU.includes(nomeP))) return true;
+                return false;
+            });
+
+            let matchResp = true;
+            if (respFilter) {
+                const unitResp = (u && u.responsavel) ? u.responsavel.toLowerCase() : '';
+                const pDigitador = (p.digitador_nome || '').toLowerCase();
+                matchResp = (pDigitador === respFilter || unitResp === respFilter);
+            }
+
+            let matchTipo = true;
+            if (tipoFilter) {
+                if (tipoFilter === 'BPA-C') matchTipo = (p.tipo_bpa === 'BPA-C');
+                else if (tipoFilter === 'BPA-I') matchTipo = (p.tipo_bpa === 'BPA-I');
+                else if (tipoFilter === 'AMBOS') matchTipo = (u && u.modalidade === 'AMBOS');
+                else if (tipoFilter === 'PARTIAL') {
+                    if (!u) matchTipo = false;
+                    else {
+                        const evalU = this.evaluateUnitDeliveries(u, this.getAccessibleProducoes().filter(pr => !comp || pr.competencia === comp));
+                        matchTipo = evalU.isPartial;
+                    }
+                }
+            }
+
+            return matchComp && matchSearch && matchResp && matchTipo;
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center" style="padding: 2.5rem 1rem; color: #64748b;">
+                        <i class="fas fa-folder-open" style="font-size: 2.2rem; margin-bottom: 0.8rem; color: #94a3b8; display: block;"></i>
+                        <span style="font-size: 0.95rem; font-weight: 700; color: #1e293b;">Nenhum arquivo de produção BPA encontrado</span><br>
+                        <span style="font-size: 0.82rem; color: #64748b;">
+                            ${(this.currentResponsavelFiltro || this.currentSearchTerm || this.currentStatusFilter || this.currentTipoFiltro) ? 
+                                '<button class="btn-secondary" onclick="BpaModule.clearAllFilters()" style="margin-top: 0.6rem; padding: 0.35rem 0.75rem;"><i class="fas fa-times-circle"></i> Limpar Filtros</button>' : 
+                                'Utilize o botão principal "Enviar Produção BPA" acima para anexar um novo arquivo.'}
+                        </span>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach(p => {
+            html += renderReceivedRow(p);
         });
 
         tbody.innerHTML = html;
@@ -3288,6 +3615,7 @@ const BpaModule = {
 
         this.loadCnesBase(); // Pré-carrega a base CNES em background
         this.filePendingUpload = null;
+        this.auditApproval = null;
         this.fileSelectionId = (this.fileSelectionId || 0) + 1;
         document.getElementById('bpaFileInput').value = '';
         document.getElementById('bpaDropzone').classList.remove('has-file');
@@ -3322,15 +3650,22 @@ const BpaModule = {
 
     closeUploadModal() {
         this.fileSelectionId = (this.fileSelectionId || 0) + 1;
-        const modal = document.getElementById('modalUploadBpa');
-        if (modal) modal.classList.add('hidden');
+        if (typeof document !== 'undefined') {
+            const modal = document.getElementById('modalUploadBpa');
+            if (modal) modal.classList.add('hidden');
+        }
         this.filePendingUpload = null;
+        this.auditApproval = null;
     },
 
     handleFileSelect(file) {
         if (!file) return;
         this.filePendingUpload = null;
-        document.getElementById('btnConfirmarUploadBpa').disabled = true;
+        this.auditApproval = null;
+        if (typeof document !== 'undefined') {
+            const btn = document.getElementById('btnConfirmarUploadBpa');
+            if (btn) btn.disabled = true;
+        }
         const selectionId = this.fileSelectionId = (this.fileSelectionId || 0) + 1;
 
         const extension = String(file.name || '').split('.').pop().toUpperCase();
@@ -3342,6 +3677,7 @@ const BpaModule = {
             alert('O arquivo está vazio. Exporte a produção novamente.');
             return;
         }
+        if (typeof FileReader === 'undefined') return;
         const reader = new FileReader();
         reader.onload = async (e) => {
             if (selectionId !== this.fileSelectionId) return;
@@ -3435,7 +3771,7 @@ const BpaModule = {
             document.getElementById('bpaDropPrompt').style.display = 'none';
             document.getElementById('bpaFileInfoCard').style.display = 'block';
             document.getElementById('bpaDropzone').classList.add('has-file');
-            document.getElementById('btnConfirmarUploadBpa').disabled = false;
+            document.getElementById('btnConfirmarUploadBpa').disabled = !this.canSubmitPendingUpload();
         };
 
         reader.onerror = () => alert('Não foi possível ler o arquivo. Selecione-o novamente.');
@@ -3444,8 +3780,13 @@ const BpaModule = {
 
     async handleFormSubmit() {
         if (!this.filePendingUpload) {
-            alert('Por favor, selecione ou arraste um arquivo de produção BPA.');
-            return;
+            if (typeof alert === 'function') alert('Por favor, selecione ou arraste um arquivo de produção BPA.');
+            return false;
+        }
+
+        if (!this.canSubmitPendingUpload()) {
+            if (typeof alert === 'function') alert('Envio bloqueado pelo Pente Fino ARGOS. A produção precisa ser auditada e aprovada sem glosas antes do envio.');
+            return false;
         }
 
         const btn = document.getElementById('btnConfirmarUploadBpa');
@@ -3492,9 +3833,11 @@ const BpaModule = {
         const btnBaixarLote = document.getElementById('btnBaixarLoteBpa');
         if (btnBaixarLote) btnBaixarLote.addEventListener('click', () => this.downloadBatchCompetencia());
 
-        // Atribuir Responsáveis (ADM / Francileide)
+        // Atribuir Responsáveis e Inserir Unidade (ADM / Francileide)
+        const btnNova = document.getElementById('btnNovaUnidadeManualBpa');
+        if (btnNova) btnNova.addEventListener('click', () => this.openAssignResponsaveisModal(true));
         const btnResp = document.getElementById('btnGerenciarResponsaveisBpa');
-        if (btnResp) btnResp.addEventListener('click', () => this.openAssignResponsaveisModal());
+        if (btnResp) btnResp.addEventListener('click', () => this.openAssignResponsaveisModal(false));
         const btnCloseResp = document.getElementById('btnCloseModalResponsaveisBpa');
         if (btnCloseResp) btnCloseResp.addEventListener('click', () => this.closeAssignResponsaveisModal());
         const btnCancelResp = document.getElementById('btnCancelResponsaveisBpa');
@@ -3681,4 +4024,5 @@ const BpaModule = {
     }
 };
 
-window.BpaModule = BpaModule;
+if (typeof window !== 'undefined') window.BpaModule = BpaModule;
+if (typeof module !== 'undefined' && module.exports) module.exports = BpaModule;
