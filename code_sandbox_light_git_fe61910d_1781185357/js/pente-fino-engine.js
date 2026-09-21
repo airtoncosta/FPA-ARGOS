@@ -84,8 +84,14 @@
                     const data = await carregarJson(item.url, item.sha256);
                     const declared = data.competencia || data.versao?.replace(/\D/g, '');
                     if (declared !== cm) throw new Error('Competência interna da base diverge da solicitada.');
-                    if (type === 'cnes' && item.url.startsWith('cnes_data/auto/') && String(data.codigoIbge) !== '210120') throw new Error('Snapshot CNES automático fora do escopo Bacabal.');
                     bases[cm][type] = { ...data, competencia: declared, fonte: item.fonte, oficial: item.oficial === true, completo: item.completo === true, cobertura: item.cobertura || {} };
+                    if (type === 'cnes') {
+                        try {
+                            const mapa = (typeof window !== 'undefined' && window.DATASUS_VINCULOS_BACABAL) || await carregarJson('cnes_data/datasus_vinculos.json');
+                            bases[cm][type].mapaVinculos = mapa;
+                            if (typeof window !== 'undefined') window.DATASUS_VINCULOS_BACABAL = mapa;
+                        } catch (_) {}
+                    }
                     sources.push({ tipo: type.toUpperCase(), competencia: cm, estado: item.oficial ? 'Carregado' : 'Origem não validada', fonte: item.fonte || item.url });
                 } catch (e) {
                     sources.push({ tipo: type.toUpperCase(), competencia: cm, estado: 'Indisponível', fonte: e.message });
@@ -101,129 +107,191 @@
         return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    function mascararCns(cns) {
+        const s = String(cns ?? '').trim();
+        if (!s) return '—';
+        const num = s.replace(/\D/g, '');
+        if (num.length === 15) {
+            return num.slice(0, 3) + '*********' + num.slice(-3);
+        }
+        if (s.length > 6) {
+            return s.slice(0, 3) + '*'.repeat(s.length - 6) + s.slice(-3);
+        }
+        return s;
+    }
+
+    const RULES = {
+        regra1_lotacao_cnes: {
+            id: 1,
+            codigo: 'regra1_lotacao_cnes',
+            titulo: 'Lotação do Profissional no CNES',
+            descricao: 'O profissional identificado está lotado e ativo no estabelecimento de saúde na competência do atendimento.',
+            regrasCore: ['VINCULO_PROFISSIONAL', 'UNIDADE_CNES', 'BASE_CNES']
+        },
+        regra2_cbo_procedimento: {
+            id: 2,
+            codigo: 'regra2_cbo_procedimento',
+            titulo: 'CBO Habilitado ao Procedimento',
+            descricao: 'Aqueles procedimentos estão habilitados àquele CBO conforme a tabela oficial do SIGTAP.',
+            regrasCore: ['CBO_SIGTAP', 'CBO_FORMATO', 'CBOS']
+        },
+        regra3_cid_procedimento: {
+            id: 3,
+            codigo: 'regra3_cid_procedimento',
+            titulo: 'CID Habilitado ao Procedimento',
+            descricao: 'O CID diagnosticado está habilitado para o procedimento na tabela do SIGTAP.',
+            regrasCore: ['CID', 'CID_FORMATO', 'CIDS']
+        },
+        regra4_servico_classificacao: {
+            id: 4,
+            codigo: 'regra4_servico_classificacao',
+            titulo: 'Serviço e Classificação no SIGTAP',
+            descricao: 'Esses serviços e classificações estão habilitados no SIGTAP para o procedimento.',
+            regrasCore: ['BASE_SIGTAP', 'PROCEDIMENTO_VIGENTE', 'SERVICO_INFORMADO', 'SERVICO_CLASSIFICACAO']
+        },
+        regra5_cns_profissional: {
+            id: 5,
+            codigo: 'regra5_cns_profissional',
+            titulo: 'Cartão SUS (CNS) do Profissional',
+            descricao: 'O cartão SUS do profissional está correto e atende ao cálculo do dígito verificador módulo 11.',
+            regrasCore: ['CNS_PROFISSIONAL']
+        }
+    };
+
     /**
      * Classifica os apontamentos da auditoria nas 5 Regras Anti-Glosa solicitadas:
      * 1. Lotação do profissional no estabelecimento (CNES)
      * 2. Habilitação CBO x Procedimento (SIGTAP)
      * 3. Habilitação CID x Procedimento (SIGTAP)
-     * 4. Habilitação Serviços e Classificações no CNES
+     * 4. Habilitação Serviços e Classificações no SIGTAP
      * 5. Validação estrutural do Cartão SUS do profissional (CNS)
      */
     function classificar5Regras(resultadoAuditoria) {
         if (!resultadoAuditoria || typeof resultadoAuditoria !== 'object') {
             return {
-                regra1_lotacao_cnes: { ok: false, glosas: [], total: 0, titulo: 'Lotação do Profissional no CNES' },
-                regra2_cbo_procedimento: { ok: false, glosas: [], total: 0, titulo: 'CBO Habilitado ao Procedimento' },
-                regra3_cid_procedimento: { ok: false, glosas: [], total: 0, titulo: 'CID Habilitado ao Procedimento' },
-                regra4_servico_classificacao: { ok: false, glosas: [], total: 0, titulo: 'Serviço e Classificação no CNES' },
-                regra5_cns_profissional: { ok: false, glosas: [], total: 0, titulo: 'Cartão SUS (CNS) do Profissional' },
-                podeEnviarSemGlosa: false
+                regra1_lotacao_cnes: { id: 1, codigo: 'regra1_lotacao_cnes', ok: false, glosas: [], totalGlosas: 0, status: 'NAO_VERIFICADO', titulo: RULES.regra1_lotacao_cnes.titulo, descricao: RULES.regra1_lotacao_cnes.descricao },
+                regra2_cbo_procedimento: { id: 2, codigo: 'regra2_cbo_procedimento', ok: false, glosas: [], totalGlosas: 0, status: 'NAO_VERIFICADO', titulo: RULES.regra2_cbo_procedimento.titulo, descricao: RULES.regra2_cbo_procedimento.descricao },
+                regra3_cid_procedimento: { id: 3, codigo: 'regra3_cid_procedimento', ok: false, glosas: [], totalGlosas: 0, status: 'NAO_VERIFICADO', titulo: RULES.regra3_cid_procedimento.titulo, descricao: RULES.regra3_cid_procedimento.descricao },
+                regra4_servico_classificacao: { id: 4, codigo: 'regra4_servico_classificacao', ok: false, glosas: [], totalGlosas: 0, status: 'NAO_VERIFICADO', titulo: RULES.regra4_servico_classificacao.titulo, descricao: RULES.regra4_servico_classificacao.descricao },
+                regra5_cns_profissional: { id: 5, codigo: 'regra5_cns_profissional', ok: false, glosas: [], totalGlosas: 0, status: 'NAO_VERIFICADO', titulo: RULES.regra5_cns_profissional.titulo, descricao: RULES.regra5_cns_profissional.descricao },
+                outrasGlosas: [],
+                bloqueadoresGlobais: [],
+                podeEnviarSemGlosa: false,
+                parecer: {
+                    podeEnviarSemGlosa: false,
+                    status: 'BLOQUEADO',
+                    totalGlosas: 1,
+                    regrasComGlosa: ['Auditoria Inconclusiva'],
+                    mensagem: 'Auditoria não realizada ou dados ausentes.'
+                }
             };
         }
 
         const findings = Array.isArray(resultadoAuditoria.findings) ? resultadoAuditoria.findings : [];
+        const checks = resultadoAuditoria.checks || {};
 
-        const isGlosa = status => status === 'NAO_CONFORME' || status === 'NAO_VERIFICADO';
+        const regrasClassificadas = {};
+        const allMappedRuleKeys = new Set();
 
-        // Filtro por regra
-        const glosasRegra1 = findings.filter(f => isGlosa(f.status) && ['VINCULO_PROFISSIONAL', 'UNIDADE_CNES', 'BASE_CNES'].includes(f.regra));
-        const glosasRegra2 = findings.filter(f => isGlosa(f.status) && ['CBO_SIGTAP', 'CBO_FORMATO', 'BASE_SIGTAP'].includes(f.regra));
-        const glosasRegra3 = findings.filter(f => isGlosa(f.status) && ['CID', 'CID_FORMATO'].includes(f.regra));
-        const glosasRegra4 = findings.filter(f => isGlosa(f.status) && ['SERVICO_CNES', 'SERVICO_CLASSIFICACAO', 'SERVICO_INFORMADO', 'HABILITACAO'].includes(f.regra));
-        const glosasRegra5 = findings.filter(f => isGlosa(f.status) && ['CNS_PROFISSIONAL'].includes(f.regra));
+        for (const [chave, rDef] of Object.entries(RULES)) {
+            rDef.regrasCore.forEach(k => allMappedRuleKeys.add(k));
+            const achados = findings.filter(f => rDef.regrasCore.includes(f.regra));
 
-        // Outras possíveis não conformidades estruturais críticas
-        const outrasGlosas = findings.filter(f => isGlosa(f.status) && !['VINCULO_PROFISSIONAL', 'UNIDADE_CNES', 'BASE_CNES', 'CBO_SIGTAP', 'CBO_FORMATO', 'BASE_SIGTAP', 'CID', 'CID_FORMATO', 'SERVICO_CNES', 'SERVICO_CLASSIFICACAO', 'SERVICO_INFORMADO', 'HABILITACAO', 'CNS_PROFISSIONAL'].includes(f.regra));
+            // Prioridade de estado da regra: NAO_CONFORME, NAO_VERIFICADO, ALERTA, CONFORME, NAO_APLICAVEL
+            let estado = 'CONFORME';
+            if (achados.some(f => f.status === 'NAO_CONFORME')) {
+                estado = 'NAO_CONFORME';
+            } else if (achados.some(f => f.status === 'NAO_VERIFICADO')) {
+                estado = 'NAO_VERIFICADO';
+            } else if (achados.some(f => f.status === 'ALERTA')) {
+                estado = 'ALERTA';
+            } else {
+                let hasConforme = false;
+                let hasNaoAplicavel = false;
+                for (const k of rDef.regrasCore) {
+                    const c = checks[k];
+                    if (c?.CONFORME > 0) hasConforme = true;
+                    if (c?.NAO_APLICAVEL > 0) hasNaoAplicavel = true;
+                }
+                if (hasConforme) estado = 'CONFORME';
+                else if (hasNaoAplicavel) estado = 'NAO_APLICAVEL';
+                else estado = 'CONFORME';
+            }
 
-        const regra1 = {
-            id: 1,
-            codigo: 'regra1_lotacao_cnes',
-            titulo: 'Lotação do Profissional no CNES',
-            descricao: 'O profissional identificado está lotado e ativo no estabelecimento de saúde na competência do atendimento.',
-            ok: glosasRegra1.length === 0,
-            glosas: glosasRegra1,
-            totalGlosas: glosasRegra1.length
-        };
+            const ok = estado === 'CONFORME' || estado === 'NAO_APLICAVEL';
+            const glosas = achados.filter(f => ['NAO_CONFORME', 'NAO_VERIFICADO', 'ALERTA'].includes(f.status));
 
-        const regra2 = {
-            id: 2,
-            codigo: 'regra2_cbo_procedimento',
-            titulo: 'CBO Habilitado ao Procedimento',
-            descricao: 'Aqueles procedimentos estão habilitados àquele CBO conforme a tabela oficial do SIGTAP.',
-            ok: glosasRegra2.length === 0,
-            glosas: glosasRegra2,
-            totalGlosas: glosasRegra2.length
-        };
+            regrasClassificadas[chave] = {
+                id: rDef.id,
+                codigo: rDef.codigo,
+                titulo: rDef.titulo,
+                descricao: rDef.descricao,
+                status: estado,
+                ok: ok,
+                glosas: glosas,
+                totalGlosas: glosas.length
+            };
+        }
 
-        const regra3 = {
-            id: 3,
-            codigo: 'regra3_cid_procedimento',
-            titulo: 'CID Habilitado ao Procedimento',
-            descricao: 'O CID diagnosticado está habilitado para o procedimento na tabela do SIGTAP.',
-            ok: glosasRegra3.length === 0,
-            glosas: glosasRegra3,
-            totalGlosas: glosasRegra3.length
-        };
+        // Bloqueadores globais: ESTRUTURA, ARQUIVO, DUPLICIDADE e quaisquer achados não mapeados com falha/alerta/pendência
+        const bloqueadoresGlobais = findings.filter(f =>
+            (!allMappedRuleKeys.has(f.regra) || ['ESTRUTURA', 'ARQUIVO', 'DUPLICIDADE'].includes(f.regra)) &&
+            ['NAO_CONFORME', 'NAO_VERIFICADO', 'ALERTA'].includes(f.status)
+        );
 
-        const regra4 = {
-            id: 4,
-            codigo: 'regra4_servico_classificacao',
-            titulo: 'Serviço e Classificação no CNES',
-            descricao: 'Esses serviços e classificações estão habilitados no CNES do estabelecimento para o procedimento.',
-            ok: glosasRegra4.length === 0,
-            glosas: glosasRegra4,
-            totalGlosas: glosasRegra4.length
-        };
-
-        const regra5 = {
-            id: 5,
-            codigo: 'regra5_cns_profissional',
-            titulo: 'Cartão SUS (CNS) do Profissional',
-            descricao: 'O cartão SUS do profissional está correto e atende ao cálculo do dígito verificador módulo 11.',
-            ok: glosasRegra5.length === 0,
-            glosas: glosasRegra5,
-            totalGlosas: glosasRegra5.length
-        };
+        // Se o status da auditoria for INCONCLUSIVO ou NAO_CONFORME e não houver achados na lista
+        if (resultadoAuditoria.status && resultadoAuditoria.status !== 'CONFORME' && findings.length === 0) {
+            bloqueadoresGlobais.push({
+                regra: 'ESTRUTURA',
+                status: 'NAO_CONFORME',
+                mensagem: 'Status geral da auditoria não conforme: ' + resultadoAuditoria.status
+            });
+        }
 
         const parecer = avaliarParecerFinal({
-            regra1_lotacao_cnes: regra1,
-            regra2_cbo_procedimento: regra2,
-            regra3_cid_procedimento: regra3,
-            regra4_servico_classificacao: regra4,
-            regra5_cns_profissional: regra5,
-            outrasGlosas: outrasGlosas
+            ...regrasClassificadas,
+            outrasGlosas: bloqueadoresGlobais,
+            bloqueadoresGlobais: bloqueadoresGlobais
         });
 
         return {
-            regra1_lotacao_cnes: regra1,
-            regra2_cbo_procedimento: regra2,
-            regra3_cid_procedimento: regra3,
-            regra4_servico_classificacao: regra4,
-            regra5_cns_profissional: regra5,
-            outrasGlosas: outrasGlosas,
+            ...regrasClassificadas,
+            outrasGlosas: bloqueadoresGlobais,
+            bloqueadoresGlobais: bloqueadoresGlobais,
             podeEnviarSemGlosa: parecer.podeEnviarSemGlosa,
             parecer: parecer
         };
     }
 
-    function avaliarParecerFinal(regras) {
+    function avaliarParecerFinal(regras, globalBlockers = []) {
         const chaves = ['regra1_lotacao_cnes', 'regra2_cbo_procedimento', 'regra3_cid_procedimento', 'regra4_servico_classificacao', 'regra5_cns_profissional'];
         let totalGlosas = 0;
-        let regrasComGlosa = [];
+        const regrasComGlosa = [];
 
         for (const chave of chaves) {
-            const r = regras[chave];
+            const r = regras?.[chave];
             if (r && !r.ok) {
                 totalGlosas += (r.totalGlosas || r.glosas?.length || 1);
                 regrasComGlosa.push(r.titulo || chave);
             }
         }
 
+        const blockers = [
+            ...(Array.isArray(globalBlockers) ? globalBlockers : []),
+            ...(Array.isArray(regras?.outrasGlosas) ? regras.outrasGlosas : []),
+            ...(Array.isArray(regras?.bloqueadoresGlobais) ? regras.bloqueadoresGlobais : [])
+        ];
+        const uniqueBlockers = [...new Set(blockers)];
+        if (uniqueBlockers.length > 0) {
+            totalGlosas += uniqueBlockers.length;
+            regrasComGlosa.push('Bloqueios Globais / Estruturais');
+        }
+
         const podeEnviar = totalGlosas === 0;
 
         return {
             podeEnviarSemGlosa: podeEnviar,
-            status: podeEnviar ? 'APROVADO' : 'GLOSA_DETECTADA',
+            status: podeEnviar ? 'APROVADO' : 'BLOQUEADO',
             totalGlosas: totalGlosas,
             regrasComGlosa: regrasComGlosa,
             mensagem: podeEnviar ? 'Pode enviar a produção sem glosa' : `Foram detectadas ${totalGlosas} ocorrências de glosa nas regras do Pente Fino.`
@@ -269,6 +337,59 @@
         return document.getElementById('malhaFinaResultadosContent');
     }
 
+    /**
+     * Execução canônica única da auditoria de produção BPA.
+     * Processa arquivo, bases da competência, SIGTAP API, audita e registra o resultado oficial.
+     */
+    async function executarAuditoria(selected, onProgress = () => {}) {
+        const text = selected?.conteudo ?? selected?.conteudo_arquivo;
+        if (typeof text !== 'string' || !text.trim()) {
+            throw new Error('Selecione um arquivo BPA válido para auditar com o Pente Fino.');
+        }
+        const core = (typeof window !== 'undefined' && window.BpaAuditCore) ? window.BpaAuditCore : (typeof globalThis !== 'undefined' && globalThis.BpaAuditCore ? globalThis.BpaAuditCore : null);
+        if (!core) throw new Error('BpaAuditCore não está carregado.');
+
+        onProgress({ fase: 'bases', mensagem: 'Lendo arquivo e carregando bases oficiais da competência...' });
+        const parsed = core.parse(text);
+        const comps = [...new Set(parsed.records.map(r => core.competencia(r.competencia)))];
+        const { bases, sources } = await loadBases(comps);
+
+        const apiRecords = parsed.records.filter(r => !bases[r.competencia]?.sigtap);
+        const sigtapApi = (typeof window !== 'undefined' && window.SigtapAuditApi) ? window.SigtapAuditApi : (typeof globalThis !== 'undefined' && globalThis.SigtapAuditApi ? globalThis.SigtapAuditApi : null);
+        if (apiRecords.length && sigtapApi) {
+            onProgress({ fase: 'sigtap', mensagem: 'Buscando relacionamentos oficiais de CBO, CID, serviços e habilitações no SIGTAP...' });
+            const api = await sigtapApi.load(apiRecords);
+            for (const [cm, sigtap] of Object.entries(api.bases)) {
+                if (!bases[cm]) bases[cm] = {};
+                bases[cm].sigtap = sigtap;
+            }
+            sources.push(...api.sources);
+        }
+
+        onProgress({ fase: '5regras', mensagem: 'Passando o Pente Fino ARGOS nas 5 regras anti-glosa...' });
+        const computed = await auditar5Regras(parsed, bases);
+        computed.arquivo = selected.nomeArquivo || selected.nome_arquivo || 'BPA';
+        computed.sources = sources;
+        computed.fingerprint = await calcularHash(text);
+
+        ultimoResultado = computed;
+
+        const bpaMod = (typeof window !== 'undefined' && window.BpaModule) ? window.BpaModule : (typeof globalThis !== 'undefined' && globalThis.BpaModule ? globalThis.BpaModule : null);
+        if (bpaMod) {
+            bpaMod.auditApproval = {
+                fingerprint: computed.fingerprint,
+                approvedAt: Date.now(),
+                podeEnviarSemGlosa: computed.podeEnviarSemGlosa === true
+            };
+            const btnUpload = typeof document !== 'undefined' ? document.getElementById('btnConfirmarUploadBpa') : null;
+            if (btnUpload) {
+                btnUpload.disabled = !computed.podeEnviarSemGlosa;
+            }
+        }
+
+        return computed;
+    }
+
     async function executar(dados) {
         if (executando) return;
         const bpaMod = (typeof window !== 'undefined' && window.BpaModule) ? window.BpaModule : null;
@@ -287,29 +408,11 @@
         box.innerHTML = '<div class="mf-audit-summary"><h2>Iniciando Pente Fino Anti-Glosa...</h2><p>Lendo arquivo e carregando bases oficiais da competência.</p></div>';
 
         try {
-            const core = window.BpaAuditCore;
-            const parsed = core.parse(text);
-            const comps = [...new Set(parsed.records.map(r => core.competencia(r.competencia)))];
-            const { bases, sources } = await loadBases(comps);
-
-            const apiRecords = parsed.records.filter(r => !bases[r.competencia]?.sigtap);
-            if (apiRecords.length && window.SigtapAuditApi) {
-                box.innerHTML = '<div class="mf-audit-summary"><h2>Consultando SIGTAP por competência...</h2><p>Buscando relacionamentos oficiais de CBO, CID, serviços e habilitações.</p></div>';
-                const api = await window.SigtapAuditApi.load(apiRecords);
-                for (const [cm, sigtap] of Object.entries(api.bases)) {
-                    if (!bases[cm]) bases[cm] = {};
-                    bases[cm].sigtap = sigtap;
-                }
-                sources.push(...api.sources);
-            }
-
-            const computed = await auditar5Regras(parsed, bases);
-            computed.arquivo = selected.nomeArquivo || selected.nome_arquivo || 'BPA';
-            computed.sources = sources;
-            computed.fingerprint = await calcularHash(text);
-
-            ultimoResultado = computed;
+            const computed = await executarAuditoria(selected, ({ mensagem }) => {
+                box.innerHTML = `<div class="mf-audit-summary"><h2>Processando Pente Fino...</h2><p>${escapar(mensagem)}</p></div>`;
+            });
             renderizarResultados();
+            return computed;
         } catch (e) {
             box.innerHTML = '<div class="mf-audit-summary mf-inconclusivo"><h2>Auditoria do Pente Fino não concluída</h2><p>' + escapar(e.message) + '</p></div>';
         } finally {
@@ -331,36 +434,10 @@
         }
 
         if (typeof window !== 'undefined' && window.PenteFino3DRenderer) {
-            window.PenteFino3DRenderer.abrirScanner(selected, async (atualizarProgresso) => {
-                const core = window.BpaAuditCore;
-                const parsed = core.parse(text);
-                const comps = [...new Set(parsed.records.map(r => core.competencia(r.competencia)))];
-                
-                atualizarProgresso({ fase: 'bases', mensagem: 'Carregando bases CNES e SIGTAP da competência...' });
-                const { bases, sources } = await loadBases(comps);
-
-                const apiRecords = parsed.records.filter(r => !bases[r.competencia]?.sigtap);
-                if (apiRecords.length && window.SigtapAuditApi) {
-                    atualizarProgresso({ fase: 'sigtap', mensagem: 'Cruzando procedimentos, CBOs e CIDs no SIGTAP...' });
-                    const api = await window.SigtapAuditApi.load(apiRecords);
-                    for (const [cm, sigtap] of Object.entries(api.bases)) {
-                        if (!bases[cm]) bases[cm] = {};
-                        bases[cm].sigtap = sigtap;
-                    }
-                    sources.push(...api.sources);
-                }
-
-                atualizarProgresso({ fase: '5regras', mensagem: 'Passando o Pente Fino ARGOS nas 5 regras anti-glosa...' });
-                const computed = await auditar5Regras(parsed, bases);
-                computed.arquivo = selected.nomeArquivo || selected.nome_arquivo || 'BPA';
-                computed.sources = sources;
-                computed.fingerprint = await calcularHash(text);
-                ultimoResultado = computed;
-
-                return computed;
+            return window.PenteFino3DRenderer.abrirScanner(selected, (atualizarProgresso) => {
+                return executarAuditoria(selected, atualizarProgresso);
             });
         } else {
-            // Fallback caso o renderizador 3D ainda não esteja montado
             return executar(dados);
         }
     }
@@ -459,7 +536,7 @@
                             <tr>
                                 <td>${f.linha}<br>${escapar(f.competencia)}</td>
                                 <td>${escapar(rotulo(f.status))}<br><strong>${escapar(rotulo(f.regra))}</strong></td>
-                                <td>${escapar(f.cnes)}<br>${escapar(f.cns)}</td>
+                                <td>${escapar(f.cnes)}<br>${escapar(mascararCns(f.cns))}</td>
                                 <td>${escapar(f.procedimento)}</td>
                                 <td class="mf-value-cell">${fmtMoeda(f.valorSa)}</td>
                                 <td>${escapar(f.mensagem)}</td>
@@ -481,7 +558,7 @@
 
     function exportarExcel() {
         if (!ultimoResultado) return;
-        const data = ultimoResultado.findings.map(f => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, typeof v === 'string' && /^[=+@-]/.test(v) ? "'" + v : v])));
+        const data = ultimoResultado.findings.map(f => Object.fromEntries(Object.entries({ ...f, cns: mascararCns(f.cns) }).map(([k, v]) => [k, typeof v === 'string' && /^[=+@-]/.test(v) ? "'" + v : v])));
         if (typeof window !== 'undefined' && window.XLSX) {
             const wb = window.XLSX.utils.book_new();
             window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(data), 'Diagnostico_Pente_Fino');
@@ -500,10 +577,13 @@
     return {
         executar,
         executarComAnimacao3D,
+        executarAuditoria,
         auditar5Regras,
         classificar5Regras,
         avaliarParecerFinal,
+        renderizarResultados,
         exportarExcel,
+        mascararCns,
         getUltimoResultado: () => ultimoResultado,
         fecharModalResultados: () => document.getElementById('modalMalhaFinaResultados')?.classList.add('hidden'),
         pagina: delta => { paginaAtual += delta; renderizarResultados(); },

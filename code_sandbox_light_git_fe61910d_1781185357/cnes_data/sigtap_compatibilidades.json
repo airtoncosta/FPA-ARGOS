@@ -17,11 +17,26 @@
   "regras_servicos": {
     "0204": { "servico": "122", "classificacao": "001", "nome": "DIAGNÓSTICO POR RADIOLOGIA" },
     "0205": { "servico": "122", "classificacao": "002", "nome": "DIAGNÓSTICO POR ULTRASSONOGRAFIA" },
-    "0206": { "servico": "122", "classificacao": "003", "nome": "DIAGNÓSTICO POR TOMOGRAFIA" },
+    "0206": { "servico": "121", "classificacao": "003", "nome": "DIAGNÓSTICO POR TOMOGRAFIA" },
     "0202": { "servico": "121", "classificacao": "001", "nome": "PATOLOGIA CLÍNICA / LABORATÓRIO" },
     "0307": { "servico": "106", "classificacao": "001", "nome": "ODONTOLOGIA ESPECIALIZADA" },
     "030106": { "servico": "134", "classificacao": "001", "nome": "ATENÇÃO PSICOSSOCIAL" },
     "0302": { "servico": "159", "classificacao": "001", "nome": "FISIOTERAPIA" }
+  },
+  "procedimentos_especificos": {
+    "0206010079": {
+      "codigo": "0206010079",
+      "nome": "TOMOGRAFIA COMPUTADORIZADA DO CRANIO",
+      "cbos": ["225320", "223260"],
+      "cids": [],
+      "servicos": [
+        { "servico": "121", "classificacao": "003", "nome": "Tomografia computadorizada" },
+        { "servico": "121", "classificacao": "009", "nome": "Tomografia computadorizada por telemedicina" }
+      ],
+      "valorSa": 97.44,
+      "sexo": "I",
+      "instrumentos": ["02", "01"]
+    }
   },
   "regras_sexo": {
     "0201010151": "F",
