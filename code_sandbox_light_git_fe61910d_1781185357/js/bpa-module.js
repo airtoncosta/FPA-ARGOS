@@ -128,7 +128,33 @@ const BpaModule = {
             totalApontamentos: computed.naoConformidades || computed.totalGlosas || (computed.achados?.length || 0),
             detalhes: computed
         };
+        if (this.filePendingUpload && computed.fingerprint) {
+            this.filePendingUpload.fingerprint = computed.fingerprint;
+        }
         this.atualizarEstadoBotaoEnvio();
+    },
+
+    buscarAprovacaoSalva(fingerprint) {
+        if (!fingerprint || !Array.isArray(this.producoes)) return null;
+        const p = this.producoes.find(x => x && x.fingerprint === fingerprint);
+        if (!p) return null;
+        return {
+            fingerprint: p.fingerprint,
+            approvedAt: p.auditado_em ? new Date(p.auditado_em).getTime() : Date.now(),
+            podeEnviarSemGlosa: p.status_auditoria === 'CONFORME',
+            status: p.status_auditoria || 'COM_APONTAMENTOS',
+            totalApontamentos: p.total_apontamentos || 0,
+            restaurada: true
+        };
+    },
+
+    async calcularFingerprintTexto(texto) {
+        try {
+            const cryptoObj = (typeof crypto !== 'undefined' && crypto.subtle) ? crypto : (typeof window !== 'undefined' && window.crypto && window.crypto.subtle ? window.crypto : null);
+            if (!cryptoObj || !cryptoObj.subtle) return '';
+            const bytes = await cryptoObj.subtle.digest('SHA-256', new TextEncoder().encode(String(texto || '')));
+            return [...new Uint8Array(bytes)].map(x => x.toString(16).padStart(2, '0')).join('');
+        } catch (e) { return ''; }
     },
 
     atualizarEstadoBotaoEnvio() {
@@ -2120,14 +2146,16 @@ const BpaModule = {
         }
 
         // Deletar no Supabase se disponível
+        const alcancaNuvem = !prod._localOnly && this.persistenceMode !== 'local' && window.SupabaseConfig && window.SupabaseConfig.isConnected();
         try {
-            if (!prod._localOnly && this.persistenceMode !== 'local' && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            if (alcancaNuvem) {
                 const client = window.SupabaseConfig.getClient();
                 if (!client) throw new Error('Conexão indisponível.');
-                if (client) {
-                    const { error } = await client.from('producoes_bpa').delete().eq('id', id);
-                    if (error) throw error;
-                }
+                const { error } = await client.from('producoes_bpa').delete().eq('id', id);
+                if (error) throw error;
+            } else if (!prod._localOnly) {
+                alert('Sem conexão com a nuvem: a produção existe no servidor e não será removida agora. Tente novamente conectado.');
+                return false;
             }
         } catch (e) {
             alert('Não foi possível excluir a produção na nuvem. Tente novamente.');
@@ -4235,6 +4263,18 @@ const BpaModule = {
                 return;
             }
             this.filePendingUpload = parsed;
+            try {
+                const texto = String(textContent || '');
+                const hash = await this.calcularFingerprintTexto(texto);
+                if (hash) {
+                    parsed.fingerprint = hash;
+                    const salva = this.buscarAprovacaoSalva(hash);
+                    if (salva) {
+                        this.auditApproval = salva;
+                        this.atualizarEstadoBotaoEnvio();
+                    }
+                }
+            } catch (_e) { /* sem cripto disponível, segue fluxo normal com auditoria */ }
 
             // Preencher cabeçalho do arquivo
             document.getElementById('inputBpaFileName').textContent = parsed.nomeArquivo;

@@ -22,6 +22,7 @@ function setup(supabaseImpl, user = { username: 'admin', role: 'ADM' }) {
     vm.createContext(ctx); vm.runInContext(source, ctx);
     const b = ctx.window.BpaModule;
     b.renderAll = () => {};
+    b.showToast = () => {};
     return { b, ctx, store, getInserted: () => inserted };
 }
 
@@ -65,4 +66,42 @@ test('reenviarOutbox drena a fila e limpa a cópia local', async () => {
     assert.equal(r.falhas, 0);
     assert.equal(JSON.parse(store.get(b.outboxKey) || '[]').length, 0);
     assert.equal(JSON.parse(store.get(b.localProducoesKey) || '[]').length, 0);
+});
+
+test('delete em modo local não apaga do cache registro que existe na nuvem', async () => {
+    const { b } = setup();
+    b.persistenceMode = 'local';
+    b.canAccessProducao = () => true;
+    b.producoes = [{ id: 'cloud-1', nome_arquivo: 'A.JUL', estabelecimento_nome: 'HOSPITAL MATERNO INFANTIL', cnes: '2387439', digitador_username: 'admin', digitador_nome: 'Admin' }];
+    const ok = await b.deleteProducao('cloud-1');
+    assert.equal(ok, false);
+    assert.equal(b.producoes.length, 1);
+});
+
+test('delete de registro só-local funciona offline', async () => {
+    const { b } = setup();
+    b.persistenceMode = 'local';
+    b.canAccessProducao = () => true;
+    b.producoes = [{ id: 'loc-1', nome_arquivo: 'A.JUL', estabelecimento_nome: 'HOSPITAL MATERNO INFANTIL', cnes: '2387439', digitador_username: 'admin', digitador_nome: 'Admin', _localOnly: true }];
+    const ok = await b.deleteProducao('loc-1');
+    assert.equal(ok, true);
+    assert.equal(b.producoes.length, 0);
+});
+
+test('setAuditResult carimba fingerprint no arquivo pendente', () => {
+    const { b } = setup();
+    b.filePendingUpload = {};
+    b.setAuditResult({ fingerprint: 'fp-1', podeEnviarSemGlosa: true, naoConformidades: 0 });
+    assert.equal(b.filePendingUpload.fingerprint, 'fp-1');
+    assert.equal(b.canSubmitPendingUpload(), true);
+});
+
+test('buscarAprovacaoSalva restaura aprovação pelo fingerprint', () => {
+    const { b } = setup();
+    b.producoes = [{ id: 'p1', fingerprint: 'fp-1', status_auditoria: 'COM_APONTAMENTOS', total_apontamentos: 4, auditado_em: '2026-09-22T10:00:00.000Z' }];
+    const ap = b.buscarAprovacaoSalva('fp-1');
+    assert.equal(ap.podeEnviarSemGlosa, false);
+    assert.equal(ap.status, 'COM_APONTAMENTOS');
+    assert.equal(ap.totalApontamentos, 4);
+    assert.equal(b.buscarAprovacaoSalva('outro'), null);
 });
