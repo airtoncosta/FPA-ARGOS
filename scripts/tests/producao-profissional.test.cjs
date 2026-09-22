@@ -160,3 +160,60 @@ test('filtro por unidade e competencia restringe a visao do profissional', () =>
     assert.equal(filteredComp.length, 1);
     assert.equal(filteredComp[0].nome, 'Dr. HMSO');
 });
+
+test('mapeamento registro<->linha do espelho preserva totais e procedimentos', () => {
+    const { mod } = setup();
+    const r = {
+        producao_id: 'prod-1', cnes: '2387439', competencia: '07/2026',
+        cns: '700000000000001', nome: 'Dr. X', cbo: '225125',
+        procedimentos: [{ codigo: '0205020046', quantidade: 3, valorUnitario: 10, valorTotal: 30 }],
+        totalQuantidade: 3, totalAtendimentos: 2, totalValor: 30
+    };
+    const linha = mod.mapearRegistroParaLinha(r, 'prod-1', 'jessica');
+    assert.equal(linha.cns_profissional, '700000000000001');
+    assert.equal(linha.producao_id, 'prod-1');
+    assert.deepEqual(JSON.parse(JSON.stringify(linha.procedimentos)), r.procedimentos);
+    const volta = mod.mapearLinhaParaRegistro({ ...linha, id: 'uuid-9' });
+    assert.equal(volta.id, 'uuid-9');
+    assert.equal(volta.totalValor, 30);
+    assert.equal(volta.totalAtendimentos, 2);
+});
+
+test('mescla nuvem+local: nuvem vence por chave estavel, local preenche lacunas', () => {
+    const { mod } = setup();
+    const nuvem = [{ id: 'c1', producao_id: 'p1', cns: 'C1', cbo: '', totalValor: 100 }];
+    const local = [
+        { id: 'l1', producao_id: 'p1', cns: 'C1', cbo: '', totalValor: 50 },
+        { id: 'l2', producao_id: 'p2', cns: 'C2', cbo: '', totalValor: 70 }
+    ];
+    const merged = mod.mesclarNuvemLocal(nuvem, local);
+    assert.equal(merged.length, 2);
+    assert.equal(merged.find(r => r.producao_id === 'p1').totalValor, 100);
+    assert.equal(merged.find(r => r.producao_id === 'p2').id, 'l2');
+});
+
+test('recordProducaoProfissionais espelha na nuvem sem quebrar o save local', async () => {
+    const { mod, store, ctx } = setup();
+    let apagados = 0; let inseridos = null;
+    ctx.window.SupabaseConfig = {
+        isConnected: () => true,
+        getClient: () => ({ from: (tabela) => {
+            if (tabela !== 'espelho_producao_profissional') throw new Error('tabela errada: ' + tabela);
+            return {
+                delete: () => ({ eq: async () => { apagados++; return { error: null }; } }),
+                insert: (rows) => { inseridos = rows; return { select: async () => ({ data: rows, error: null }) }; }
+            };
+        } })
+    };
+    mod.recordProducaoProfissionais(
+        { id: 'prod-1', cnes: '2387439', estabelecimento_nome: 'HMI', competencia: '07/2026', nome_arquivo: 'A.JUL', digitador_username: 'jessica' },
+        { cnes: '2387439', estabelecimentoNome: 'HMI', competencia: '07/2026', nomeArquivo: 'A.JUL',
+          profissionaisDetalhados: [{ cns: '700000000000001', nome: 'Dr. X', cbo: '225125', quantidade: 3, atendimentos: 2, procedimentos: [{ codigo: '0205020046', quantidade: 3 }] }] }
+    );
+    await new Promise(r => setTimeout(r, 50));
+    const saved = JSON.parse(store.get(mod.storageKey) || '[]');
+    assert.equal(saved.length, 1);
+    assert.equal(apagados, 1);
+    assert.equal(inseridos.length, 1);
+    assert.equal(inseridos[0].cns_profissional, '700000000000001');
+});

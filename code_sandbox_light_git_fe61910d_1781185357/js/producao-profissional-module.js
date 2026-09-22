@@ -265,6 +265,75 @@ window.ProducaoProfissionalModule = {
         return profsFound;
     },
 
+    chaveEstavelRegistro(r) {
+        return [r.producao_id || '', r.cns || '', r.cbo || ''].join('|');
+    },
+
+    mapearRegistroParaLinha(r, producaoId, digitador) {
+        return {
+            producao_id: producaoId || r.producao_id,
+            cnes: r.cnes || '',
+            competencia: r.competencia || '',
+            cns_profissional: r.cns || '',
+            nome_profissional: r.nome || '',
+            cbo: r.cbo || '',
+            procedimentos: Array.isArray(r.procedimentos) ? r.procedimentos : [],
+            total_quantidade: r.totalQuantidade || 0,
+            total_atendimentos: r.totalAtendimentos || 0,
+            total_valor: (typeof r.totalValor === 'number') ? r.totalValor : 0,
+            digitador_username: digitador || ''
+        };
+    },
+
+    mapearLinhaParaRegistro(row) {
+        const r = row || {};
+        return {
+            id: r.id,
+            producao_id: r.producao_id,
+            cnes: r.cnes || '',
+            competencia: r.competencia || '',
+            cns: r.cns_profissional || r.cns || '',
+            nome: r.nome_profissional || r.nome || '',
+            cbo: r.cbo || '',
+            procedimentos: Array.isArray(r.procedimentos) ? r.procedimentos : [],
+            totalQuantidade: r.total_quantidade || r.totalQuantidade || 0,
+            totalAtendimentos: r.total_atendimentos || r.totalAtendimentos || 0,
+            totalValor: (typeof r.total_valor === 'number') ? r.total_valor : ((typeof r.totalValor === 'number') ? r.totalValor : Number(r.total_valor || 0)),
+            criado_em: r.criado_em
+        };
+    },
+
+    mesclarNuvemLocal(nuvem, local) {
+        const mapa = new Map();
+        for (const r of (Array.isArray(local) ? local : [])) {
+            if (r) mapa.set(this.chaveEstavelRegistro(r), r);
+        }
+        for (const row of (Array.isArray(nuvem) ? nuvem : [])) {
+            const r = this.mapearLinhaParaRegistro(row);
+            mapa.set(this.chaveEstavelRegistro(r), { ...r });
+        }
+        return [...mapa.values()];
+    },
+
+    async persistirEspelhoNuvem(producaoId, registros, clientForcado) {
+        if (!producaoId || !Array.isArray(registros)) return false;
+        try {
+            const g = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+            const client = clientForcado || (g.SupabaseConfig && g.SupabaseConfig.isConnected() && g.SupabaseConfig.getClient());
+            if (!client) return false;
+            const linhas = registros.map(r => this.mapearRegistroParaLinha(r, producaoId, (r._digitador || '')));
+            const del = await client.from('espelho_producao_profissional').delete().eq('producao_id', producaoId);
+            if (del && del.error) throw del.error;
+            if (!linhas.length) return true;
+            const ins = await client.from('espelho_producao_profissional').insert(linhas).select();
+            if (ins && ins.error) throw ins.error;
+            return true;
+        } catch (e) {
+            if (typeof console !== 'undefined' && console.warn) console.warn('Espelho nuvem adiado:', e.message);
+            return false;
+        }
+    },
+
     /**
      * Salva o registro dos profissionais ao enviar uma nova remessa de produção BPA
      */
@@ -294,6 +363,7 @@ window.ProducaoProfissionalModule = {
             try {
                 const parsed = auditCore.parse(rawContent);
                 const profRecords = this.aggregateProfissionais(parsed.records, cnes, unidade, competencia, producaoId, producaoRecord.nome_arquivo);
+                profRecords.forEach(x => { x._digitador = producaoRecord.digitador_username || ''; });
                 saved.push(...profRecords);
             } catch (e) {
                 console.error('Falha ao agregar profissionais da remessa BPA:', e);
@@ -335,6 +405,7 @@ window.ProducaoProfissionalModule = {
                     totalAtendimentos: p.atendimentos || Math.max(1, p.quantidade || 0),
                     totalValor: Number(totalValor.toFixed(2)),
                     procedimentos: procsWithValues,
+                    _digitador: producaoRecord.digitador_username || '',
                     vinculoConfirmado: info?.vinculadoUnidade ?? true,
                     vinculoAlerta: !info?.vinculadoUnidade,
                     criado_em: new Date().toISOString()
@@ -347,6 +418,12 @@ window.ProducaoProfissionalModule = {
         } catch (e) {
             console.error('Erro ao persistir produção dos profissionais:', e);
         }
+
+        try {
+            const soDesta = saved.filter(r => r.producao_id === producaoId);
+            const p = this.persistirEspelhoNuvem(producaoId, soDesta);
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch (e) {}
 
         this.records = saved;
         if (this.initialized) {
@@ -528,6 +605,17 @@ window.ProducaoProfissionalModule = {
         } catch (e) {
             console.error('Erro ao salvar após exclusão de produção:', e);
         }
+
+        try {
+            const g = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+            if (g.SupabaseConfig && g.SupabaseConfig.isConnected()) {
+                const client = g.SupabaseConfig.getClient();
+                if (client) {
+                    const pr = client.from('espelho_producao_profissional').delete().eq('producao_id', producaoId);
+                    if (pr && typeof pr.catch === 'function') pr.catch(() => {});
+                }
+            }
+        } catch (e) {}
 
         if (this.initialized) {
             this.populateFilterOptions();
