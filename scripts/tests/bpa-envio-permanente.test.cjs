@@ -41,3 +41,28 @@ test('saveProducao persiste os campos de auditoria na nuvem', async () => {
     assert.equal(payload.fingerprint, 'fp-abc-123');
     assert.equal(payload._localOnly, undefined);
 });
+
+test('falha na nuvem guarda na outbox e resolve (sem perder o envio)', async () => {
+    const failing = { from: () => ({ insert: () => ({ select: async () => ({ data: null, error: new Error('rede caiu') }) }) }) };
+    const { b, store } = setup(failing);
+    const rec = await b.saveProducao({
+        nomeArquivo: 'PAULTRAE.JUL', estabelecimentoNome: 'HOSPITAL MATERNO INFANTIL',
+        cnes: '2387439', competencia: '07/2026', tipoBpa: 'BPA-I', conteudo: 'x'
+    });
+    assert.equal(rec._localOnly, true);
+    const outbox = JSON.parse(store.get(b.outboxKey) || '[]');
+    assert.equal(outbox.length, 1);
+    assert.equal(outbox[0].nome_arquivo, 'PAULTRAE.JUL');
+});
+
+test('reenviarOutbox drena a fila e limpa a cópia local', async () => {
+    const { b, store } = setup();
+    const rec = { id: 'pend-1', nome_arquivo: 'A.JUL', _localOnly: true };
+    store.set(b.outboxKey, JSON.stringify([rec]));
+    store.set(b.localProducoesKey, JSON.stringify([rec]));
+    const r = await b.reenviarOutbox();
+    assert.equal(r.enviados, 1);
+    assert.equal(r.falhas, 0);
+    assert.equal(JSON.parse(store.get(b.outboxKey) || '[]').length, 0);
+    assert.equal(JSON.parse(store.get(b.localProducoesKey) || '[]').length, 0);
+});

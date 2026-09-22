@@ -16,6 +16,7 @@ const BpaModule = {
     accessLoadError: '',
     persistenceMode: 'cloud',
     localProducoesKey: 'argos_producoes_bpa',
+    outboxKey: 'argos_bpa_outbox',
     responsaveisKey: 'argos_bpa_responsaveis',
     modalidadesKey: 'argos_bpa_modalidades',
     unidadesManuaisKey: 'argos_bpa_unidades_manuais',
@@ -1772,6 +1773,50 @@ const BpaModule = {
         localStorage.setItem(this.localProducoesKey, JSON.stringify(updated));
     },
 
+    lerOutbox() {
+        try {
+            const v = JSON.parse(localStorage.getItem(this.outboxKey) || '[]');
+            return Array.isArray(v) ? v : [];
+        } catch (e) { return []; }
+    },
+    enfileirarOutbox(record) {
+        try {
+            const fila = this.lerOutbox().filter(r => r && r.id !== record.id);
+            fila.unshift({ ...record });
+            localStorage.setItem(this.outboxKey, JSON.stringify(fila));
+        } catch (e) {}
+    },
+    removerDaOutbox(id) {
+        try {
+            localStorage.setItem(this.outboxKey, JSON.stringify(this.lerOutbox().filter(r => r && r.id !== id)));
+        } catch (e) {}
+    },
+    async reenviarOutbox() {
+        const resultado = { enviados: 0, falhas: 0 };
+        if (this.persistenceMode === 'local' || !window.SupabaseConfig || !window.SupabaseConfig.isConnected()) return resultado;
+        const client = window.SupabaseConfig.getClient();
+        if (!client) return resultado;
+        for (const rec of this.lerOutbox()) {
+            try {
+                const paraNuvem = { ...rec };
+                delete paraNuvem._localOnly;
+                const { data, error } = await client.from('producoes_bpa').insert([paraNuvem]).select();
+                if (error) throw error;
+                if (data && data[0] && data[0].id && data[0].id !== rec.id) {
+                    const idx = (this.producoes || []).findIndex(p => p.id === rec.id);
+                    if (idx > -1) this.producoes[idx].id = data[0].id;
+                }
+                this.persistLocalProducao(rec, true);
+                this.removerDaOutbox(rec.id);
+                resultado.enviados++;
+            } catch (e) {
+                resultado.falhas++;
+                console.warn('Reenvio BPA adiado:', e.message);
+            }
+        }
+        return resultado;
+    },
+
     async loadProducoes() {
         const loadId = this.loadId = (this.loadId || 0) + 1;
         const username = this.getCurrentUser().username;
@@ -1816,6 +1861,7 @@ const BpaModule = {
                         this.saveUnidadesManuais(currentManuais).catch(e => console.warn('Sync inicial manuais:', e));
                     }
                 }
+                try { await this.reenviarOutbox(); } catch (e) { console.warn('Outbox BPA adiada:', e.message); }
                 const unidades = this.getUnidadesSistema();
                 let results = [];
                 if (this.isAdminOrFrancileide()) {
@@ -2007,28 +2053,29 @@ const BpaModule = {
             criado_em: new Date().toISOString()
         };
 
-        // Salvar no Supabase se disponível
+        // Salvar no Supabase se disponível; em falha, guarda na outbox para reenvio (nunca perde o envio)
+        let salvoNaNuvem = false;
         try {
             if (this.persistenceMode !== 'local' && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
                 const client = window.SupabaseConfig.getClient();
                 if (!client) throw new Error('Conexão indisponível.');
-                if (client) {
-                    const paraNuvem = { ...newRecord };
-                    delete paraNuvem._localOnly;
-                    const { data, error } = await client.from('producoes_bpa').insert([paraNuvem]).select();
-                    if (error) throw error;
-                    if (data && data[0]) {
-                        newRecord.id = data[0].id;
-                    }
+                const paraNuvem = { ...newRecord };
+                delete paraNuvem._localOnly;
+                const { data, error } = await client.from('producoes_bpa').insert([paraNuvem]).select();
+                if (error) throw error;
+                if (data && data[0]) {
+                    newRecord.id = data[0].id;
                 }
+                salvoNaNuvem = true;
             }
         } catch (e) {
-            throw new Error('Não foi possível salvar a produção na nuvem: ' + e.message);
+            console.warn('Falha ao salvar na nuvem; envio guardado para reenvio:', e.message);
         }
 
-        if (this.persistenceMode === 'local' || !window.SupabaseConfig || !window.SupabaseConfig.isConnected()) {
+        if (!salvoNaNuvem) {
             newRecord._localOnly = true;
             this.persistLocalProducao(newRecord);
+            this.enfileirarOutbox(newRecord);
         }
         // Notificar o modulo de Producao Profissional CNS
         try {
