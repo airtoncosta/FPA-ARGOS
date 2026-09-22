@@ -16,7 +16,8 @@ function setup(supabaseImpl, user = { username: 'admin', role: 'ADM' }) {
         document: { getElementById: () => null, querySelectorAll: () => [] },
         localStorage: storage(store), sessionStorage: storage(session),
         console: { error() {}, warn() {} }, alert() {}, confirm: () => true,
-        crypto: require('node:crypto').webcrypto
+        crypto: require('node:crypto').webcrypto,
+        TextEncoder: require('node:util').TextEncoder
     };
     ctx.window.BpaAuditCore = require('../../code_sandbox_light_git_fe61910d_1781185357/js/bpa-audit-core.js');
     vm.createContext(ctx); vm.runInContext(source, ctx);
@@ -104,4 +105,28 @@ test('buscarAprovacaoSalva restaura aprovação pelo fingerprint', () => {
     assert.equal(ap.status, 'COM_APONTAMENTOS');
     assert.equal(ap.totalApontamentos, 4);
     assert.equal(b.buscarAprovacaoSalva('outro'), null);
+});
+
+test('delete remove o registro da outbox (sem ressurreicao na nuvem)', async () => {
+    const { b, store } = setup();
+    b.persistenceMode = 'local';
+    b.canAccessProducao = () => true;
+    const row = { id: 'q1', nome_arquivo: 'Q.JUL', estabelecimento_nome: 'HOSPITAL MATERNO INFANTIL', cnes: '2387439', digitador_username: 'admin', digitador_nome: 'Admin', _localOnly: true };
+    b.producoes = [{ ...row }];
+    store.set(b.outboxKey, JSON.stringify([{ ...row }]));
+    const ok = await b.deleteProducao('q1');
+    assert.equal(ok, true);
+    assert.equal(JSON.parse(store.get(b.outboxKey) || '[]').length, 0);
+});
+
+test('restaurarAprovacaoDoArquivo recupera aprovacao salva pelo hash do conteudo', async () => {
+    const { b } = setup();
+    const fp = await b.calcularFingerprintTexto('conteudo-teste-abc');
+    assert.ok(fp && fp.length === 64);
+    b.producoes = [{ id: 'p9', fingerprint: fp, status_auditoria: 'CONFORME', total_apontamentos: 0, auditado_em: '2026-09-22T10:00:00.000Z' }];
+    const parsed = {};
+    await b.restaurarAprovacaoDoArquivo(parsed, 'conteudo-teste-abc');
+    assert.equal(parsed.fingerprint, fp);
+    assert.equal(b.auditApproval && b.auditApproval.fingerprint, fp);
+    assert.equal(b.auditApproval.podeEnviarSemGlosa, true);
 });

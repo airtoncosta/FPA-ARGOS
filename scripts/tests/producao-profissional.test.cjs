@@ -252,3 +252,9 @@ test('atendimentos nao duplicam o mesmo paciente/data entre remessas', () => {
     assert.equal(lista[0].totalAtendimentos, 3);
     assert.equal(lista[0].totalQuantidade, 4);
 });
+
+test('mapearRegistroParaLinha coage totalValor string', () => {
+    const { mod } = setup();
+    const linha = mod.mapearRegistroParaLinha({ producao_id: 'p', totalValor: '30.5' }, 'p', '');
+    assert.equal(linha.total_valor, 30.5);
+});

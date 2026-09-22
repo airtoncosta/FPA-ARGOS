@@ -288,7 +288,7 @@ window.ProducaoProfissionalModule = {
             procedimentos: Array.isArray(r.procedimentos) ? r.procedimentos : [],
             total_quantidade: r.totalQuantidade || 0,
             total_atendimentos: r.totalAtendimentos || 0,
-            total_valor: (typeof r.totalValor === 'number') ? r.totalValor : 0,
+            total_valor: Number(r.totalValor || 0),
             digitador_username: digitador || ''
         };
     },

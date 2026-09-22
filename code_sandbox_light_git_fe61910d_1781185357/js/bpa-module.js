@@ -157,6 +157,21 @@ const BpaModule = {
         } catch (e) { return ''; }
     },
 
+    async restaurarAprovacaoDoArquivo(parsed, textContent) {
+        try {
+            const texto = String(textContent || '');
+            const hash = await this.calcularFingerprintTexto(texto);
+            if (hash) {
+                if (parsed && typeof parsed === 'object') parsed.fingerprint = hash;
+                const salva = this.buscarAprovacaoSalva(hash);
+                if (salva) {
+                    this.auditApproval = salva;
+                    this.atualizarEstadoBotaoEnvio();
+                }
+            }
+        } catch (_e) { /* sem cripto disponível, segue fluxo normal com auditoria */ }
+    },
+
     atualizarEstadoBotaoEnvio() {
         const btnUpload = typeof document !== 'undefined' ? document.getElementById('btnConfirmarUploadBpa') : null;
         if (!btnUpload) return;
@@ -2176,6 +2191,7 @@ const BpaModule = {
             catch (error) { alert('Não foi possível remover o arquivo local: ' + error.message); return false; }
         }
         this.producoes.splice(index, 1);
+        try { this.removerDaOutbox(id); } catch (e) {}
         localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
 
         // Notificar o modulo de Espelho de Produção para expurgo em cascata
@@ -4275,18 +4291,7 @@ const BpaModule = {
                 return;
             }
             this.filePendingUpload = parsed;
-            try {
-                const texto = String(textContent || '');
-                const hash = await this.calcularFingerprintTexto(texto);
-                if (hash) {
-                    parsed.fingerprint = hash;
-                    const salva = this.buscarAprovacaoSalva(hash);
-                    if (salva) {
-                        this.auditApproval = salva;
-                        this.atualizarEstadoBotaoEnvio();
-                    }
-                }
-            } catch (_e) { /* sem cripto disponível, segue fluxo normal com auditoria */ }
+            await this.restaurarAprovacaoDoArquivo(parsed, textContent);
 
             // Preencher cabeçalho do arquivo
             document.getElementById('inputBpaFileName').textContent = parsed.nomeArquivo;
