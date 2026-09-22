@@ -11,7 +11,9 @@ const ARGOS_USERS_HASHES = {
     'ewerton': 'f5b1f7e02f7c4262c58aa0ef7414e850a610d4b8c051e12c3c48acc2bbac3973',
     'marilene': '2ee5551e6e31e7cd748d42f7a9beb2878aa3ece2e7124e8b72cdacbc94eea7d4',
     'flavia': '17f40d3c094d044dc7f94bd3724e8e88d4225205345d1b54035b55cc249b2e2e',
-    'mateus': 'd5ba7ab9de1cf0bca3bb33cad947cc61671ad4d469bc9c1627492c24810b322c'
+    'mateus': 'd5ba7ab9de1cf0bca3bb33cad947cc61671ad4d469bc9c1627492c24810b322c',
+    'carol': '22d4954d6dd4a39356d3329d1b48f54425d3bb3f33ca45adcc559f6e81c759f5',
+    'carolina': '22d4954d6dd4a39356d3329d1b48f54425d3bb3f33ca45adcc559f6e81c759f5'
 };
 
 const ARGOS_USERS = [
@@ -70,6 +72,14 @@ const ARGOS_USERS = [
         email: 'mateus@fpa.gov.br',
         name: 'Mateus',
         password: ARGOS_USERS_HASHES['mateus'],
+        role: 'GERENTE',
+        municipio_vinculado: 'Bacabal-MA'
+    },
+    {
+        username: 'carol',
+        email: 'carol@fpa.gov.br',
+        name: 'CAROLINA CARNEIRO DAMASCENO SOUZA',
+        password: ARGOS_USERS_HASHES['carol'],
         role: 'GERENTE',
         municipio_vinculado: 'Bacabal-MA'
     }
@@ -192,6 +202,18 @@ const LoginModule = {
                     needsUpdate = true;
                 }
                 return u;
+            });
+
+            // Garantir que usuários padrão (como carol) sejam adicionados se ausentes
+            ARGOS_USERS.forEach(defUser => {
+                if (!users.some(u => u.username.toLowerCase() === defUser.username.toLowerCase())) {
+                    users.push({
+                        ...defUser,
+                        status: 'ATIVO',
+                        createdAt: '21/09/2026, 10:00:00'
+                    });
+                    needsUpdate = true;
+                }
             });
 
             // Migrar se não tiver o hash (senha ainda em texto puro) ou se dados foram atualizados

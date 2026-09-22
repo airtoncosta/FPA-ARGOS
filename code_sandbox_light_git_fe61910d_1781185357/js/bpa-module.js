@@ -24,18 +24,67 @@ const BpaModule = {
     getUnidadesManuais() {
         try {
             const str = localStorage.getItem(this.unidadesManuaisKey);
-            if (str) {
+            if (str !== null && str !== undefined) {
                 const parsed = JSON.parse(str);
                 if (Array.isArray(parsed)) return parsed;
             }
         } catch(e) {}
-        return [];
+        // Inicialização padrão com a APAE cadastrada pela gestão (CNES 7916647)
+        const defaultManuais = [
+            {
+                id: 'manual_apae_bacabal',
+                nome: 'APAE',
+                cnes: '7916647',
+                isManual: true,
+                criado_em: '2026-09-21T00:00:00.000Z'
+            }
+        ];
+        try {
+            localStorage.setItem(this.unidadesManuaisKey, JSON.stringify(defaultManuais));
+        } catch(e) {}
+        return defaultManuais;
     },
 
-    saveUnidadesManuais(list) {
+    async saveUnidadesManuais(list) {
         try {
             localStorage.setItem(this.unidadesManuaisKey, JSON.stringify(list || []));
         } catch(e) {}
+
+        if (window.SupabaseService && typeof window.SupabaseService.saveConfig === 'function') {
+            try {
+                await window.SupabaseService.saveConfig('bpa_unidades_manuais', list || []);
+            } catch(e) {
+                console.warn('Erro ao salvar unidades manuais no Supabase:', e);
+            }
+        }
+    },
+
+    async saveResponsaveisMap(map) {
+        try {
+            localStorage.setItem(this.responsaveisKey, JSON.stringify(map || {}));
+        } catch(e) {}
+
+        if (window.SupabaseService && typeof window.SupabaseService.saveConfig === 'function') {
+            try {
+                await window.SupabaseService.saveConfig('bpa_responsaveis', map || {});
+            } catch(e) {
+                console.warn('Erro ao salvar mapa de responsáveis no Supabase:', e);
+            }
+        }
+    },
+
+    async saveModalidadesMap(map) {
+        try {
+            localStorage.setItem(this.modalidadesKey, JSON.stringify(map || {}));
+        } catch(e) {}
+
+        if (window.SupabaseService && typeof window.SupabaseService.saveConfig === 'function') {
+            try {
+                await window.SupabaseService.saveConfig('bpa_modalidades', map || {});
+            } catch(e) {
+                console.warn('Erro ao salvar mapa de modalidades no Supabase:', e);
+            }
+        }
     },
     currentCompetenciaFiltro: '',
     currentStatusFilter: '', // '' (todos), 'delivered' (enviadas), 'pending' (faltam enviar)
@@ -149,7 +198,8 @@ const BpaModule = {
         'MOTO02': 'MOTOLANCIA BACABAL 02',
         'MOTO 02': 'MOTOLANCIA BACABAL 02',
         'MOTO03': 'MOTOLANCIA BACABAL 03',
-        'MOTO 03': 'MOTOLANCIA BACABAL 03'
+        'MOTO 03': 'MOTOLANCIA BACABAL 03',
+        'APAE': 'APAE'
     },
 
     cnesUnidadesMap: {
@@ -174,7 +224,8 @@ const BpaModule = {
         '2389235': 'SAMU 192 SBV BACABAL 03',
         '2389243': 'MOTOLANCIA BACABAL 01',
         '2389251': 'MOTOLANCIA BACABAL 02',
-        '2389260': 'MOTOLANCIA BACABAL 03'
+        '2389260': 'MOTOLANCIA BACABAL 03',
+        '7916647': 'APAE'
     },
 
     async init() {
@@ -513,14 +564,75 @@ const BpaModule = {
     },
 
     isAssignedToUser(unit, user = this.getCurrentUser()) {
-        if (!user.username) return false;
-        const assigned = this.normalizeIdentity(unit.responsavel);
-        if (!assigned || assigned === 'nao atribuido') return false;
-        const names = [user.username, user.name];
-        if ((user.username || '').toLowerCase() === 'airton' || (user.role || '').toUpperCase() === 'ADM') {
-            names.push('airton/argos', 'airton argos', 'airton costa', 'airton', 'argos');
+        if (!user || !user.username) return false;
+        const rawAssigned = unit.responsavel;
+        if (!rawAssigned || rawAssigned === 'Não atribuído') return false;
+        const assignedNorm = this.normalizeIdentity(rawAssigned);
+        if (!assignedNorm || assignedNorm === 'nao atribuido') return false;
+
+        // Administrador e Francileide têm visão irrestrita
+        if (this.isAdminOrFrancileide(user)) return true;
+
+        // 1. Identificadores diretos do usuário da sessão
+        const userLogin = this.normalizeIdentity(user.username);
+        const cleanLogin = this.normalizeIdentity((user.username || '').includes('@') ? user.username.split('@')[0] : user.username);
+        const userName = this.normalizeIdentity(user.name);
+        const userEmail = this.normalizeIdentity(user.email);
+        const userEmailLogin = this.normalizeIdentity((user.email || '').includes('@') ? user.email.split('@')[0] : '');
+
+        const candidates = new Set([userLogin, cleanLogin, userName, userEmail, userEmailLogin].filter(Boolean));
+
+        // Mapeamentos específicos e apelidos conhecidos (ex: Carol <-> Carolina)
+        if (userLogin.includes('carol') || cleanLogin.includes('carol') || userName.includes('carol') || userName.includes('carolina')) {
+            candidates.add('carol');
+            candidates.add('carolina');
+            candidates.add('carolina carneiro damasceno souza');
+            candidates.add('carolina souza');
+            candidates.add('carolina carneiro');
         }
-        return names.filter(Boolean).some(value => this.normalizeIdentity(value) === assigned);
+        if (userLogin === 'airton' || (user.role || '').toUpperCase() === 'ADM') {
+            candidates.add('airton');
+            candidates.add('airton/argos');
+            candidates.add('airton argos');
+            candidates.add('airton costa');
+            candidates.add('argos');
+        }
+
+        // Se bater diretamente com qualquer candidato
+        for (const cand of candidates) {
+            if (cand === assignedNorm) return true;
+        }
+
+        // 2. Cruzamento com os usuários cadastrados no sistema (getSystemUsers)
+        const systemUsers = this.getSystemUsers();
+        const assignedUserInSystem = systemUsers.find(u => {
+            const uName = this.normalizeIdentity(u.name);
+            const uUser = this.normalizeIdentity(u.username);
+            const uClean = this.normalizeIdentity((u.username || '').includes('@') ? u.username.split('@')[0] : u.username);
+            const uEmail = this.normalizeIdentity(u.email);
+            return uName === assignedNorm || uUser === assignedNorm || uClean === assignedNorm || (uEmail && uEmail === assignedNorm);
+        });
+
+        if (assignedUserInSystem) {
+            const suUser = this.normalizeIdentity(assignedUserInSystem.username);
+            const suClean = this.normalizeIdentity((assignedUserInSystem.username || '').includes('@') ? assignedUserInSystem.username.split('@')[0] : assignedUserInSystem.username);
+            const suName = this.normalizeIdentity(assignedUserInSystem.name);
+            const suEmail = this.normalizeIdentity(assignedUserInSystem.email);
+
+            if (candidates.has(suUser) || candidates.has(suClean) || candidates.has(suName) || (suEmail && candidates.has(suEmail))) {
+                return true;
+            }
+        }
+
+        // 3. Verificação por contenção de nome (mínimo 4 caracteres para evitar falso positivo)
+        for (const cand of candidates) {
+            if (!cand || cand.length < 4) continue;
+            if (assignedNorm.includes(cand) || cand.includes(assignedNorm)) {
+                return true;
+            }
+        }
+
+        return false;
     },
 
     matchesUnit(record, unit) {
@@ -598,10 +710,11 @@ const BpaModule = {
     },
 
     getResponsaveisMap() {
+        let map = {};
         try {
             const str = localStorage.getItem(this.responsaveisKey);
             if (str) {
-                const map = JSON.parse(str);
+                map = JSON.parse(str);
                 let altered = false;
                 for (const k of Object.keys(map)) {
                     const v = String(map[k] || '').toLowerCase();
@@ -613,10 +726,16 @@ const BpaModule = {
                 if (altered) {
                     try { localStorage.setItem(this.responsaveisKey, JSON.stringify(map)); } catch(e){}
                 }
-                return map;
             }
         } catch(e){}
-        return {};
+
+        // Garantir que a APAE venha com Carolina atribuída por padrão se ainda não configurada
+        if (!map['7916647'] && !map['APAE']) {
+            map['7916647'] = 'CAROLINA CARNEIRO DAMASCENO SOUZA';
+            map['APAE'] = 'CAROLINA CARNEIRO DAMASCENO SOUZA';
+        }
+
+        return map;
     },
 
     getModalidadesMap() {
@@ -665,7 +784,10 @@ const BpaModule = {
             'MOTOLANCIA BACABAL 02': 'BPA-C',
             'MOTOLÂNCIA 02': 'BPA-C',
             'MOTOLANCIA BACABAL 03': 'BPA-C',
-            'MOTOLÂNCIA 03': 'BPA-C'
+            'MOTOLÂNCIA 03': 'BPA-C',
+            '7916647': 'BPA-I',
+            'APAE': 'BPA-I',
+            'APAE BACABAL': 'BPA-I'
         };
     },
 
@@ -770,7 +892,7 @@ const BpaModule = {
         if (modal) modal.classList.add('hidden');
     },
 
-    adicionarNovaUnidadeManual() {
+    async adicionarNovaUnidadeManual() {
         if (!this.isAdminOrFrancileide()) {
             this.showToast('Apenas Administrador e Francileide podem cadastrar novas unidades.', 'warning');
             return;
@@ -815,26 +937,22 @@ const BpaModule = {
 
         const manuais = this.getUnidadesManuais();
         manuais.push(novaUnidade);
-        this.saveUnidadesManuais(manuais);
+        await this.saveUnidadesManuais(manuais);
 
-        // Salvar a modalidade da nova unidade
+        // Salvar a modalidade da nova unidade no mapa e na nuvem
         const modalMap = this.getModalidadesMap();
         if (cnes) modalMap[cnes] = modalidade;
         modalMap[nome] = modalidade;
         modalMap[novaUnidade.id] = modalidade;
-        try {
-            localStorage.setItem(this.modalidadesKey, JSON.stringify(modalMap));
-        } catch(e) {}
+        await this.saveModalidadesMap(modalMap);
 
-        // Salvar o responsável se atribuído
+        // Salvar o responsável se atribuído no mapa e na nuvem
         if (responsavel) {
             const respMap = this.getResponsaveisMap();
             if (cnes) respMap[cnes] = responsavel;
             respMap[nome] = responsavel;
             respMap[novaUnidade.id] = responsavel;
-            try {
-                localStorage.setItem(this.responsaveisKey, JSON.stringify(respMap));
-            } catch(e) {}
+            await this.saveResponsaveisMap(respMap);
         }
 
         // Limpar os campos do formulário
@@ -845,11 +963,12 @@ const BpaModule = {
 
         // Re-renderizar o modal e atualizar o restante do sistema
         this.openAssignResponsaveisModal();
+        this.populateResponsaveisFilter();
         this.renderAll();
-        this.showToast(`Unidade "${nome}" cadastrada com sucesso!`, 'success');
+        this.showToast(`Unidade "${nome}" cadastrada e sincronizada com sucesso!`, 'success');
     },
 
-    removerUnidadeManual(id) {
+    async removerUnidadeManual(id) {
         if (!this.isAdminOrFrancileide()) return;
         const manuais = this.getUnidadesManuais();
         const target = manuais.find(m => m.id === id);
@@ -858,16 +977,23 @@ const BpaModule = {
         if (!confirm(`Deseja realmente remover a unidade manual "${target.nome}"?`)) return;
 
         const updated = manuais.filter(m => m.id !== id);
-        this.saveUnidadesManuais(updated);
+        await this.saveUnidadesManuais(updated);
 
-        // Remover do respMap e modalMap se necessário
+        // Remover do respMap e modalMap
         const respMap = this.getResponsaveisMap();
         if (target.cnes) delete respMap[target.cnes];
         delete respMap[target.nome];
         delete respMap[target.id];
-        try { localStorage.setItem(this.responsaveisKey, JSON.stringify(respMap)); } catch(e){}
+        await this.saveResponsaveisMap(respMap);
+
+        const modalMap = this.getModalidadesMap();
+        if (target.cnes) delete modalMap[target.cnes];
+        delete modalMap[target.nome];
+        delete modalMap[target.id];
+        await this.saveModalidadesMap(modalMap);
 
         this.openAssignResponsaveisModal();
+        this.populateResponsaveisFilter();
         this.renderAll();
         this.showToast(`Unidade "${target.nome}" removida.`, 'info');
     },
@@ -897,27 +1023,108 @@ const BpaModule = {
             if (cnes) newModalMap[cnes] = val;
         });
 
+        const manuais = this.getUnidadesManuais();
+
         try {
-            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
-                const client = window.SupabaseConfig.getClient();
-                if (!client) throw new Error('Conexão indisponível.');
-                const { error } = await client.from('configuracoes').upsert([
-                    { chave: 'bpa_responsaveis', valor: JSON.stringify(newMap) },
-                    { chave: 'bpa_modalidades', valor: JSON.stringify(newModalMap) }
-                ], { onConflict: 'chave' });
-                if (error) throw error;
-            }
-            localStorage.setItem(this.responsaveisKey, JSON.stringify(newMap));
-            localStorage.setItem(this.modalidadesKey, JSON.stringify(newModalMap));
+            await Promise.all([
+                this.saveResponsaveisMap(newMap),
+                this.saveModalidadesMap(newModalMap),
+                this.saveUnidadesManuais(manuais)
+            ]);
         } catch (error) {
-            alert('Não foi possível salvar as atribuições. Elas não foram alteradas. ' + error.message);
+            alert('Não foi possível salvar as atribuições. ' + error.message);
             return;
         }
 
         this.closeAssignResponsaveisModal();
         this.populateResponsaveisFilter();
         this.renderAll();
-        this.showToast('Responsáveis e modalidades esperadas atualizados com sucesso!', 'success');
+        this.showToast('Responsáveis, unidades e modalidades sincronizados na Nuvem!', 'success');
+    },
+
+    async setUnitResponsavel(nome, cnes, novoResponsavel) {
+        if (!this.isAdminOrFrancileide() || (!nome && !cnes)) return;
+
+        const map = this.getResponsaveisMap();
+        const cleanCnes = (cnes || '').replace(/\D/g, '');
+        if (cleanCnes) map[cleanCnes] = novoResponsavel;
+        if (cnes) map[cnes] = novoResponsavel;
+        if (nome) map[nome] = novoResponsavel;
+
+        // Atualizar se for unidade manual
+        const manuais = this.getUnidadesManuais();
+        const manualTarget = manuais.find(m => (cleanCnes && m.cnes && m.cnes.replace(/\D/g, '') === cleanCnes) || this.normalizeIdentity(m.nome) === this.normalizeIdentity(nome));
+        if (manualTarget) {
+            map[manualTarget.id] = novoResponsavel;
+        }
+
+        try {
+            await this.saveResponsaveisMap(map);
+        } catch(e) {
+            alert('Não foi possível salvar o responsável no servidor. Tente novamente.');
+            return;
+        }
+
+        this.populateResponsaveisFilter();
+        this.renderAll();
+        const displayResp = novoResponsavel || 'Não Atribuído';
+        this.showToast(`"${nome}": responsável alterado para ${displayResp}`, 'success');
+    },
+
+    openQuickAssignModal(nome, cnes) {
+        if (!this.isAdminOrFrancileide()) return;
+        const modal = document.getElementById('modalQuickAssignResponsavelBpa');
+        if (!modal) {
+            this.openAssignResponsaveisModal();
+            return;
+        }
+
+        const titleEl = document.getElementById('quickAssignUnitName');
+        const cnesEl = document.getElementById('quickAssignUnitCnes');
+        const selectEl = document.getElementById('quickAssignUserSelect') || document.getElementById('quickAssignSelectResp');
+        const btnSave = document.getElementById('btnSalvarQuickAssignBpa') || document.getElementById('btnQuickAssignSalvar');
+
+        if (titleEl) titleEl.textContent = nome;
+        if (cnesEl) cnesEl.textContent = cnes ? `CNES: ${cnes}` : 'CNES: Não informado';
+
+        // Preencher select com usuários
+        const currentMap = this.getResponsaveisMap();
+        const cleanCnes = (cnes || '').replace(/\D/g, '');
+        const currentResp = currentMap[cleanCnes] || currentMap[cnes] || currentMap[nome] || '';
+
+        const users = this.getSystemUsers();
+        let options = `<option value="">-- Não Atribuído --</option>`;
+        users.forEach(usr => {
+            const isSelected = currentResp && (
+                this.normalizeIdentity(usr.name) === this.normalizeIdentity(currentResp) ||
+                this.normalizeIdentity(usr.username) === this.normalizeIdentity(currentResp) ||
+                (this.normalizeIdentity(currentResp).includes('carol') && this.normalizeIdentity(usr.name).includes('carol'))
+            );
+            options += `<option value="${usr.name}" ${isSelected ? 'selected' : ''}>${usr.name} (@${usr.username})</option>`;
+        });
+        if (selectEl) selectEl.innerHTML = options;
+
+        if (btnSave) {
+            btnSave.onclick = async () => {
+                const novoResp = selectEl ? selectEl.value : '';
+                btnSave.disabled = true;
+                btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+                try {
+                    await this.setUnitResponsavel(nome, cnes, novoResp);
+                    this.closeQuickAssignModal();
+                } finally {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = '<i class="fas fa-check"></i> Salvar Atribuição';
+                }
+            };
+        }
+
+        modal.classList.remove('hidden');
+    },
+
+    closeQuickAssignModal() {
+        const modal = document.getElementById('modalQuickAssignResponsavelBpa');
+        if (modal) modal.classList.add('hidden');
     },
 
     /* =========================================================
@@ -1494,12 +1701,32 @@ const BpaModule = {
             if (connected) {
                 const client = window.SupabaseConfig.getClient();
                 if (!client) throw new Error('Não foi possível conectar para consultar suas unidades.');
-                const config = await client.from('configuracoes').select('chave,valor').in('chave', ['bpa_responsaveis', 'bpa_modalidades']);
+                const config = await client.from('configuracoes').select('chave,valor').in('chave', ['bpa_responsaveis', 'bpa_modalidades', 'bpa_unidades_manuais']);
                 if (config.error) throw config.error;
+                let foundCloudManuais = false;
                 for (const row of config.data || []) {
                     const value = typeof row.valor === 'string' ? JSON.parse(row.valor) : row.valor;
-                    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Configuração de unidades inválida.');
-                    localStorage.setItem(row.chave === 'bpa_responsaveis' ? this.responsaveisKey : this.modalidadesKey, JSON.stringify(value));
+                    if (row.chave === 'bpa_unidades_manuais') {
+                        foundCloudManuais = true;
+                        if (Array.isArray(value)) {
+                            localStorage.setItem(this.unidadesManuaisKey, JSON.stringify(value));
+                        }
+                    } else if (row.chave === 'bpa_responsaveis') {
+                        if (value && typeof value === 'object' && !Array.isArray(value)) {
+                            localStorage.setItem(this.responsaveisKey, JSON.stringify(value));
+                        }
+                    } else if (row.chave === 'bpa_modalidades') {
+                        if (value && typeof value === 'object' && !Array.isArray(value)) {
+                            localStorage.setItem(this.modalidadesKey, JSON.stringify(value));
+                        }
+                    }
+                }
+                // Se as unidades manuais ainda não existiam na nuvem, inicializar com a base oficial (APAE)
+                if (!foundCloudManuais && this.isAdminOrFrancileide()) {
+                    const currentManuais = this.getUnidadesManuais();
+                    if (currentManuais && currentManuais.length > 0) {
+                        this.saveUnidadesManuais(currentManuais).catch(e => console.warn('Sync inicial manuais:', e));
+                    }
                 }
                 const unidades = this.getUnidadesSistema();
                 let results = [];
@@ -2801,26 +3028,13 @@ const BpaModule = {
         if (nome) map[nome] = novaModalidade;
         if (cnes) map[cnes] = novaModalidade;
 
-        // Sincronizar com Supabase se conectado
         try {
-            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
-                const client = window.SupabaseConfig.getClient();
-                if (!client) throw new Error('Conexão indisponível.');
-                if (client) {
-                    const { error } = await client.from('configuracoes').upsert({
-                        chave: 'bpa_modalidades',
-                        valor: map,
-                        atualizado_em: new Date().toISOString()
-                    }, { onConflict: 'chave' });
-                    if (error) throw error;
-                }
-            }
+            await this.saveModalidadesMap(map);
         } catch(e) {
             alert('Não foi possível salvar a modalidade. Tente novamente.');
             this.renderAll();
             return;
         }
-        localStorage.setItem(this.modalidadesKey, JSON.stringify(map));
 
         const labelMap = {
             'AMBOS': 'Ambas (BPA-C + BPA-I)',
@@ -3281,7 +3495,7 @@ const BpaModule = {
                         <div class="bpa-card-meta">
                             <span class="bpa-meta-item text-muted">
                                 <i class="fas fa-user-edit"></i> Resp: <strong>${estab.responsavel}</strong>
-                                ${isPrivileged ? `<button onclick="BpaModule.openAssignResponsaveisModal()" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 0.75rem; padding: 0 4px;" title="Alterar responsável"><i class="fas fa-pen"></i></button>` : ''}
+                                ${isPrivileged ? `<button onclick="BpaModule.openQuickAssignModal('${escapedNome}', '${estab.cnes || ''}')" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 0.75rem; padding: 0 4px;" title="Alterar responsável desta unidade"><i class="fas fa-pen"></i></button>` : ''}
                             </span>
                             <span class="bpa-meta-item text-muted"><i class="fas fa-hospital"></i> CNES: ${estab.cnes || 'N/D'}</span>
                             ${modalidadeSelectHtml}
@@ -3352,7 +3566,7 @@ const BpaModule = {
                             <div class="bpa-card-meta">
                                 <span class="bpa-meta-item text-muted">
                                     <i class="fas fa-user-edit"></i> Resp: <strong>${estab.responsavel}</strong>
-                                    ${isPrivileged ? `<button onclick="BpaModule.openAssignResponsaveisModal()" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 0.75rem; padding: 0 4px;" title="Alterar responsável"><i class="fas fa-pen"></i></button>` : ''}
+                                    ${isPrivileged ? `<button onclick="BpaModule.openQuickAssignModal('${escapedNome}', '${estab.cnes || ''}')" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 0.75rem; padding: 0 4px;" title="Alterar responsável desta unidade"><i class="fas fa-pen"></i></button>` : ''}
                                 </span>
                                 <span class="bpa-meta-item text-muted"><i class="fas fa-hospital"></i> CNES: ${estab.cnes || 'N/D'}</span>
                                 ${modalidadeSelectHtml}

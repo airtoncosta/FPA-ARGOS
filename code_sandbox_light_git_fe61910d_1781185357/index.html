@@ -503,6 +503,22 @@
                             <i class="fas fa-key"></i> Trocar minha senha
                         </button>
                     </div>
+                <!-- Minhas Unidades Atribuídas (Produção BPA) -->
+                <div class="account-card" id="accountUnitsCard" style="grid-column: 1 / -1;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.85rem; margin-bottom: 1rem;">
+                        <h3 style="margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; color: #0f172a;">
+                            <i class="fas fa-hospital-user" style="color: #0284c7;"></i> Minhas Unidades Atribuídas (Produção BPA)
+                        </h3>
+                        <span id="accountUnitsBadgeCount" style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid #bae6fd;">0 unidades</span>
+                    </div>
+                    <div class="card-body">
+                        <p style="font-size: 0.85rem; color: #64748b; margin-top: 0; margin-bottom: 1rem;">
+                            Unidades de saúde vinculadas ao seu usuário para conferência, preenchimento e envio de arquivos BPA-C e BPA-I.
+                        </p>
+                        <div id="accountUnitsListContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.85rem;">
+                            <!-- Preenchido dinamicamente via AccountModule.renderAssignedUnits() -->
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Histórico de Ações -->
@@ -2443,6 +2459,44 @@
                         <i class="fas fa-save"></i> Salvar Atribuições
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODAL DE ATRIBUIÇÃO RÁPIDA DE RESPONSÁVEL BPA ===== -->
+    <div id="modalQuickAssignResponsavelBpa" class="modal-overlay hidden" style="z-index: 10005;">
+        <div class="modal-box modal-small" style="max-width: 32rem; border-radius: 1.1rem; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 1.1rem 1.4rem;">
+                <h3 style="margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fas fa-user-tag"></i> Atribuir Responsável da Unidade
+                </h3>
+                <button class="modal-close" onclick="BpaModule.closeQuickAssignModal()" style="background: none; border: none; color: rgba(255,255,255,0.85); cursor: pointer; font-size: 1.2rem;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 1.4rem; background: #fff;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.25rem;">
+                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">Unidade Selecionada</div>
+                    <div id="quickAssignUnitName" style="font-weight: 700; color: #0f172a; font-size: 1.05rem;">-</div>
+                    <div id="quickAssignUnitCnes" style="font-size: 0.8rem; color: #64748b; font-family: monospace; margin-top: 0.2rem;">CNES: -</div>
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 0.4rem;">
+                        <i class="fas fa-user-check" style="color: #0284c7;"></i> Selecione o Responsável:
+                    </label>
+                    <select id="quickAssignUserSelect" class="bpa-input" style="width: 100%; padding: 0.65rem 0.75rem; font-size: 0.95rem; border-radius: 0.5rem; border: 1px solid #cbd5e1; background: #fff;">
+                        <!-- Preenchido via BpaModule.openQuickAssignModal -->
+                    </select>
+                    <p style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">
+                        <i class="fas fa-info-circle"></i> A alteração é sincronizada imediatamente com o banco de dados e refletida para todos os usuários.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 1rem 1.4rem; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn-secondary" onclick="BpaModule.closeQuickAssignModal()">Cancelar</button>
+                <button type="button" class="btn-primary" id="btnSalvarQuickAssignBpa" style="background: #0284c7; border-color: #0284c7;">
+                    <i class="fas fa-check"></i> Confirmar Atribuição
+                </button>
             </div>
         </div>
     </div>

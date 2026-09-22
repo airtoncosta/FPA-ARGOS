@@ -173,27 +173,69 @@ const SupabaseService = {
        CONFIGURAÇÕES (RPC) — logo, portaria, etc.
        ========================================================= */
 
+    async saveConfig(chave, valor) {
+        const strVal = typeof valor === 'string' ? valor : JSON.stringify(valor);
+        try {
+            return await this._rpc('fn_salvar_config', { p_chave: chave, p_valor: strVal });
+        } catch (e) {
+            console.warn(`RPC fn_salvar_config falhou para "${chave}", tentando fallback upsert:`, e);
+            if (!this.init()) throw e;
+            const { error } = await this.client.from('configuracoes').upsert({
+                chave: chave,
+                valor: strVal,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'chave' });
+            if (error) throw error;
+            return { success: true };
+        }
+    },
+
+    async loadConfig(chave) {
+        try {
+            const val = await this._rpc('fn_carregar_config', { p_chave: chave });
+            return val;
+        } catch (e) {
+            if (this.init()) {
+                const { data, error } = await this.client.from('configuracoes').select('valor').eq('chave', chave).maybeSingle();
+                if (!error && data) return data.valor;
+            }
+            return null;
+        }
+    },
+
+    async deleteConfig(chave) {
+        try {
+            return await this._rpc('fn_excluir_config', { p_chave: chave });
+        } catch (e) {
+            if (this.init()) {
+                const { error } = await this.client.from('configuracoes').delete().eq('chave', chave);
+                if (!error) return { success: true };
+            }
+            return { success: false, error: e };
+        }
+    },
+
     async saveLogo(base64Image) {
-        return await this._rpc('fn_salvar_config', { p_chave: 'logo_pdf', p_valor: base64Image });
+        return await this.saveConfig('logo_pdf', base64Image);
     },
 
     async loadLogo() {
-        try { return await this._rpc('fn_carregar_config', { p_chave: 'logo_pdf' }); } catch (e) { return null; }
+        return await this.loadConfig('logo_pdf');
     },
 
     async saveLogoHistory(historyArray) {
-        return await this._rpc('fn_salvar_config', { p_chave: 'logo_history_array', p_valor: JSON.stringify(historyArray) });
+        return await this.saveConfig('logo_history_array', JSON.stringify(historyArray));
     },
 
     async loadLogoHistory() {
         try {
-            const val = await this._rpc('fn_carregar_config', { p_chave: 'logo_history_array' });
+            const val = await this.loadConfig('logo_history_array');
             return val ? JSON.parse(val) : null;
         } catch (e) { return null; }
     },
 
     async deleteLogo() {
-        return await this._rpc('fn_excluir_config', { p_chave: 'logo_pdf' });
+        return await this.deleteConfig('logo_pdf');
     },
 
     /* =========================================================

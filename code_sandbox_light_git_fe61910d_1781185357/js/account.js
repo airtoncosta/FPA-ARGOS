@@ -18,6 +18,7 @@ const AccountModule = {
 
     async refreshAccountView() {
         await this.renderProfileData();
+        await this.renderAssignedUnits();
         await this.renderActionHistory();
     },
 
@@ -73,6 +74,90 @@ const AccountModule = {
         } catch(e) {
             console.error('Erro ao renderizar perfil:', e);
         }
+    },
+
+    async renderAssignedUnits() {
+        const container = document.getElementById('accountUnitsListContainer');
+        const badgeCount = document.getElementById('accountUnitsBadgeCount');
+        if (!container) return;
+
+        const userStr = sessionStorage.getItem('argos_user') || localStorage.getItem('argos_user');
+        if (!userStr) {
+            container.innerHTML = '<div style="color: #64748b; font-size: 0.9rem;">Nenhum usuário logado.</div>';
+            if (badgeCount) badgeCount.textContent = '0 unidades';
+            return;
+        }
+
+        let userObj = null;
+        try { userObj = JSON.parse(userStr); } catch (e) {}
+        if (!userObj) return;
+
+        // Sincroniza configurações da nuvem se o BpaModule estiver disponível
+        if (window.BpaModule && typeof BpaModule.loadConfiguracoesCloud === 'function') {
+            try {
+                await BpaModule.loadConfiguracoesCloud();
+            } catch (e) {
+                console.warn('[AccountModule] Erro ao sincronizar configs BPA:', e);
+            }
+        }
+
+        const allUnits = window.BpaModule && typeof BpaModule.getUnidadesSistema === 'function'
+            ? BpaModule.getUnidadesSistema()
+            : [];
+
+        // Filtra unidades atribuídas a este usuário usando a inteligência do BpaModule
+        const myUnits = allUnits.filter(unit => {
+            if (window.BpaModule && typeof BpaModule.isAssignedToUser === 'function') {
+                return BpaModule.isAssignedToUser(unit, userObj);
+            }
+            const resp = (unit.responsavel || '').toLowerCase().trim();
+            const uName = (userObj.name || '').toLowerCase().trim();
+            const uUser = (userObj.username || '').toLowerCase().trim();
+            return resp && (resp === uName || resp === uUser);
+        });
+
+        if (badgeCount) {
+            badgeCount.textContent = `${myUnits.length} unidade${myUnits.length !== 1 ? 's' : ''}`;
+        }
+
+        if (myUnits.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1 / -1; padding: 1.5rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 0.75rem; text-align: center; color: #64748b;">
+                    <i class="fas fa-clipboard-check" style="font-size: 1.8rem; color: #94a3b8; margin-bottom: 0.5rem; display: block;"></i>
+                    <p style="margin: 0; font-weight: 600; color: #334155;">Nenhuma unidade atribuída no momento</p>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem;">O administrador do sistema pode atribuir unidades para você no módulo Produções BPA.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = myUnits.map(unit => {
+            const mod = unit.modalidade || 'AMBOS';
+            const modBadge = mod === 'AMBOS' ? '<span style="background: #e0e7ff; color: #4338ca; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700;">BPA-C + BPA-I</span>' :
+                             mod === 'BPA-C' ? '<span style="background: #dbeafe; color: #1d4ed8; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700;">Apenas BPA-C</span>' :
+                             '<span style="background: #fef3c7; color: #b45309; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.72rem; font-weight: 700;">Apenas BPA-I</span>';
+
+            const cnesClean = unit.cnes || 'S/N';
+
+            return `
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; gap: 0.75rem; border-left: 4px solid #0284c7;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
+                            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: #0f172a;">${CryptoUtils.escapeHtml(unit.nome)}</h4>
+                            ${modBadge}
+                        </div>
+                        <div style="font-size: 0.78rem; color: #64748b; font-family: monospace;">CNES: ${CryptoUtils.escapeHtml(cnesClean)}</div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: flex-end; border-top: 1px solid #f1f5f9; padding-top: 0.5rem; margin-top: 0.25rem;">
+                        <button onclick="if(window.Router && typeof Router.navigate === 'function') { Router.navigate('producoes-bpa'); } else { document.querySelector('[data-section=\\'producoes-bpa\\']')?.click(); }" 
+                                style="background: #f0f9ff; color: #0284c7; border: 1px solid #bae6fd; border-radius: 0.4rem; padding: 0.4rem 0.75rem; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.2s;"
+                                onmouseover="this.style.background='#e0f2fe'" onmouseout="this.style.background='#f0f9ff'">
+                            <i class="fas fa-file-upload"></i> Acessar no BPA
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
     },
 
     async renderActionHistory() {
