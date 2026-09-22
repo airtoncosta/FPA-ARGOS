@@ -77,7 +77,8 @@ test('lookupProfissional aponta GLOSA quando o profissional NÃO tem vínculo na
     assert.ok(res.motivoGlosa.includes('outra unidade'), 'Deve indicar lotação em outra unidade');
 });
 
-test('lookupProfissional aponta GLOSA quando a base carregada não confere com a competência da produção', () => {
+test('lookupProfissional NÃO glosa quando a base da competência alvo ainda não foi carregada (evita falso-positivo 07/2026)', () => {
+    bpaModule.cnesBasesByComp = {};
     bpaModule.cnesBaseCache = {
         competencia: '202607', // Base de Julho
         estabelecimentos: [{
@@ -93,14 +94,42 @@ test('lookupProfissional aponta GLOSA quando a base carregada não confere com a
         }]
     };
 
-    // Produção referente a Agosto/2026 (202608), mas a base disponível é 202607
+    // Produção referente a Agosto/2026 (202608), mas só há base de Julho carregada:
+    // vínculo na unidade é mantido e competência fica pendente (null), sem glosa falsa.
     const res = bpaModule.lookupProfissional('702200000000002', '2387412', '202608');
     assert.ok(res, 'Profissional é retornado para diagnóstico');
-    assert.strictEqual(res.vinculadoCompetencia, false, 'Não deve validar vínculo fora da competência');
-    assert.strictEqual(res.isGlosa, true, 'Deve gerar glosa por competência');
+    assert.strictEqual(res.vinculadoUnidade, true, 'Vínculo na unidade deve ser mantido');
+    assert.strictEqual(res.vinculadoCompetencia, null, 'Competência sem base alvo deve ficar pendente, não glosada');
+    assert.strictEqual(res.isGlosa, false, 'Não deve gerar glosa falsa sem a base da competência');
+});
+
+test('lookupProfissional glosa por competência somente com a base alvo carregada e profissional ausente', () => {
+    bpaModule.cnesBasesByComp = {
+        '202608': {
+            competencia: '202608',
+            estabelecimentos: [{
+                cnes: '2458055',
+                nomeFantasia: 'HOSPITAL MARIA SOCORRO BRANDAO',
+                aliases: ['2387412'],
+                profissionais: []
+            }]
+        }
+    };
+    bpaModule.cnesBaseCache = bpaModule.cnesBasesByComp['202608'];
+
+    const res = bpaModule.lookupProfissional('702200000000002', '2387412', '202608');
+    assert.ok(res, 'Retorno para profissional ausente na base alvo');
+    assert.strictEqual(res.isGlosa, true, 'Deve glosar quando a base da competência confirma ausência');
+});
+
+test('normalizarCompAAAAMM converte MM/AAAA para AAAAMM (ex: 07/2026 -> 202607)', () => {
+    assert.strictEqual(bpaModule.normalizarCompAAAAMM('07/2026'), '202607');
+    assert.strictEqual(bpaModule.normalizarCompAAAAMM('202607'), '202607');
+    assert.strictEqual(bpaModule.normalizarCompAAAAMM('2026-07'), '202607');
 });
 
 test('parseBpaFile reconhece dinamicamente TODOS os profissionais do arquivo com 15 dígitos e aponta glosa se sem vínculo', () => {
+    bpaModule.cnesBasesByComp = {};
     bpaModule.cnesBaseCache = {
         competencia: '202608',
         estabelecimentos: [

@@ -62,6 +62,160 @@
         return entries;
     }
 
+    let aliasesCache = null;
+
+    function normalizarCompAAAAMM(valor) {
+        const s = String(valor || '').trim();
+        let m = s.match(/^(\d{4})[-\/]?(\d{2})$/);
+        if (m && /^\d{4}(0[1-9]|1[0-2])$/.test(m[1] + m[2])) return m[1] + m[2];
+        m = s.match(/^(0[1-9]|1[0-2])\/(\d{4})$/);
+        if (m) return m[2] + m[1];
+        const d = s.replace(/\D/g, '');
+        if (/^\d{4}(0[1-9]|1[0-2])$/.test(d)) return d;
+        return '';
+    }
+
+    // Cabeçalhos de sessão para a API CNES (mesmo padrão do menu CNES e do anexo de produção).
+    async function cabecalhosCnesAutorizados() {
+        const headers = {};
+        try {
+            const g = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+            const supa = g.SupabaseConfig;
+            const client = supa && typeof supa.getClient === 'function' ? supa.getClient() : null;
+            if (client && client.auth && typeof client.auth.getSession === 'function') {
+                const sessionResult = await client.auth.getSession().catch(() => null);
+                const token = sessionResult && sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token;
+                if (token) headers.Authorization = `Bearer ${token}`;
+            }
+            if (!headers.Authorization && supa && typeof supa.getAnonKey === 'function') {
+                const anon = supa.getAnonKey();
+                if (anon) headers.Authorization = `Bearer ${anon}`;
+            }
+        } catch (_) {}
+        return headers;
+    }
+
+    // Base CNES pela API autorizada (mesmo canal do menu CNES & Vínculos e do anexo de produção).
+    // O acesso estático direto (/cnes_data/*) é bloqueado com 403 sob server.js.
+    async function carregarBaseCnesViaApi(cm) {
+        const r = await fetch(`/api/cnes/bacabal?competencia=${cm}`, { cache: 'no-store', headers: await cabecalhosCnesAutorizados() });
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' na API CNES');
+        const data = await r.json();
+        if (String(data.codigoIbge || '') !== '210120') throw new Error('Snapshot CNES da API fora do escopo Bacabal.');
+        const declared = normalizarCompAAAAMM(data.competencia || '');
+        if (declared !== cm) throw new Error('Competência interna da base diverge da solicitada.');
+        if (!Array.isArray(data.estabelecimentos)) throw new Error('Resposta da API CNES sem estabelecimentos.');
+        const publicado = data.source_type === 'published_snapshot' || data.sourceType === 'published_snapshot';
+        const coberturaApi = data.coverage || {};
+        const countsApi = data.counts || {};
+        const completo = publicado
+            ? (coberturaApi.st === true && coberturaApi.pf === true && countsApi.quarantined === 0)
+            : true;
+        const cobertura = publicado
+            ? { profissionais: coberturaApi.pf === true && countsApi.quarantined === 0, servicos: coberturaApi.services === true, habilitacoes: coberturaApi.habilitacoes === true }
+            : { profissionais: true, servicos: true, habilitacoes: true };
+        return {
+            ...data,
+            competencia: declared,
+            fonte: 'API CNES autorizada (/api/cnes/bacabal)' + (publicado ? ' — snapshot publicado' : ' — base legada'),
+            oficial: true,
+            completo,
+            cobertura
+        };
+    }
+
+    function normalizarMapaAliases(data) {
+        const mapa = data && data.municipio_ibge === '210120' && data.aliases && typeof data.aliases === 'object' ? data.aliases : {};
+        const normalizado = {};
+        for (const [atual, lista] of Object.entries(mapa)) {
+            const principal = String(atual).replace(/\D/g, '');
+            const historicos = [...new Set((Array.isArray(lista) ? lista : [lista]).map(x => String(x ?? '').replace(/\D/g, '')).filter(x => /^\d{7}$/.test(x) && x !== principal))];
+            if (/^\d{7}$/.test(principal) && historicos.length) normalizado[principal] = historicos;
+        }
+        return normalizado;
+    }
+
+    async function carregarAliasesVersionados() {
+        if (aliasesCache) return aliasesCache;
+        aliasesCache = {};
+        try {
+            const data = await carregarJson('cnes_data/cnes_aliases_210120.json');
+            Object.assign(aliasesCache, normalizarMapaAliases(data));
+            if (Object.keys(aliasesCache).length) return aliasesCache;
+        } catch (_) {}
+        try {
+            const r = await fetch('/api/cnes/aliases?ibge=210120', { cache: 'no-store', headers: await cabecalhosCnesAutorizados() });
+            if (!r.ok) throw new Error('HTTP ' + r.status + ' na API de aliases');
+            Object.assign(aliasesCache, normalizarMapaAliases(await r.json()));
+        } catch (_) {}
+        return aliasesCache;
+    }
+
+    function fontesVivasCnes() {
+        const fontes = [];
+        try {
+            const g = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+            const estado = g.CnesModule?.state;
+            if (estado && Array.isArray(estado.estabelecimentos) && estado.estabelecimentos.length) {
+                fontes.push({ estabelecimentos: estado.estabelecimentos, competencia: normalizarCompAAAAMM(estado.competenciaAtiva || estado.competencia || ''), origem: 'Menu CNES & Vínculos (vínculos vigentes em tempo de execução)' });
+            }
+            const argos = g.ArgosCnesBase;
+            if (argos && Array.isArray(argos.estabelecimentos) && argos.estabelecimentos.length) {
+                fontes.push({ estabelecimentos: argos.estabelecimentos, competencia: normalizarCompAAAAMM(argos.competencia || ''), origem: 'Cache CNES vigente (tempo de execução)' });
+            }
+            const ppc = g.ProducaoProfissionalModule?.cnesCache;
+            if (ppc && Array.isArray(ppc.estabelecimentos) && ppc.estabelecimentos.length) {
+                fontes.push({ estabelecimentos: ppc.estabelecimentos, competencia: normalizarCompAAAAMM(ppc.competencia || ''), origem: 'Cache de produção (tempo de execução)' });
+            }
+        } catch (_) {}
+        return fontes;
+    }
+
+    // Enriquecimento auditável da base CNES da competência (contrato: mesma fonte do menu CNES & Vínculos).
+    // 1. Aliases históricos versionados (identidade de unidade, sem alterar fatos cadastrais).
+    // 2. Vínculos vigentes das fontes vivas SOMENTE da mesma competência (aditivo; fail-closed preservado).
+    async function enriquecerBaseCnes(cm, baseCnes, sources) {
+        const dig = v => String(v ?? '').replace(/\D/g, '');
+        const unidades = Array.isArray(baseCnes.estabelecimentos) ? baseCnes.estabelecimentos : [];
+        const porCodigo = new Map();
+        for (const u of unidades) {
+            if (dig(u.cnes)) porCodigo.set(dig(u.cnes), u);
+        }
+        const aliases = await carregarAliasesVersionados();
+        let aliasesAplicados = 0;
+        for (const [principal, historicos] of Object.entries(aliases)) {
+            const alvo = porCodigo.get(principal);
+            if (!alvo) continue;
+            alvo.aliases = [...new Set([...(Array.isArray(alvo.aliases) ? alvo.aliases.map(String) : []), ...historicos])];
+            for (const h of historicos) if (!porCodigo.has(h)) porCodigo.set(h, alvo);
+            aliasesAplicados++;
+        }
+        if (aliasesAplicados > 0) {
+            sources.push({ tipo: 'CNES aliases', competencia: cm, estado: 'Aplicados', fonte: 'cnes_data/cnes_aliases_210120.json (códigos históricos versionados)' });
+        }
+        const vivas = fontesVivasCnes().filter(f => f.competencia && f.competencia === cm);
+        let vinculosAdicionados = 0;
+        for (const fonte of vivas) {
+            for (const u of (fonte.estabelecimentos || [])) {
+                const alvo = porCodigo.get(dig(u.cnes));
+                if (!alvo || !Array.isArray(u.profissionais)) continue;
+                alvo.profissionais = Array.isArray(alvo.profissionais) ? alvo.profissionais : [];
+                const conhecidos = new Set(alvo.profissionais.map(p => dig(p.cns || p.cnsMaster)));
+                for (const p of u.profissionais) {
+                    const cns = dig(p.cns || p.cnsMaster);
+                    if (cns && !conhecidos.has(cns)) {
+                        conhecidos.add(cns);
+                        alvo.profissionais.push({ cns: p.cns || p.cnsMaster, cnsMaster: p.cnsMaster || p.cns, cbo: p.cbo, nome: p.nome, fonteViva: true });
+                        vinculosAdicionados++;
+                    }
+                }
+            }
+        }
+        if (vinculosAdicionados > 0) {
+            sources.push({ tipo: 'CNES vínculos vigentes', competencia: cm, estado: `${vinculosAdicionados} vínculo(s) incorporado(s)`, fonte: vivas.map(v => v.origem).filter((v, i, a) => a.indexOf(v) === i).join('; ') });
+        }
+    }
+
     async function loadBases(competencias) {
         let manifest, sources = [];
         try {
@@ -70,33 +224,55 @@
             manifest = { cnes: {}, sigtap: {} };
             sources.push({ tipo: 'Manifesto legado', competencia: '', estado: 'Indisponível', fonte: e.message });
         }
-        manifest.cnes = { ...(manifest.cnes || {}), ...await cnesPublishedEntries() };
+        const legadoCnes = { ...(manifest.cnes || {}) };
+        manifest.cnes = { ...legadoCnes, ...await cnesPublishedEntries() };
         const bases = {};
         await Promise.all(competencias.filter(Boolean).map(async cm => {
             bases[cm] = {};
-            await Promise.all(['cnes', 'sigtap'].map(async type => {
-                const item = manifest[type]?.[cm];
-                if (!item) {
-                    sources.push({ tipo: type.toUpperCase() + ' local', competencia: cm, estado: 'Sem base local', fonte: 'Base desta competência ausente' });
-                    return;
-                }
+            // CNES: estático fundido -> API autorizada (mesmo canal do anexo/menu) -> estático legado.
+            const candidatosCnes = [];
+            if (manifest.cnes?.[cm]) candidatosCnes.push({ origem: 'static', item: manifest.cnes[cm] });
+            candidatosCnes.push({ origem: 'api' });
+            if (legadoCnes[cm] && legadoCnes[cm].url !== manifest.cnes?.[cm]?.url) candidatosCnes.push({ origem: 'static', item: legadoCnes[cm] });
+            for (const cand of candidatosCnes) {
                 try {
-                    const data = await carregarJson(item.url, item.sha256);
+                    if (cand.origem === 'api') {
+                        bases[cm].cnes = await carregarBaseCnesViaApi(cm);
+                    } else {
+                        const data = await carregarJson(cand.item.url, cand.item.sha256);
+                        const declared = data.competencia || data.versao?.replace(/\D/g, '');
+                        if (declared !== cm) throw new Error('Competência interna da base diverge da solicitada.');
+                        bases[cm].cnes = { ...data, competencia: declared, fonte: cand.item.fonte, oficial: cand.item.oficial === true, completo: cand.item.completo === true, cobertura: cand.item.cobertura || {} };
+                    }
+                    try {
+                        const mapa = (typeof window !== 'undefined' && window.DATASUS_VINCULOS_BACABAL) || await carregarJson('cnes_data/datasus_vinculos.json');
+                        bases[cm].cnes.mapaVinculos = mapa;
+                        if (typeof window !== 'undefined') window.DATASUS_VINCULOS_BACABAL = mapa;
+                    } catch (_) {}
+                    sources.push({ tipo: 'CNES', competencia: cm, estado: bases[cm].cnes.oficial ? 'Carregado' : 'Origem não validada', fonte: bases[cm].cnes.fonte });
+                    break;
+                } catch (e) {
+                    sources.push({ tipo: 'CNES', competencia: cm, estado: 'Indisponível', fonte: (cand.origem === 'api' ? 'API CNES autorizada' : (cand.item.url || 'base local')) + ': ' + e.message });
+                }
+            }
+            // SIGTAP: tentativa única pela relação oficial da competência.
+            const itemSigtap = manifest.sigtap?.[cm];
+            if (!itemSigtap) {
+                sources.push({ tipo: 'SIGTAP local', competencia: cm, estado: 'Sem base local', fonte: 'Base desta competência ausente' });
+            } else {
+                try {
+                    const data = await carregarJson(itemSigtap.url, itemSigtap.sha256);
                     const declared = data.competencia || data.versao?.replace(/\D/g, '');
                     if (declared !== cm) throw new Error('Competência interna da base diverge da solicitada.');
-                    bases[cm][type] = { ...data, competencia: declared, fonte: item.fonte, oficial: item.oficial === true, completo: item.completo === true, cobertura: item.cobertura || {} };
-                    if (type === 'cnes') {
-                        try {
-                            const mapa = (typeof window !== 'undefined' && window.DATASUS_VINCULOS_BACABAL) || await carregarJson('cnes_data/datasus_vinculos.json');
-                            bases[cm][type].mapaVinculos = mapa;
-                            if (typeof window !== 'undefined') window.DATASUS_VINCULOS_BACABAL = mapa;
-                        } catch (_) {}
-                    }
-                    sources.push({ tipo: type.toUpperCase(), competencia: cm, estado: item.oficial ? 'Carregado' : 'Origem não validada', fonte: item.fonte || item.url });
+                    bases[cm].sigtap = { ...data, competencia: declared, fonte: itemSigtap.fonte, oficial: itemSigtap.oficial === true, completo: itemSigtap.completo === true, cobertura: itemSigtap.cobertura || {} };
+                    sources.push({ tipo: 'SIGTAP', competencia: cm, estado: itemSigtap.oficial ? 'Carregado' : 'Origem não validada', fonte: itemSigtap.fonte || itemSigtap.url });
                 } catch (e) {
-                    sources.push({ tipo: type.toUpperCase(), competencia: cm, estado: 'Indisponível', fonte: e.message });
+                    sources.push({ tipo: 'SIGTAP', competencia: cm, estado: 'Indisponível', fonte: e.message });
                 }
-            }));
+            }
+            if (bases[cm].cnes) {
+                await enriquecerBaseCnes(cm, bases[cm].cnes, sources);
+            }
         }));
         return { bases, sources };
     }
@@ -263,16 +439,29 @@
         };
     }
 
+    // Apontamento sem estado explícito é tratado como glosa (fail-closed conservador).
+    function ehGlosaConfirmada(apontamento) {
+        const estado = apontamento?.status;
+        return estado !== 'NAO_VERIFICADO' && estado !== 'ALERTA';
+    }
+
     function avaliarParecerFinal(regras, globalBlockers = []) {
         const chaves = ['regra1_lotacao_cnes', 'regra2_cbo_procedimento', 'regra3_cid_procedimento', 'regra4_servico_classificacao', 'regra5_cns_profissional'];
         let totalGlosas = 0;
+        let totalPendencias = 0;
         const regrasComGlosa = [];
+        const regrasComPendencia = [];
 
         for (const chave of chaves) {
             const r = regras?.[chave];
             if (r && !r.ok) {
-                totalGlosas += (r.totalGlosas || r.glosas?.length || 1);
-                regrasComGlosa.push(r.titulo || chave);
+                const apontamentos = Array.isArray(r.glosas) && r.glosas.length ? r.glosas : [{}];
+                const glosas = apontamentos.filter(ehGlosaConfirmada).length;
+                const pendencias = apontamentos.length - glosas;
+                totalGlosas += glosas;
+                totalPendencias += pendencias;
+                if (glosas > 0) regrasComGlosa.push(r.titulo || chave);
+                if (pendencias > 0) regrasComPendencia.push(r.titulo || chave);
             }
         }
 
@@ -282,19 +471,33 @@
             ...(Array.isArray(regras?.bloqueadoresGlobais) ? regras.bloqueadoresGlobais : [])
         ];
         const uniqueBlockers = [...new Set(blockers)];
-        if (uniqueBlockers.length > 0) {
-            totalGlosas += uniqueBlockers.length;
+        const glosasGlobais = uniqueBlockers.filter(ehGlosaConfirmada).length;
+        const pendenciasGlobais = uniqueBlockers.length - glosasGlobais;
+        if (glosasGlobais > 0) {
+            totalGlosas += glosasGlobais;
             regrasComGlosa.push('Bloqueios Globais / Estruturais');
         }
+        if (pendenciasGlobais > 0) {
+            totalPendencias += pendenciasGlobais;
+            regrasComPendencia.push('Pendências Globais / Verificação incompleta');
+        }
 
-        const podeEnviar = totalGlosas === 0;
+        const podeEnviar = totalGlosas === 0 && totalPendencias === 0;
+        const status = podeEnviar ? 'APROVADO' : (totalGlosas > 0 ? 'BLOQUEADO' : 'INCONCLUSIVO');
+        const mensagem = podeEnviar
+            ? 'Pode enviar a produção sem glosa'
+            : (totalGlosas > 0
+                ? `Foram detectadas ${totalGlosas} ocorrência(s) de glosa nas regras do Pente Fino.` + (totalPendencias > 0 ? ` Além disso, ${totalPendencias} pendência(s) exigem conferência.` : '')
+                : `Auditoria inconclusiva: ${totalPendencias} pendência(s) exigem conferência antes do envio sem glosa. Nenhuma glosa definitiva foi confirmada.`);
 
         return {
             podeEnviarSemGlosa: podeEnviar,
-            status: podeEnviar ? 'APROVADO' : 'BLOQUEADO',
+            status: status,
             totalGlosas: totalGlosas,
+            totalPendencias: totalPendencias,
             regrasComGlosa: regrasComGlosa,
-            mensagem: podeEnviar ? 'Pode enviar a produção sem glosa' : `Foram detectadas ${totalGlosas} ocorrências de glosa nas regras do Pente Fino.`
+            regrasComPendencia: regrasComPendencia,
+            mensagem: mensagem
         };
     }
 
@@ -455,6 +658,8 @@
         const c5 = r.classificacao5Regras || classificar5Regras(r);
         const podeEnviar = c5.podeEnviarSemGlosa;
 
+        const temGlosas = (r.naoConformidades || 0) > 0;
+        const temPendencias = ((r.naoVerificados || 0) + (r.alertas || 0)) > 0;
         const bannerHtml = podeEnviar
             ? `<div class="mf-audit-summary mf-conforme" style="background: linear-gradient(135deg, rgba(6, 78, 59, 0.9), rgba(6, 95, 70, 0.95)); border: 1px solid #10b981; color: #ecfdf5; box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
@@ -468,6 +673,19 @@
                     O <strong>Pente Fino ARGOS</strong> realizou a varredura completa nas 5 regras determinísticas. Nenhuma glosa foi encontrada no lote <strong>${escapar(r.arquivo)}</strong> (${r.totalLinhas} registros reais).
                 </p>
                </div>`
+            : (!temGlosas && temPendencias
+            ? `<div class="mf-audit-summary mf-nao_conforme" style="background: linear-gradient(135deg, rgba(69, 41, 10, 0.9), rgba(120, 72, 10, 0.95)); border: 1px solid #f59e0b; color: #fffbeb; box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.4);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span class="mf-badge" style="background: #f59e0b; color: #451a03; font-weight: 800;">PENTE FINO ARGOS · VERIFICAÇÃO INCOMPLETA</span>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: #fde68a;"><i class="fas fa-exclamation-triangle"></i> Conferência Requerida</span>
+                </div>
+                <h2 style="font-size: 1.4rem; margin: 0 0 0.4rem 0; color: #ffffff; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fas fa-search" style="color: #fbbf24;"></i> Nenhuma glosa confirmada, mas há pendências a conferir
+                </h2>
+                <p style="margin: 0; opacity: 0.95; font-size: 0.92rem;">
+                    Foram registradas <strong>${(r.naoVerificados || 0) + (r.alertas || 0)}</strong> pendência(s) de verificação no arquivo <strong>${escapar(r.arquivo)}</strong>. Confira os pontos abaixo antes do envio sem glosa — ou envie para recepção integrada.
+                </p>
+               </div>`
             : `<div class="mf-audit-summary mf-nao_conforme" style="background: linear-gradient(135deg, rgba(69, 10, 10, 0.9), rgba(127, 29, 29, 0.95)); border: 1px solid #ef4444; color: #fef2f2; box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.4);">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
                     <span class="mf-badge" style="background: #ef4444; color: #450a0a; font-weight: 800;">PENTE FINO ARGOS · GLOSAS APONTADAS</span>
@@ -479,7 +697,7 @@
                 <p style="margin: 0; opacity: 0.95; font-size: 0.92rem;">
                     Foram apontadas <strong>${r.naoConformidades}</strong> glosas no arquivo <strong>${escapar(r.arquivo)}</strong>. Corrija os pontos indicados abaixo antes do envio oficial para evitar rejeição no SIA/SUS.
                 </p>
-               </div>`;
+               </div>`);
 
         // Cards das 5 Regras Anti-Glosa
         const cards5RegrasHtml = `

@@ -1246,6 +1246,33 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // 1.3b. Aliases CNES históricos versionados (identidade de unidade, sem fatos cadastrais).
+    // Canal autorizado para o overlay que o acesso estático direto (/cnes_data/*) bloqueia.
+    if (pathname === '/api/cnes/aliases') {
+        handleCors(res);
+        const aliasQuery = parsedUrl.query ? new URLSearchParams(parsedUrl.query) : new URLSearchParams();
+        const aliasIbge = (aliasQuery.get('ibge') || '210120').slice(0, 6);
+        if (aliasIbge !== '210120') {
+            sendJsonResponse(req, res, 404, {
+                error: 'Aliases CNES não publicados para este município',
+                code: 'CNES_SCOPE_UNAVAILABLE',
+                codigoIbge: aliasIbge
+            });
+            return;
+        }
+        const aliasFile = path.join(PUBLIC_DIR, 'cnes_data', 'cnes_aliases_210120.json');
+        if (!fs.existsSync(aliasFile)) {
+            sendJsonResponse(req, res, 503, {
+                error: 'Overlay de aliases CNES indisponível',
+                code: 'CNES_ALIASES_UNAVAILABLE'
+            });
+            return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        fs.createReadStream(aliasFile).pipe(res);
+        return;
+    }
+
     // 1.4. Rotas do Módulo de Produções BPA — Envio de E-mail com Anexo Oficial
     if (pathname === '/api/bpa/email-config' && req.method === 'GET') {
         handleCors(res);

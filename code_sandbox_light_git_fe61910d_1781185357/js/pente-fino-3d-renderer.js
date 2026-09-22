@@ -286,7 +286,10 @@
 
         // Conclusão e Parecer Final
         const finalCont = document.getElementById('pf3dFinalContainer');
-        const podeEnviar = c5.podeEnviarSemGlosa;
+        const podeEnviar = c5.podeEnviarSemGlosa === true;
+        const parecerStatus = c5.parecer?.status || (podeEnviar ? 'APROVADO' : 'BLOQUEADO');
+        const totalGlosas = c5.parecer?.totalGlosas ?? 0;
+        const totalPendencias = c5.parecer?.totalPendencias ?? 0;
 
         const laser = document.getElementById('pf3dLaserBeam');
         const imgBg = document.getElementById('pf3dCombBg');
@@ -323,11 +326,39 @@
             `;
 
             // Marca visual no modal original de envio BPA
-            const btnEnviarPrincipal = document.getElementById('btnConfirmarEnvioBpa') || document.querySelector('.btn-bpa-submit');
+            const btnEnviarPrincipal = document.getElementById('btnConfirmarUploadBpa') || document.getElementById('btnConfirmarEnvioBpa') || document.querySelector('.btn-bpa-submit');
             if (btnEnviarPrincipal) {
                 btnEnviarPrincipal.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.7)';
                 btnEnviarPrincipal.style.border = '2px solid #34d399';
             }
+        } else if (parecerStatus === 'INCONCLUSIVO') {
+            // Verificação incompleta: nenhuma glosa definitiva, mas há pendências a conferir (âmbar).
+            if (laser) {
+                laser.style.background = 'linear-gradient(90deg, transparent 0%, #f59e0b 30%, #fbbf24 50%, #f59e0b 70%, transparent 100%)';
+                laser.style.boxShadow = '0 0 25px #f59e0b, 0 0 50px #fbbf24';
+            }
+
+            finalCont.innerHTML = `
+                <div class="pf3d-final-panel pf3d-final-warning">
+                    <div class="pf3d-final-text">
+                        <h3>
+                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>
+                            VERIFICAÇÃO INCOMPLETA NO PENTE FINO
+                        </h3>
+                        <p>
+                            Nenhuma glosa definitiva foi confirmada, mas ${totalPendencias} pendência(s) exigem conferência antes do envio sem glosa. A auditoria foi registrada para rastreabilidade e você pode conferir as pendências ou enviar para recepção integrada.
+                        </p>
+                    </div>
+                    <div class="pf3d-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" class="btn-pf3d-secondary" onclick="PenteFino3DRenderer.abrirDiagnosticoCompleto()">
+                            <i class="fas fa-list-check"></i> Ver Pendências
+                        </button>
+                        <button type="button" class="btn-pf3d-secondary" style="background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); border: none;" onclick="PenteFino3DRenderer.confirmarEnvioDireto()">
+                            <i class="fas fa-shield-alt"></i> Enviar para Recepção Integrada
+                        </button>
+                    </div>
+                </div>
+            `;
         } else {
             // Glosa Detectada: Efeito vermelho/alerta
             if (laser) {
@@ -342,18 +373,18 @@
                 <div class="pf3d-final-panel pf3d-final-warning">
                     <div class="pf3d-final-text">
                         <h3>
-                            <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>
-                            APONTAMENTOS DETECTADOS NO PENTE FINO
+                            <i class="fas fa-ban" style="color: #f87171;"></i>
+                            GLOSAS DETECTADAS NO PENTE FINO
                         </h3>
                         <p>
-                            Foram identificados apontamentos de risco no lote. A auditoria foi registrada para rastreabilidade e você pode optar por corrigir ou enviar para recepção integrada.
+                            Foram confirmadas ${totalGlosas} glosa(s) no lote${totalPendencias > 0 ? `, além de ${totalPendencias} pendência(s) a conferir` : ''}. Corrija os pontos indicados no diagnóstico antes do envio oficial para evitar rejeição no SIA/SUS — ou envie com apontamentos para recepção integrada.
                         </p>
                     </div>
                     <div class="pf3d-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                         <button type="button" class="btn-pf3d-secondary" onclick="PenteFino3DRenderer.abrirDiagnosticoCompleto()">
                             <i class="fas fa-list-check"></i> Ver Linhas com Glosa
                         </button>
-                        <button type="button" class="btn-pf3d-primary" style="background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); border: none;" onclick="PenteFino3DRenderer.confirmarEnvioDireto()">
+                        <button type="button" class="btn-pf3d-secondary" style="background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); border: none;" onclick="PenteFino3DRenderer.confirmarEnvioDireto()">
                             <i class="fas fa-shield-alt"></i> Confirmar Envio com Apontamentos
                         </button>
                     </div>

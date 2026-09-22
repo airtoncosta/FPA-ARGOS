@@ -1,0 +1,9 @@
+{
+  "municipio_ibge": "210120",
+  "municipio": "Bacabal",
+  "uf": "MA",
+  "fonte": "Códigos CNES históricos presentes nos arquivos BPA exportados pelos sistemas de origem e na base CNES legada versionada (cnes_data/cnes_210120_*.json). Este overlay declara equivalências de identidade de unidade; não altera fatos cadastrais (profissionais, vínculos, cobertura).",
+  "aliases": {
+    "2458055": ["2387412"]
+  }
+}

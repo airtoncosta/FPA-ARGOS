@@ -490,3 +490,170 @@ test('botão 3D de envio direto roteia para BpaModule.handleFormSubmit()', () =>
     penteFino3D.confirmarEnvioDireto();
     assert.strictEqual(submitChamado, true, 'confirmarEnvioDireto do 3D Renderer deve invocar BpaModule.handleFormSubmit');
 });
+
+function basesCompletasComRegras(regrasComplementares) {
+    return {
+        '202608': {
+            cnes: {
+                competencia: '202608', oficial: true, completo: true,
+                cobertura: { profissionais: true, servicos: true, habilitacoes: true },
+                estabelecimentos: [{
+                    cnes: '2456184',
+                    profissionais: [{ cns: '703203601654994', cbo: '225320', ativo: true }]
+                }]
+            },
+            sigtap: {
+                competencia: '202608', oficial: true, completo: true,
+                procedimentos: {
+                    '0205020143': {
+                        valorSa: 15.50,
+                        sexo: 'I',
+                        idade: { min: 0, max: 130, unidade: 'anos' },
+                        limiteQuantidade: { aplicavel: false },
+                        cobertura: { cbos: true, cids: true, servicos: true, instrumentos: true, regrasComplementares: true },
+                        cbos: ['225320'],
+                        cids: ['R104'],
+                        servicos: [],
+                        instrumentos: ['02'],
+                        habilitacoes: [],
+                        regrasComplementares
+                    }
+                }
+            }
+        }
+    };
+}
+
+function registroConsultaLimpa() {
+    return {
+        records: [{
+            linha: 2, tipo: 'BPA-I', cnes: '2456184', competencia: '202608',
+            cbo: '225320', cnsProfissional: '703203601654994', procedimento: '0205020143',
+            quantidade: 1, idade: 35, sexo: 'M', cid: 'R104', dataAtendimento: '20260810',
+            nascimento: '19910101', servico: '', classificacao: '',
+            folha: '001', sequencia: '01', cpfPaciente: '', cnsPaciente: ''
+        }]
+    };
+}
+
+test('atributos informativos do SIGTAP (PMAE, modalidade, financiamento, compatibilidades) com cobertura completa não bloqueiam o parecer', () => {
+    const informativos = [
+        { tipo: 'informativo', codigo: '053', fonte: 'Programa Mais Acesso a Especialistas (PMAE)' },
+        { tipo: 'informativo', codigo: '060', fonte: 'Componente Complementar - Modalidade 3' },
+        { tipo: 'informativo', codigo: '0014', fonte: 'CONDICIONA O TIPO DE FINANCIAMENTO EM MAC' },
+        { tipo: 'informativo', codigo: 'compat', fonte: 'Compatibilidade com outro procedimento' }
+    ];
+    const res = bpaAuditCore.audit(registroConsultaLimpa(), basesCompletasComRegras(informativos));
+    assert.strictEqual(res.findings.some(f => f.regra === 'REGRAS_COMPLEMENTARES'), false, 'Atributo informativo com cobertura completa não gera pendência');
+    assert.ok((res.checks.REGRAS_COMPLEMENTARES?.NAO_APLICAVEL || 0) >= 1, 'Atributo informativo é registrado como não aplicável por linha');
+    assert.strictEqual(res.status, 'CONFORME');
+    const c5 = penteFinoEngine.classificar5Regras(res);
+    assert.strictEqual(c5.podeEnviarSemGlosa, true, 'Lote limpo com atributos informativos pode ser enviado sem glosa');
+    assert.strictEqual(c5.parecer.status, 'APROVADO');
+});
+
+test('regra complementar de tipo desconhecido mantém fail-closed (NAO_VERIFICADO)', () => {
+    const res = bpaAuditCore.audit(registroConsultaLimpa(), basesCompletasComRegras([{ tipo: 'desconhecida' }]));
+    assert.ok(res.findings.some(f => f.regra === 'REGRAS_COMPLEMENTARES' && f.status === 'NAO_VERIFICADO'), 'Tipo desconhecido continua inconclusivo');
+    assert.strictEqual(res.status, 'INCONCLUSIVO');
+});
+
+test('CPF obrigatório ausente gera ATRIBUTO_COMPLEMENTAR NAO_CONFORME com orientação corretiva', () => {
+    const res = bpaAuditCore.audit(
+        registroConsultaLimpa(),
+        basesCompletasComRegras([{ tipo: 'campoObrigatorio', campo: 'cpfPaciente', fonte: 'Obrigatório CPF' }])
+    );
+    const achado = res.findings.find(f => f.regra === 'ATRIBUTO_COMPLEMENTAR');
+    assert.ok(achado, 'Deve apontar o campo obrigatório ausente');
+    assert.strictEqual(achado.status, 'NAO_CONFORME');
+    assert.ok(/339/.test(achado.mensagem), 'Mensagem deve orientar onde preencher o CPF (posições 339-349 do BPA-I), got: ' + achado.mensagem);
+});
+
+test('parecer é INCONCLUSIVO (não BLOQUEADO por glosa) quando há apenas pendências', () => {
+    const result = penteFinoEngine.classificar5Regras({
+        status: 'INCONCLUSIVO',
+        findings: [{ regra: 'CID', status: 'NAO_VERIFICADO' }]
+    });
+    assert.strictEqual(result.podeEnviarSemGlosa, false);
+    assert.strictEqual(result.parecer.status, 'INCONCLUSIVO');
+    assert.strictEqual(result.parecer.totalGlosas, 0, 'Pendência de verificação não é glosa definitiva');
+    assert.strictEqual(result.parecer.totalPendencias, 1);
+});
+
+function basesServico(paresServico) {
+    return {
+        '202608': {
+            sigtap: {
+                competencia: '202608', oficial: true, completo: true,
+                procedimentos: {
+                    '0205020143': {
+                        cobertura: { servicos: true },
+                        servicos: paresServico
+                    }
+                }
+            }
+        }
+    };
+}
+
+function registroServico(servico, classificacao) {
+    return {
+        records: [{
+            linha: 2, tipo: 'BPA-I', cnes: '2456184', competencia: '202608',
+            cbo: '225320', cnsProfissional: '703203601654994', procedimento: '0205020143',
+            quantidade: 1, idade: 30, sexo: 'M', cid: 'R104', dataAtendimento: '20260810',
+            nascimento: '19910101', servico, classificacao, folha: '001', sequencia: '01'
+        }]
+    };
+}
+
+test('Regra 4: par numérico da fonte oficial equivale ao par do layout (só elimina diferença de tipo JSON)', () => {
+    const res = bpaAuditCore.audit(
+        registroServico('121', '003'),
+        basesServico([{ servico: 121, classificacao: 3 }])
+    );
+    assert.ok(!res.findings.some(f => f.regra === 'SERVICO_INFORMADO' && f.status === 'NAO_CONFORME'), 'Par 121/003 numérico da fonte equivale ao par do layout');
+    assert.ok((res.checks.SERVICO_INFORMADO?.CONFORME || 0) >= 1);
+});
+
+test('Regra 4: par fora da lista habilitada no SIGTAP gera glosa', () => {
+    const res = bpaAuditCore.audit(
+        registroServico('999', '999'),
+        basesServico([{ servico: '121', classificacao: '003' }])
+    );
+    const achado = res.findings.find(f => f.regra === 'SERVICO_INFORMADO');
+    assert.ok(achado, 'Deve apontar o par incompatível');
+    assert.strictEqual(achado.status, 'NAO_CONFORME');
+});
+
+test('Regra 4: procedimento sem exigência de serviço é NAO_APLICAVEL mesmo com par informado', () => {
+    const res = bpaAuditCore.audit(registroServico('121', '003'), basesServico([]));
+    assert.ok(!res.findings.some(f => f.regra === 'SERVICO_INFORMADO'), 'Sem exigência não há apontamento');
+    assert.ok((res.checks.SERVICO_CLASSIFICACAO?.NAO_APLICAVEL || 0) >= 1);
+});
+
+test('Regra 4: BPA-C registra NAO_APLICAVEL em vez de aprovação silenciosa', () => {
+    const res = bpaAuditCore.audit({
+        records: [{
+            linha: 2, tipo: 'BPA-C', cnes: '2456184', competencia: '202608',
+            cbo: '225125', procedimento: '0205020143', quantidade: '000120',
+            idade: '030', folha: '001', sequencia: '01'
+        }]
+    }, basesServico([{ servico: '121', classificacao: '003' }]));
+    assert.ok(!res.findings.some(f => f.regra === 'SERVICO_INFORMADO'), 'BPA-C não informa par por linha');
+    assert.ok((res.checks.SERVICO_INFORMADO?.NAO_APLICAVEL || 0) >= 1, 'BPA-C deve registrar não aplicabilidade explícita');
+});
+
+test('parecer BLOQUEADO conta como glosa apenas NAO_CONFORME confirmado', () => {
+    const result = penteFinoEngine.classificar5Regras({
+        status: 'NAO_CONFORME',
+        findings: [
+            { regra: 'CNS_PROFISSIONAL', status: 'NAO_CONFORME' },
+            { regra: 'CID', status: 'NAO_VERIFICADO' }
+        ]
+    });
+    assert.strictEqual(result.podeEnviarSemGlosa, false);
+    assert.strictEqual(result.parecer.status, 'BLOQUEADO');
+    assert.strictEqual(result.parecer.totalGlosas, 1, 'Somente o NAO_CONFORME confirmado conta como glosa');
+    assert.strictEqual(result.parecer.totalPendencias, 1);
+});

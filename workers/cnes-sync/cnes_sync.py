@@ -311,7 +311,37 @@ def _write_quarantine(root: Path, snapshot: Mapping[str, Any]) -> None:
     _atomic_write_json(root / "quarantine" / f"{competence}-{timestamp}.json", {"snapshot": snapshot, "reason": "quarentena bloqueia publicação"})
 
 
-def _public_snapshot(snapshot: Mapping[str, Any]) -> dict[str, Any]:
+def _load_alias_overlay(public_root: Path | str | None) -> dict[str, list[str]]:
+    """Load versioned historic CNES codes (identity mapping, not cadastral facts).
+
+    The overlay lives next to the public snapshots (cnes_aliases_210120.json)
+    so future syncs keep resolving BPA files that carry a historic unit code.
+    Missing or invalid overlay means no aliases; never abort publication.
+    """
+    candidates: list[Path] = []
+    if public_root is not None:
+        candidates.append(Path(public_root) / "cnes_aliases_210120.json")
+    candidates.append(Path(__file__).resolve().parents[2] / "code_sandbox_light_git_fe61910d_1781185357" / "cnes_data" / "cnes_aliases_210120.json")
+    for candidate in candidates:
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if data.get("municipio_ibge") != SCOPE_IBGE or not isinstance(data.get("aliases"), dict):
+            continue
+        overlay: dict[str, list[str]] = {}
+        for current, historic in data["aliases"].items():
+            principal = re.sub(r"\D", "", str(current))
+            codes = historic if isinstance(historic, list) else [historic]
+            valid = sorted({re.sub(r"\D", "", str(code)) for code in codes})
+            valid = [code for code in valid if re.fullmatch(r"\d{7}", code) and code != principal]
+            if re.fullmatch(r"\d{7}", principal) and valid:
+                overlay[principal] = valid
+        return overlay
+    return {}
+
+
+def _public_snapshot(snapshot: Mapping[str, Any], aliases: Mapping[str, Sequence[str]] | None = None) -> dict[str, Any]:
     """Produce the UI/BPA shape from a minimal ST/PF-only source.
 
     The worker never fabricates demographic, address, CNPJ, CPF or professional
@@ -332,6 +362,10 @@ def _public_snapshot(snapshot: Mapping[str, Any]) -> dict[str, Any]:
             "tipoGestaoCodigo": item.get("management_code", ""),
             "profissionais": [],
         }
+    for cnes, historic in (aliases or {}).items():
+        establishment = establishments.get(str(cnes))
+        if establishment is not None and historic:
+            establishment["aliases"] = sorted({str(code) for code in historic})
     for link in snapshot["professional_links"]:
         establishment = establishments.get(link["cnes"])
         if establishment is None:
@@ -382,7 +416,7 @@ def _set_active_competence(manifest: dict[str, Any]) -> None:
 
 
 def _publish_public_snapshot(private_snapshot: Mapping[str, Any], record: Mapping[str, Any], public_root: Path) -> None:
-    public_payload = _public_snapshot(private_snapshot)
+    public_payload = _public_snapshot(private_snapshot, _load_alias_overlay(public_root))
     public_hash = _sha256(public_payload)
     competence = private_snapshot["competence"]
     manifest = _read_manifest(public_root) if (public_root / "manifest.json").exists() else {"schema_version": SCHEMA_VERSION, "scope": {"municipality_ibge": SCOPE_IBGE, "uf": SCOPE_UF}, "competencies": {}}

@@ -13,11 +13,18 @@ async function load(records,fetcher=fetch){const grouped=new Map();for(const r o
  const relations=[['cbos','ocupacoes',x=>x.ocupacao?.co_ocupacao],['cids','cids',x=>x.cid?.co_cid],['servicos','servicos',x=>({servico:x.servico_classificacao?.co_servico,classificacao:x.servico_classificacao?.co_classificacao})],['habilitacoes','habilitacoes',x=>x.habilitacao?.co_habilitacao]];
  // Limite global de três procedimentos, com relações sequenciais para não saturar o serviço.
  for(const [key,path,mapper]of relations){try{const rows=await relation(code,cm,path,fetcher);proc[key]=rows.map(mapper).filter(x=>x!==null);if(proc[key].some(x=>x===undefined||typeof x==='object'&&(!x.servico||!x.classificacao)))throw Error('Formato da relação inválido.');proc.cobertura[key]=true;}catch(e){proc.cobertura[key]=false;}}
- try{const attrs=await relation(code,cm,'detalhes',fetcher),rules=await relation(code,cm,'regras-condicionadas',fetcher),compat=await relation(code,cm,'compativeis',fetcher);
- proc.regrasComplementares=attrs.map(x=>{const a=x.detalhe;return a?.co_detalhe==='058'?{tipo:'campoObrigatorio',campo:'cpfPaciente',fonte:a.no_detalhe}:a?.co_detalhe==='012'?{tipo:'idadeBpaC',fonte:a.no_detalhe}:{tipo:'Atributo '+(a?.co_detalhe||'?')+': '+(a?.no_detalhe||'não identificado')};});
- proc.regrasComplementares.push(...rules.map(x=>({tipo:'Regra '+x.regra_condicionada?.co_regra_condicionada+': '+x.regra_condicionada?.ds_regra_condicionada})),...compat.map(x=>({tipo:'Compatibilidade '+x.tp_compatibilidade+' com '+x.procedimento_compativel?.co_procedimento})));
- proc.cobertura.regrasComplementares=true;
- }catch(e){proc.cobertura.regrasComplementares=false;}
+  try{const attrs=await relation(code,cm,'detalhes',fetcher),rules=await relation(code,cm,'regras-condicionadas',fetcher),compat=await relation(code,cm,'compativeis',fetcher);
+  // Detalhes 058 (CPF obrigatório) e 012 (idade no BPA-C) são exigências verificáveis por linha.
+  // Demais detalhes (ex: 053 PMAE, 060 modalidade), regras de financiamento e compatibilidades
+  // são atributos informativos do procedimento: sem verificação por linha, não bloqueiam o parecer.
+  const mapearDetalhe=x=>{const a=x.detalhe||{};const co=String(a.co_detalhe||'').trim();const nome=String(a.no_detalhe||'não identificado').trim();
+  if(co==='058')return{tipo:'campoObrigatorio',campo:'cpfPaciente',codigo:co,fonte:nome};
+  if(co==='012')return{tipo:'idadeBpaC',codigo:co,fonte:nome};
+  return{tipo:'informativo',codigo:co,fonte:nome};};
+  proc.regrasComplementares=attrs.map(mapearDetalhe);
+  proc.regrasComplementares.push(...rules.map(x=>{const rc=x.regra_condicionada||{};const co=String(rc.co_regra_condicionada||'').trim();const ds=String(rc.ds_regra_condicionada||rc.no_regra_condicionada||'Regra condicionada').trim();return{tipo:'informativo',codigo:co,fonte:'Regra '+co+': '+ds};}),...compat.map(x=>{const co=String(x.procedimento_compativel?.co_procedimento||'').trim();return{tipo:'informativo',codigo:co,fonte:'Compatibilidade '+String(x.tp_compatibilidade||'?')+' com '+co};}));
+  proc.cobertura.regrasComplementares=true;
+  }catch(e){proc.cobertura.regrasComplementares=false;}
  base.procedimentos[code]=proc;sources.push({tipo:'SIGTAP API',competencia:cm,estado:'Procedimento '+code+' consultado',fonte:base.fonte});
  }catch(e){sources.push({tipo:'SIGTAP API',competencia:cm,estado:'Não verificado: '+code,fonte:e.message});}
  }}await Promise.all(Array.from({length:Math.min(concurrency,queue.length)},worker));return {bases,sources};}

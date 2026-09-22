@@ -320,9 +320,26 @@ const BpaModule = {
         }
     },
 
+    normalizarCompAAAAMM(value) {
+        const s = String(value || '').trim();
+        if (!s) return '';
+        let m = s.match(/^(\d{4})[-\/]?(\d{2})$/);
+        if (m) {
+            const aaaamm = m[1] + m[2];
+            if (/^\d{4}(0[1-9]|1[0-2])$/.test(aaaamm)) return aaaamm;
+        }
+        m = s.match(/^(0[1-9]|1[0-2])\/(\d{4})$/);
+        if (m) return m[2] + m[1];
+        const d = s.replace(/\D/g, '');
+        if (/^\d{4}(0[1-9]|1[0-2])$/.test(d)) return d;
+        if (/^(0[1-9]|1[0-2])\d{4}$/.test(d)) return d.slice(2) + d.slice(0, 2);
+        return '';
+    },
+
     async loadCnesBase(compStr = '') {
-        const rawComp = String(compStr || this.currentCompetenciaFiltro || '202608').replace(/\D/g, '');
-        const normComp = rawComp.length === 6 ? rawComp : '202608';
+        const normFromArg = this.normalizarCompAAAAMM(compStr);
+        const normFromFiltro = this.normalizarCompAAAAMM(this.currentCompetenciaFiltro);
+        const normComp = normFromArg || normFromFiltro || '202608';
         this.cnesBasesByComp = this.cnesBasesByComp || {};
 
         if (this.cnesBasesByComp[normComp] && Array.isArray(this.cnesBasesByComp[normComp].estabelecimentos)) {
@@ -331,13 +348,15 @@ const BpaModule = {
         }
 
         if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos) && this.cnesBaseCache.estabelecimentos.length > 0) {
-            if (this.cnesBaseCache.competencia === normComp) {
+            if (this.normalizarCompAAAAMM(this.cnesBaseCache.competencia) === normComp) {
+                this.cnesBaseCache.competencia = normComp;
                 this.cnesBasesByComp[normComp] = this.cnesBaseCache;
                 return this.cnesBaseCache;
             }
         }
         if (typeof window !== 'undefined' && window.ArgosCnesBase && Array.isArray(window.ArgosCnesBase.estabelecimentos)) {
-            if (!window.ArgosCnesBase.competencia || window.ArgosCnesBase.competencia === normComp) {
+            const compGlobal = this.normalizarCompAAAAMM(window.ArgosCnesBase.competencia);
+            if (!compGlobal || compGlobal === normComp) {
                 this.cnesBaseCache = window.ArgosCnesBase;
                 this.cnesBasesByComp[normComp] = this.cnesBaseCache;
                 return this.cnesBaseCache;
@@ -1432,19 +1451,24 @@ const BpaModule = {
         const cleanCns = String(cns || '').replace(/\D/g, '');
         if (!cleanCns) return null;
         const cleanCnes = String(cnes || '').replace(/\D/g, '');
-        const cleanComp = String(competencia || '').replace(/\D/g, '');
-        const targetComp = cleanComp.length === 6 ? cleanComp : '';
+        const targetComp = typeof this.normalizarCompAAAAMM === 'function'
+            ? this.normalizarCompAAAAMM(competencia)
+            : (String(competencia || '').replace(/\D/g, '').length === 6 ? String(competencia).replace(/\D/g, '') : '');
+
+        const normFn = (v) => (typeof this.normalizarCompAAAAMM === 'function' ? this.normalizarCompAAAAMM(v) : String(v || '').replace(/\D/g, ''));
+        // Base autoritativa da competência alvo (prioridade: mapa por competência, depois cache geral se for do mesmo mês).
+        let alvoBase = null;
+        if (targetComp && this.cnesBasesByComp && this.cnesBasesByComp[targetComp] && Array.isArray(this.cnesBasesByComp[targetComp].estabelecimentos)) {
+            alvoBase = this.cnesBasesByComp[targetComp];
+        } else if (targetComp && this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos) && normFn(this.cnesBaseCache.competencia) === targetComp) {
+            alvoBase = this.cnesBaseCache;
+        }
+        const temBaseAlvo = !!alvoBase;
+        const baseComp = alvoBase ? (normFn(alvoBase.competencia) || targetComp) : normFn(this.cnesBaseCache && this.cnesBaseCache.competencia);
 
         const estabs = [];
-        let baseComp = '';
-        if (targetComp && this.cnesBasesByComp && this.cnesBasesByComp[targetComp]) {
-            const b = this.cnesBasesByComp[targetComp];
-            if (Array.isArray(b.estabelecimentos)) estabs.push(...b.estabelecimentos);
-            baseComp = b.competencia || targetComp;
-        } else if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos)) {
-            estabs.push(...this.cnesBaseCache.estabelecimentos);
-            baseComp = this.cnesBaseCache.competencia || '';
-        }
+        if (alvoBase && Array.isArray(alvoBase.estabelecimentos)) estabs.push(...alvoBase.estabelecimentos);
+        if (this.cnesBaseCache && Array.isArray(this.cnesBaseCache.estabelecimentos) && this.cnesBaseCache !== alvoBase) estabs.push(...this.cnesBaseCache.estabelecimentos);
 
         if (typeof window !== 'undefined' && window.CnesModule?.state && Array.isArray(window.CnesModule.state.estabelecimentos)) {
             estabs.push(...window.CnesModule.state.estabelecimentos);
@@ -1495,21 +1519,45 @@ const BpaModule = {
             }
         }
 
-        // 3. Verificação de competência e unidade (Se não estiver na unidade ou na competência, é GLOSA)
-        const baseCompClean = String(baseComp || '').replace(/\D/g, '');
-        const compConferida = !targetComp || !baseCompClean || baseCompClean === targetComp;
-
+        // 3. Verificação de unidade e competência.
+        // REGRA CORRIGIDA: a ausência da base CNES da competência alvo NUNCA gera glosa.
+        // Com a base alvo carregada, o vínculo é conferido nela (autoritativa).
+        // Sem a base alvo, vínculo na unidade é mantido e competência fica pendente (null).
         if (found) {
-            const vinculadoUnidade = !cleanCnes || (unitFound && matchesUnitCnes(unitFound, cleanCnes));
-            const vinculadoCompetencia = compConferida;
-            const isGlosa = !vinculadoUnidade || !vinculadoCompetencia;
+            let vinculadoUnidade = !cleanCnes || !!(unitFound && matchesUnitCnes(unitFound, cleanCnes));
+            let vinculadoCompetencia;
+            if (!targetComp) {
+                vinculadoCompetencia = true;
+            } else if (temBaseAlvo && alvoBase) {
+                const alvoUnit = cleanCnes ? (alvoBase.estabelecimentos || []).find((est) => matchesUnitCnes(est, cleanCnes)) : null;
+                if (cleanCnes && !alvoUnit) {
+                    // Unidade nem existe na base da competência: mantém achado geral, competência pendente.
+                    vinculadoCompetencia = null;
+                } else if (cleanCnes && alvoUnit) {
+                    const profNoAlvo = Array.isArray(alvoUnit.profissionais) && alvoUnit.profissionais.some((x) => String(x.cns || x.cnsMaster || '').replace(/\D/g, '') === cleanCns);
+                    if (profNoAlvo) {
+                        vinculadoUnidade = true;
+                        vinculadoCompetencia = true;
+                    } else {
+                        // Base alvo confirma ausência nesta unidade (pode estar em outra ou inexistente).
+                        vinculadoUnidade = false;
+                        vinculadoCompetencia = false;
+                    }
+                } else {
+                    vinculadoCompetencia = true;
+                }
+            } else {
+                // Base da competência alvo ainda não carregada: não glosar.
+                vinculadoCompetencia = null;
+            }
+            const isGlosa = !vinculadoUnidade || vinculadoCompetencia === false;
 
             let motivoGlosa = '';
             if (!vinculadoUnidade) {
                 motivoGlosa = unitFound
                     ? `Glosa: Profissional lotado em outra unidade (${unitFound.nomeFantasia || unitFound.nome || ('CNES ' + unitFound.cnes)})`
                     : 'Glosa: Sem Vínculo nesta Unidade';
-            } else if (!vinculadoCompetencia) {
+            } else if (vinculadoCompetencia === false) {
                 motivoGlosa = `Glosa: Profissional sem vínculo ativo na competência ${targetComp.slice(4)}/${targetComp.slice(0, 4)}`;
             }
 
@@ -1604,25 +1652,65 @@ const BpaModule = {
         return profsFound;
     },
 
+    revalidarProfissionaisNaCompetencia(parsed, compAAAAMM) {
+        if (!parsed || !Array.isArray(parsed.profissionaisDetalhados)) return false;
+        const compAlvo = (typeof this.normalizarCompAAAAMM === 'function' ? this.normalizarCompAAAAMM(compAAAAMM || parsed.competencia) : String(compAAAAMM || '').replace(/\D/g, ''));
+        if (!compAlvo) return false;
+        let updated = false;
+        for (const prof of parsed.profissionaisDetalhados) {
+            if (prof.isConsolidadoBpaC) continue;
+            const info = this.lookupProfissional ? this.lookupProfissional(prof.cnsReal || prof.cns, parsed.cnes, compAlvo) : null;
+            if (!info) continue;
+            if ((info.nome && info.nome !== prof.nome) || info.vinculadoUnidade !== prof.vinculadoUnidade || info.vinculadoCompetencia !== prof.vinculadoCompetencia || info.isGlosa !== prof.isGlosa) {
+                if (info.nome) prof.nome = info.nome;
+                if (info.ocupacao) prof.cboDesc = info.ocupacao;
+                prof.vinculadoUnidade = info.vinculadoUnidade;
+                prof.vinculadoCompetencia = info.vinculadoCompetencia;
+                prof.isGlosa = info.isGlosa;
+                prof.motivoGlosa = info.motivoGlosa || '';
+                prof.cnesUnidade = info.cnesUnidade;
+                prof.nomeUnidade = info.nomeUnidade;
+                prof.vinculoOficial = info.vinculoOficial;
+                updated = true;
+            }
+        }
+        if (updated) {
+            parsed.profissionaisAmostra = this.formatProfissionaisAmostra(parsed.profissionaisDetalhados);
+            if (typeof document !== 'undefined') {
+                const elProfs = document.getElementById('bpaProfissionaisAmostra');
+                if (elProfs && (this.filePendingUpload === parsed || !this.filePendingUpload)) {
+                    elProfs.style.display = 'block';
+                    elProfs.innerHTML = '<div class="bpa-section-divider-title"><span><i class="fas fa-user-md" style="color: #0284c7;"></i> Profissionais Identificados (' + parsed.profissionaisDetalhados.length + ')</span><span style="font-weight: 500; color: #10b981; font-size: 0.72rem;"><i class="fas fa-shield-alt"></i> Cruzamento CNES Ativo</span></div><div class="bpa-prof-scroll-container" style="max-height: 380px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 6px;">' + parsed.profissionaisAmostra.join('') + '</div>';
+                }
+            }
+        }
+        return updated;
+    },
+
     async enrichProfissionaisNames(parsed) {
         if (!parsed || !parsed.profissionaisDetalhados || !parsed.profissionaisDetalhados.length) return;
-        const hasMissing = parsed.profissionaisDetalhados.some(p => !p.nome || p.nome.startsWith('Profissional CNS'));
-        if (!hasMissing) return;
-
+        const compAlvo = (typeof this.normalizarCompAAAAMM === 'function' ? this.normalizarCompAAAAMM(parsed.competencia) : '');
+        const hasMissing = parsed.profissionaisDetalhados.some(p => !p.nome || String(p.nome).startsWith('Profissional CNS'));
         try {
-            await this.loadCnesBase();
-            let updated = false;
+            await this.loadCnesBase(compAlvo || '');
+            let updated = this.revalidarProfissionaisNaCompetencia(parsed, compAlvo) || false;
+            if (!hasMissing && !updated) return;
+            if (hasMissing && !updated) {
             for (const prof of parsed.profissionaisDetalhados) {
-                if (!prof.nome || prof.nome.startsWith('Profissional CNS')) {
-                    const info = this.lookupProfissional(prof.cnsReal || prof.cns, parsed.cnes);
+                if (!prof.nome || String(prof.nome).startsWith('Profissional CNS')) {
+                    const info = this.lookupProfissional(prof.cnsReal || prof.cns, parsed.cnes, compAlvo);
                     if (info && info.nome) {
                         prof.nome = info.nome;
                         prof.cboDesc = info.ocupacao || prof.cboDesc;
                         prof.vinculadoUnidade = info.vinculadoUnidade;
+                        prof.vinculadoCompetencia = info.vinculadoCompetencia;
+                        prof.isGlosa = info.isGlosa;
+                        prof.motivoGlosa = info.motivoGlosa || '';
                         prof.vinculoOficial = info.vinculoOficial;
                         updated = true;
                     }
                 }
+            }
             }
             if (updated) {
                 parsed.profissionaisAmostra = this.formatProfissionaisAmostra(parsed.profissionaisDetalhados);
@@ -3999,6 +4087,8 @@ const BpaModule = {
         document.getElementById('bpaFileInfoCard').style.display = 'none';
         document.getElementById('bpaDropPrompt').style.display = 'block';
         document.getElementById('btnConfirmarUploadBpa').disabled = true;
+        const btnAuditarInit = document.getElementById('btnAuditarPenteFinoBpa') || document.getElementById('btnExecutarPenteFinoUpload');
+        if (btnAuditarInit) btnAuditarInit.disabled = true;
         const elProfsInit = document.getElementById('bpaProfissionaisAmostra');
         if (elProfsInit) elProfsInit.innerHTML = '';
 
@@ -4042,6 +4132,8 @@ const BpaModule = {
         if (typeof document !== 'undefined') {
             const btn = document.getElementById('btnConfirmarUploadBpa');
             if (btn) btn.disabled = true;
+            const btnAuditar = document.getElementById('btnAuditarPenteFinoBpa') || document.getElementById('btnExecutarPenteFinoUpload');
+            if (btnAuditar) btnAuditar.disabled = true;
         }
         const selectionId = this.fileSelectionId = (this.fileSelectionId || 0) + 1;
 
@@ -4063,6 +4155,19 @@ const BpaModule = {
                 await this.loadCnesBase();
             }
             const parsed = this.parseBpaFile(file, textContent);
+            // GARANTIA DE COMPETÊNCIA: carrega a base CNES exata do arquivo antes de
+            // validar vínculos, evitando glosa falsa por base de mês divergente.
+            try {
+                const compArquivo = (typeof this.normalizarCompAAAAMM === 'function' ? this.normalizarCompAAAAMM(parsed.competencia) : '')
+                    || (Array.isArray(parsed.competenciasAtendimento) && parsed.competenciasAtendimento.length ? String(parsed.competenciasAtendimento[0]).replace(/\D/g, '') : '');
+                if (compArquivo && (!this.cnesBasesByComp || !this.cnesBasesByComp[compArquivo])) {
+                    await this.loadCnesBase(compArquivo);
+                    if (selectionId !== this.fileSelectionId) return;
+                    if (typeof this.revalidarProfissionaisNaCompetencia === 'function') {
+                        this.revalidarProfissionaisNaCompetencia(parsed, compArquivo);
+                    }
+                }
+            } catch (_e) { /* mantém preview inicial em caso de falha de rede */ }
 
             if (this.uploadTarget) {
                 if (parsed.cnes && String(parsed.cnes) !== String(this.uploadTarget.cnes)) {
@@ -4153,10 +4258,10 @@ const BpaModule = {
 
             // Exibir a caixa de status e acionamento da auditoria Pente Fino
             this.atualizarEstadoBotaoEnvio();
-            const btnAuditar = document.getElementById('btnExecutarPenteFinoUpload');
+            const btnAuditar = document.getElementById('btnAuditarPenteFinoBpa') || document.getElementById('btnExecutarPenteFinoUpload');
             if (btnAuditar) {
                 btnAuditar.disabled = false;
-                btnAuditar.style.display = 'inline-flex';
+                btnAuditar.style.display = 'flex';
             }
         };
 

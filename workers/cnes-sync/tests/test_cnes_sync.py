@@ -258,6 +258,28 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(result["status"], "published")
             self.assertTrue((private_root / "manifest.json").exists())
 
+    def test_public_snapshot_embeds_versioned_historic_cnes_aliases(self):
+        with tempfile.TemporaryDirectory() as private_directory, tempfile.TemporaryDirectory() as public_directory:
+            public_root = Path(public_directory)
+            (public_root / "cnes_aliases_210120.json").write_text(
+                json.dumps({"municipio_ibge": "210120", "aliases": {"0123456": ["0765432"]}}),
+                encoding="utf-8",
+            )
+            publish_snapshot(self.snapshot, self.source_files, Path(private_directory), public_root)
+
+            manifest = json.loads((public_root / "manifest.json").read_text(encoding="utf-8"))
+            payload = json.loads((public_root / manifest["competencies"][COMPETENCE]["snapshot"]["path"]).read_text(encoding="utf-8"))
+            self.assertEqual(payload["estabelecimentos"][0]["aliases"], ["0765432"])
+
+    def test_public_snapshot_without_overlay_has_no_aliases(self):
+        with tempfile.TemporaryDirectory() as private_directory, tempfile.TemporaryDirectory() as public_directory:
+            public_root = Path(public_directory)
+            publish_snapshot(self.snapshot, self.source_files, Path(private_directory), public_root)
+
+            manifest = json.loads((public_root / "manifest.json").read_text(encoding="utf-8"))
+            payload = json.loads((public_root / manifest["competencies"][COMPETENCE]["snapshot"]["path"]).read_text(encoding="utf-8"))
+            self.assertNotIn("aliases", payload["estabelecimentos"][0])
+
     def test_backfill_of_an_older_competence_does_not_move_active_pointer_backwards(self):
         old_establishment = establishment()
         old_professional = professional()

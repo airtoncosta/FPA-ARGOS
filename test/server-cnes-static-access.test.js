@@ -36,3 +36,16 @@ test('bloqueia API CNES sem sessão autenticada', async () => {
     assert.equal(response.status, 401);
     assert.equal((await response.json()).code, 'CNES_AUTH_REQUIRED');
 });
+
+test('bloqueia overlay de aliases servido diretamente como estático', async () => {
+    const response = await fetch(`http://localhost:${TEST_PORT}/cnes_data/cnes_aliases_210120.json`);
+
+    assert.equal(response.status, 403);
+});
+
+test('bloqueia API de aliases sem sessão autenticada', async () => {
+    const response = await fetch(`http://localhost:${TEST_PORT}/api/cnes/aliases?ibge=210120`);
+
+    assert.equal(response.status, 401);
+    assert.equal((await response.json()).code, 'CNES_AUTH_REQUIRED');
+});
