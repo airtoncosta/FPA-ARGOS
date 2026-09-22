@@ -217,3 +217,38 @@ test('recordProducaoProfissionais espelha na nuvem sem quebrar o save local', as
     assert.equal(inseridos.length, 1);
     assert.equal(inseridos[0].cns_profissional, '700000000000001');
 });
+
+test('chave do espelho isolada por usuario', () => {
+    const { mod } = setup();
+    assert.ok(mod.chaveArmazenamento('jessica').includes('jessica'));
+    assert.notEqual(mod.chaveArmazenamento('jessica'), mod.chaveArmazenamento('flavia'));
+});
+
+test('expurgo de orfaos so roda com BPA sincronizado', async () => {
+    const { mod, store } = setup();
+    mod.render = () => {};
+    store.set(mod.chaveArmazenamento(), JSON.stringify([{ id: 'x', producao_id: 'sumiu', cns: 'C1' }]));
+    mod.bpaSincronizadoEm = 0;
+    await mod.loadData();
+    let kept = JSON.parse(store.get(mod.chaveArmazenamento()) || '[]');
+    assert.equal(kept.length, 1);
+    mod.bpaSincronizadoEm = Date.now();
+    await mod.loadData();
+    kept = JSON.parse(store.get(mod.chaveArmazenamento()) || '[]');
+    assert.equal(kept.length, 0);
+});
+
+test('atendimentos nao duplicam o mesmo paciente/data entre remessas', () => {
+    const { mod } = setup();
+    const mk = (pid, chaves, qtd) => ({
+        id: pid, producao_id: pid, cns: 'C1', nome: 'Dr. X', cbo: '225125',
+        estabelecimento_nome: 'HMI', competencia: '07/2026',
+        totalQuantidade: qtd, totalAtendimentos: chaves.length, totalValor: 0,
+        procedimentos: [], atendimentosChaves: chaves
+    });
+    mod.records = [mk('p1', ['PAC1_20260710', 'PAC2_20260710'], 2), mk('p2', ['PAC1_20260710', 'PAC3_20260711'], 2)];
+    const lista = mod.getFilteredAndAggregatedProfissionais();
+    assert.equal(lista.length, 1);
+    assert.equal(lista[0].totalAtendimentos, 3);
+    assert.equal(lista[0].totalQuantidade, 4);
+});

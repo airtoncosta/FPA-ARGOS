@@ -6,6 +6,14 @@
  */
 window.ProducaoProfissionalModule = {
     storageKey: 'argos_producoes_profissionais_cns',
+    chaveArmazenamento(username) {
+        let user = username;
+        if (!user && typeof window !== 'undefined' && window.BpaModule && typeof window.BpaModule.getCurrentUser === 'function') {
+            try { user = window.BpaModule.getCurrentUser().username; } catch (e) {}
+        }
+        user = String(user || '').trim().toLowerCase();
+        return user ? (this.storageKey + ':' + user) : this.storageKey;
+    },
     records: [],
     sigtapCache: null,
     cnesCache: null,
@@ -348,7 +356,7 @@ window.ProducaoProfissionalModule = {
         // Carrega registros existentes
         let saved = [];
         try {
-            saved = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+            saved = JSON.parse(localStorage.getItem(this.chaveArmazenamento()) || '[]');
         } catch (e) {
             saved = [];
         }
@@ -414,7 +422,7 @@ window.ProducaoProfissionalModule = {
         }
 
         try {
-            localStorage.setItem(this.storageKey, JSON.stringify(saved));
+            localStorage.setItem(this.chaveArmazenamento(), JSON.stringify(saved));
         } catch (e) {
             console.error('Erro ao persistir produção dos profissionais:', e);
         }
@@ -570,6 +578,7 @@ window.ProducaoProfissionalModule = {
                 nome_arquivo: nomeArquivo || '',
                 totalQuantidade: item.totalQuantidade,
                 totalAtendimentos,
+                atendimentosChaves: item.isConsolidadoBpaC ? [] : [...item.atendimentosSet],
                 totalValor: Number(totalValor.toFixed(2)),
                 procedimentos: procsWithValues,
                 membrosEquipe: item.membrosEquipe || [],
@@ -593,7 +602,7 @@ window.ProducaoProfissionalModule = {
         if (!producaoId) return;
         let saved = [];
         try {
-            saved = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+            saved = JSON.parse(localStorage.getItem(this.chaveArmazenamento()) || '[]');
         } catch (e) {
             saved = [];
         }
@@ -601,7 +610,7 @@ window.ProducaoProfissionalModule = {
         this.records = (this.records || []).filter(r => r.producao_id !== producaoId);
 
         try {
-            localStorage.setItem(this.storageKey, JSON.stringify(saved));
+            localStorage.setItem(this.chaveArmazenamento(), JSON.stringify(saved));
         } catch (e) {
             console.error('Erro ao salvar após exclusão de produção:', e);
         }
@@ -628,7 +637,7 @@ window.ProducaoProfissionalModule = {
      */
     clearAllData() {
         try {
-            localStorage.removeItem(this.storageKey);
+            localStorage.removeItem(this.chaveArmazenamento());
         } catch (e) {}
         this.records = [];
         this.filtros = {
@@ -646,18 +655,32 @@ window.ProducaoProfissionalModule = {
     async loadData(forceSyncWithBpa = false) {
         let loaded = [];
         try {
-            const str = localStorage.getItem(this.storageKey);
+            const str = localStorage.getItem(this.chaveArmazenamento());
             if (str) loaded = JSON.parse(str);
         } catch (e) {
             loaded = [];
         }
 
+        let nuvemRows = [];
+        try {
+            const g = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+            if (g.SupabaseConfig && g.SupabaseConfig.isConnected()) {
+                const client = g.SupabaseConfig.getClient();
+                if (client) {
+                    const res = await client.from('espelho_producao_profissional').select('*').order('criado_em', { ascending: false }).limit(5000);
+                    if (res && !res.error && Array.isArray(res.data)) nuvemRows = res.data;
+                }
+            }
+        } catch (e) {}
+        loaded = this.mesclarNuvemLocal(nuvemRows, loaded);
+
         // Sincronização com produções do BPA (sempre verifica se há produções adicionadas)
         const existingBpa = this.getExistingBpaProductions();
         const validBpaIds = new Set(existingBpa.map(b => b.id));
 
-        // EXPURGO ATIVO DE ÓRFÃOS: remove do Espelho registros de produções que já foram deletadas do BPA
-        if (existingBpa.length > 0) {
+        // EXPURGO DE ÓRFÃOS somente com lista BPA sincronizada: sem isso, init/logout esvaziariam o espelho à toa
+        const bpaPronto = Number(this.bpaSincronizadoEm || 0) > 0;
+        if (bpaPronto) {
             loaded = loaded.filter(r => validBpaIds.has(r.producao_id));
         }
 
@@ -688,7 +711,7 @@ window.ProducaoProfissionalModule = {
         }
 
         try {
-            localStorage.setItem(this.storageKey, JSON.stringify(loaded));
+            localStorage.setItem(this.chaveArmazenamento(), JSON.stringify(loaded));
         } catch (e) {}
 
         // Enriquecimento e re-resolução de nomes de profissionais que possam ter ficado pendentes
@@ -801,9 +824,6 @@ window.ProducaoProfissionalModule = {
                 if (r.competencia) compSet.add(r.competencia.trim());
             });
 
-            // Default competencies
-            ['06/2026', '07/2026', '08/2026'].forEach(c => compSet.add(c));
-
             const sortedComp = [...compSet].sort().reverse();
             let opts = '<option value="">Todas as Competências</option>';
             sortedComp.forEach(c => {
@@ -853,6 +873,7 @@ window.ProducaoProfissionalModule = {
                     totalAtendimentos: 0,
                     totalValor: 0,
                     procsMap: new Map(),
+                    chavesAtend: new Set(), temChaves: false,
                     isConsolidadoBpaC: r.isConsolidadoBpaC
                 });
             }
@@ -867,6 +888,10 @@ window.ProducaoProfissionalModule = {
             agg.totalQuantidade += (r.totalQuantidade || 0);
             agg.totalAtendimentos += (r.totalAtendimentos || 0);
             agg.totalValor += (r.totalValor || 0);
+            if (Array.isArray(r.atendimentosChaves) && r.atendimentosChaves.length) {
+                agg.temChaves = true;
+                r.atendimentosChaves.forEach(k => agg.chavesAtend.add(String(k)));
+            }
 
             // Consolidação de procedimentos
             (r.procedimentos || []).forEach(p => {
@@ -903,7 +928,7 @@ window.ProducaoProfissionalModule = {
                 unidadesFormatadas: [...prof.unidades].join(' • ') || 'Unidade Principal',
                 competencias: [...prof.competencias].join(', ') || '-',
                 totalQuantidade: prof.totalQuantidade,
-                totalAtendimentos: prof.totalAtendimentos,
+                totalAtendimentos: prof.temChaves ? Math.max(1, prof.chavesAtend.size) : prof.totalAtendimentos,
                 totalValor: Number(prof.totalValor.toFixed(2)),
                 totalValorFormatado: prof.totalValor > 0 ? `R$ ${prof.totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'R$ 0,00',
                 procedimentos: procsList,

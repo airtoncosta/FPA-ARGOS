@@ -1965,6 +1965,10 @@ const BpaModule = {
         } catch(e){}
 
         this.producoes = loaded;
+        try {
+            const g = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+            if (g.ProducaoProfissionalModule) g.ProducaoProfissionalModule.bpaSincronizadoEm = Date.now();
+        } catch (e) {}
         this.loadedUsername = username;
         this.renderLoadingState(false);
         this.populateCompetenciaFilter();
@@ -2107,6 +2111,10 @@ const BpaModule = {
         try {
             if (window.ProducaoProfissionalModule && typeof window.ProducaoProfissionalModule.recordProducaoProfissionais === 'function') {
                 window.ProducaoProfissionalModule.recordProducaoProfissionais(newRecord, producaoData);
+                try {
+                    const g = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+                    if (g.ProducaoProfissionalModule) g.ProducaoProfissionalModule.bpaSincronizadoEm = Date.now();
+                } catch (e) {}
             }
         } catch (e) {
             console.warn('Falha ao sincronizar com ProducaoProfissionalModule:', e);
@@ -2174,6 +2182,10 @@ const BpaModule = {
         try {
             if (typeof window !== 'undefined' && window.ProducaoProfissionalModule && typeof window.ProducaoProfissionalModule.removeProducao === 'function') {
                 window.ProducaoProfissionalModule.removeProducao(id);
+                try {
+                    const g = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+                    if (g.ProducaoProfissionalModule) g.ProducaoProfissionalModule.bpaSincronizadoEm = Date.now();
+                } catch (e) {}
             }
         } catch (e) {
             console.warn('Falha ao sincronizar exclusão com ProducaoProfissionalModule:', e);
