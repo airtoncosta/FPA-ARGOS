@@ -34,12 +34,13 @@ CREATE TABLE IF NOT EXISTS public.espelho_producao_profissional (
     producao_id UUID REFERENCES public.producoes_bpa(id) ON DELETE CASCADE,
     cnes VARCHAR(20),
     competencia VARCHAR(20) NOT NULL,
-    cns_profissional VARCHAR(20),
+    cns_profissional VARCHAR(255),
     nome_profissional VARCHAR(255),
     cbo VARCHAR(10),
-    procedimento VARCHAR(20),
-    quantidade INTEGER DEFAULT 0,
-    valor_sa NUMERIC(12,2),
+    procedimentos JSONB DEFAULT '[]',
+    total_quantidade INTEGER DEFAULT 0,
+    total_atendimentos INTEGER DEFAULT 0,
+    total_valor NUMERIC(12,2),
     digitador_username VARCHAR(255),
     criado_em TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -47,6 +48,8 @@ CREATE INDEX IF NOT EXISTS idx_espelho_comp ON public.espelho_producao_profissio
 CREATE INDEX IF NOT EXISTS idx_espelho_cns ON public.espelho_producao_profissional(cns_profissional);
 CREATE INDEX IF NOT EXISTS idx_espelho_prod ON public.espelho_producao_profissional(producao_id);
 ```
+
+Delta vs rascunho inicial: grão 1 linha por profissional com `procedimentos JSONB` (1:1 com o record do espelho), em vez de 1 linha por procedimento.
 
 RLS: mesmo padrão aberto do projeto (`migration_producoes_bpa.sql`): `ENABLE ROW LEVEL SECURITY` + políticas `TO anon` de SELECT/INSERT/UPDATE/DELETE com `USING (true)`.
 
@@ -64,7 +67,7 @@ RLS: mesmo padrão aberto do projeto (`migration_producoes_bpa.sql`): `ENABLE RO
 
 ## 6. Espelho — `js/producao-profissional-module.js`
 
-- Escrita: após `recordProducaoProfissionais`, upsert na tabela do espelho (apagar linhas da `producao_id` e reinserir — reenvio não duplica); manter escrita local como fallback imediato.
+- Escrita: após `recordProducaoProfissionais`, grava 1 linha por profissional (upsert por produção: apagar a linha da `producao_id`+profissional e reinserir com `procedimentos JSONB` + totais — reenvio não duplica); manter escrita local como fallback imediato.
 - Leitura: nuvem-primeiro (`producoes_bpa` + `espelho_producao_profissional` filtrando por acesso/unidade, mesmo padrão de `loadProducoes`), fallback local.
 - Chave local com namespace por usuário (`argos_producoes_profissionais_cns:<username>`).
 - Expurgo de órfãos **somente** após a lista BPA estar carregada e não-vazia por motivo válido (flag `bpaListaPronta`); nunca expurgar durante init.
