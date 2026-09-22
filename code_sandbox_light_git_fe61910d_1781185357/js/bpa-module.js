@@ -2000,6 +2000,10 @@ const BpaModule = {
             digitador_nome: currentUser.name || currentUser.username,
             observacoes: producaoData.observacoes || '',
             status: 'ENVIADO',
+            status_auditoria: producaoData.status_auditoria || 'NAO_AUDITADO',
+            total_apontamentos: producaoData.total_apontamentos || 0,
+            auditado_em: producaoData.auditado_em ? new Date(producaoData.auditado_em).toISOString() : null,
+            fingerprint: producaoData.fingerprint || '',
             criado_em: new Date().toISOString()
         };
 
@@ -2009,7 +2013,9 @@ const BpaModule = {
                 const client = window.SupabaseConfig.getClient();
                 if (!client) throw new Error('Conexão indisponível.');
                 if (client) {
-                    const { data, error } = await client.from('producoes_bpa').insert([newRecord]).select();
+                    const paraNuvem = { ...newRecord };
+                    delete paraNuvem._localOnly;
+                    const { data, error } = await client.from('producoes_bpa').insert([paraNuvem]).select();
                     if (error) throw error;
                     if (data && data[0]) {
                         newRecord.id = data[0].id;
