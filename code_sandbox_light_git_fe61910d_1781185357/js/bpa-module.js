@@ -790,13 +790,42 @@ const BpaModule = {
             }
         } catch(e){}
 
-        // Garantir que a APAE venha com Carolina atribuída por padrão se ainda não configurada
-        if (!map['7916647'] && !map['APAE']) {
-            map['7916647'] = 'CAROLINA CARNEIRO DAMASCENO SOUZA';
-            map['APAE'] = 'CAROLINA CARNEIRO DAMASCENO SOUZA';
-        }
-
         return map;
+    },
+
+    // Troca o nome do responsável nos valores do mapa (chaves/CNES preservados).
+    // Comparação normalizada (caixa/acentos) para alcançar variações do nome antigo.
+    aplicarRenomeacaoEmMapa(map, antigo, novo) {
+        const origem = map && typeof map === 'object' ? { ...map } : {};
+        const alvo = this.normalizeIdentity(antigo);
+        const destino = String(novo || '').trim();
+        if (!alvo || !destino) return { map: origem, trocas: 0 };
+        let trocas = 0;
+        for (const k of Object.keys(origem)) {
+            if (this.normalizeIdentity(origem[k]) === alvo) {
+                origem[k] = destino;
+                trocas++;
+            }
+        }
+        return { map: origem, trocas };
+    },
+
+    // Propaga a edição de nome do menu de usuários para as atribuições do BPA.
+    async renomearResponsavel(antigo, novo) {
+        try {
+            const atual = this.getResponsaveisMap();
+            const { map, trocas } = this.aplicarRenomeacaoEmMapa(atual, antigo, novo);
+            if (trocas > 0) {
+                await this.saveResponsaveisMap(map);
+                if (this.normalizeIdentity(this.currentResponsavelFiltro) === this.normalizeIdentity(antigo)) {
+                    this.currentResponsavelFiltro = String(novo || '').trim();
+                }
+            }
+            return trocas;
+        } catch (e) {
+            console.warn('Falha ao propagar renomeação de responsável no BPA:', e);
+            return 0;
+        }
     },
 
     getModalidadesMap() {

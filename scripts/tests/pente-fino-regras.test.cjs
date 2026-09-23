@@ -657,3 +657,80 @@ test('parecer BLOQUEADO conta como glosa apenas NAO_CONFORME confirmado', () => 
     assert.strictEqual(result.parecer.totalGlosas, 1, 'Somente o NAO_CONFORME confirmado conta como glosa');
     assert.strictEqual(result.parecer.totalPendencias, 1);
 });
+
+test('filtro por regra isola apenas os achados da Regra 4 (servico/classificacao)', () => {
+    assert.strictEqual(typeof penteFinoEngine.filtrarRegra, 'function');
+    assert.strictEqual(typeof penteFinoEngine.limparFiltroRegra, 'function');
+    assert.strictEqual(typeof penteFinoEngine.findingsDaRegra, 'function');
+    const findings = [
+        { regra: 'SERVICO_INFORMADO', status: 'NAO_CONFORME', linha: 10 },
+        { regra: 'SERVICO_CLASSIFICACAO', status: 'NAO_VERIFICADO', linha: 11 },
+        { regra: 'CBO_SIGTAP', status: 'NAO_CONFORME', linha: 12 },
+        { regra: 'CID', status: 'NAO_CONFORME', linha: 13 }
+    ];
+    const daRegra4 = penteFinoEngine.findingsDaRegra(findings, 'regra4_servico_classificacao');
+    assert.deepStrictEqual(daRegra4.map(f => f.linha), [10, 11]);
+    penteFinoEngine.limparFiltroRegra();
+    assert.strictEqual(penteFinoEngine.getFiltroRegra(), '');
+    penteFinoEngine.filtrarRegra('regra4_servico_classificacao');
+    assert.strictEqual(penteFinoEngine.getFiltroRegra(), 'regra4_servico_classificacao');
+    penteFinoEngine.limparFiltroRegra();
+});
+
+test('pendência de catálogo parcial traz frase objetiva com ação (Regra 4)', () => {
+    const bpa = {
+        records: [{
+            linha: 188, tipo: 'BPA-I', cnes: '2456184', competencia: '202607',
+            cbo: '225320', cnsProfissional: '703203601654994', procedimento: '0205020061',
+            quantidade: 1, idade: 30, sexo: 'M', cid: 'R104', dataAtendimento: '20260710',
+            nascimento: '19950101', servico: '115', classificacao: '001', folha: '001', sequencia: '01'
+        }]
+    };
+    // Base parcial via API: válida, mas incompleta e sem o procedimento.
+    const bases = {
+        '202607': {
+            sigtap: { competencia: '202607', validada: true, completo: false, procedimentos: {} }
+        }
+    };
+    const res = bpaAuditCore.audit(bpa, bases);
+    const achado = res.findings.find(f => f.regra === 'PROCEDIMENTO_VIGENTE');
+    assert.ok(achado, 'Deve apontar a vigência não verificada do procedimento');
+    assert.strictEqual(achado.status, 'NAO_VERIFICADO');
+    assert.ok(achado.mensagem.includes('0205020061'), 'Mensagem deve citar o procedimento, got: ' + achado.mensagem);
+    assert.ok(achado.mensagem.includes('202607'), 'Mensagem deve citar a competência, got: ' + achado.mensagem);
+    assert.ok(achado.esperado && achado.encontrado, 'Esperado/encontrado devem vir preenchidos');
+    assert.ok(achado.orientacao, 'Deve trazer o que fazer (orientação de ação)');
+});
+
+test('resumoRegra separa glosa confirmada de pendência a conferir', () => {
+    assert.strictEqual(typeof penteFinoEngine.resumoRegra, 'function');
+    const resumo = penteFinoEngine.resumoRegra({ glosas: [
+        { status: 'NAO_CONFORME' },
+        { status: 'NAO_VERIFICADO' },
+        { status: 'ALERTA' }
+    ]});
+    assert.deepStrictEqual(resumo, { confirmadas: 1, pendencias: 2, total: 3 });
+    assert.deepStrictEqual(penteFinoEngine.resumoRegra({ glosas: [] }), { confirmadas: 0, pendencias: 0, total: 0 });
+});
+
+test('3D renderer abre diagnostico repassando a regra clicada ao engine', () => {
+    const penteFino3D = require(path.join(basePath, 'js/pente-fino-3d-renderer.js'));
+    assert.strictEqual(typeof penteFino3D.abrirDiagnosticoCompleto, 'function');
+    let regraRecebida = null;
+    const g = typeof globalThis !== 'undefined' ? globalThis : {};
+    const origWindow = g.window;
+    const origEngine = g.PenteFinoEngine;
+    g.window = g.window || {};
+    g.PenteFinoEngine = {
+        filtrarRegra: (codigo) => { regraRecebida = codigo; },
+        renderizarResultados: () => {}
+    };
+    g.window.PenteFinoEngine = g.PenteFinoEngine;
+    if (typeof document === 'undefined') {
+        g.document = { getElementById: () => null };
+    }
+    penteFino3D.abrirDiagnosticoCompleto('regra4_servico_classificacao');
+    assert.strictEqual(regraRecebida, 'regra4_servico_classificacao');
+    if (origEngine === undefined) delete g.PenteFinoEngine; else g.PenteFinoEngine = origEngine;
+    if (origWindow === undefined) delete g.window; else g.window = origWindow;
+});

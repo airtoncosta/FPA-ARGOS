@@ -15,6 +15,7 @@
     let executando = false;
     let paginaAtual = 0;
     let filtroAtual = '';
+    let filtroRegraAtual = '';
     const tamanhoPagina = 75;
 
     const rotulo = v => String(v || '').replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase());
@@ -334,6 +335,36 @@
         }
     };
 
+    function codigoRegraValido(codigo) {
+        return typeof codigo === 'string' && Object.prototype.hasOwnProperty.call(RULES, codigo);
+    }
+
+    function findingsDaRegra(findings, codigoRegra) {
+        if (!codigoRegraValido(codigoRegra)) return [];
+        const lista = Array.isArray(findings) ? findings : [];
+        const nucleo = RULES[codigoRegra].regrasCore || [];
+        return lista.filter(f => nucleo.includes(f && f.regra));
+    }
+
+    function getFiltroRegra() {
+        return filtroRegraAtual;
+    }
+
+    function resumoRegra(reg) {
+        const lista = Array.isArray(reg && reg.glosas) ? reg.glosas : [];
+        const confirmadas = lista.filter(g => g && g.status === 'NAO_CONFORME').length;
+        const pendencias = lista.length - confirmadas;
+        return { confirmadas, pendencias, total: lista.length };
+    }
+
+    function aplicarVisivel(findings) {
+        let visible = (Array.isArray(findings) ? findings : []).filter(f => !filtroAtual || f.status === filtroAtual);
+        if (codigoRegraValido(filtroRegraAtual)) {
+            const nucleo = RULES[filtroRegraAtual].regrasCore || [];
+            visible = visible.filter(f => nucleo.includes(f && f.regra));
+        }
+        return visible;
+    }
     /**
      * Classifica os apontamentos da auditoria nas 5 Regras Anti-Glosa solicitadas:
      * 1. Lotação do profissional no estabelecimento (CNES)
@@ -613,6 +644,7 @@
         ultimoResultado = null;
         paginaAtual = 0;
         filtroAtual = '';
+        filtroRegraAtual = '';
         const box = obterOuCriarModalResultados();
         box.innerHTML = '<div class="mf-audit-summary"><h2>Iniciando Pente Fino Anti-Glosa...</h2><p>Lendo arquivo e carregando bases oficiais da competência.</p></div>';
 
@@ -699,28 +731,98 @@
                 </p>
                </div>`);
 
-        // Cards das 5 Regras Anti-Glosa
+        // Cards das 5 Regras Anti-Glosa (clicáveis: filtram as linhas daquela regra)
+        const regrasOrdem = [c5.regra1_lotacao_cnes, c5.regra2_cbo_procedimento, c5.regra3_cid_procedimento, c5.regra4_servico_classificacao, c5.regra5_cns_profissional];
+        const regraAtiva = codigoRegraValido(filtroRegraAtual) ? c5[filtroRegraAtual] : null;
+        const orientacaoHtml = f => f.orientacao ? `<br><span style="font-size: 0.75rem; opacity: 0.85;">O que fazer: ${escapar(f.orientacao)}</span>` : '';
         const cards5RegrasHtml = `
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.75rem; margin: 1rem 0;">
-                ${[c5.regra1_lotacao_cnes, c5.regra2_cbo_procedimento, c5.regra3_cid_procedimento, c5.regra4_servico_classificacao, c5.regra5_cns_profissional].map(rg => `
-                    <div style="background: ${rg.ok ? 'rgba(6, 78, 59, 0.25)' : 'rgba(127, 29, 29, 0.25)'}; border: 1px solid ${rg.ok ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)'}; border-radius: 0.5rem; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                ${regrasOrdem.map(rg => {
+                    const res = resumoRegra(rg);
+                    const selo = rg.ok ? 'OK' : (res.confirmadas > 0 ? 'GLOSA' : 'A CONFERIR');
+                    const seloNum = rg.ok ? '' : (res.confirmadas > 0 ? res.confirmadas : res.pendencias);
+                    const cor = rg.ok ? '#34d399' : (res.confirmadas > 0 ? '#f87171' : '#fbbf24');
+                    const fundo = rg.ok ? '#065f46' : (res.confirmadas > 0 ? '#991b1b' : '#92400e');
+                    return `
+                    <div role="button" tabindex="0" title="${rg.ok ? 'Nenhuma glosa nesta regra' : 'Clique para ver as ' + res.total + ' linha(s)'}" onclick="PenteFinoEngine.filtrarRegra('${rg.codigo}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();PenteFinoEngine.filtrarRegra('${rg.codigo}')}" style="cursor: ${rg.ok ? 'default' : 'pointer'}; background: ${rg.ok ? 'rgba(6, 78, 59, 0.25)' : (res.confirmadas > 0 ? 'rgba(127, 29, 29, 0.25)' : 'rgba(120, 53, 15, 0.25)')}; border: 1px solid ${rg.ok ? 'rgba(52, 211, 153, 0.3)' : (res.confirmadas > 0 ? 'rgba(248, 113, 113, 0.3)' : 'rgba(251, 191, 36, 0.35)')}; ${!rg.ok && filtroRegraAtual === rg.codigo ? 'outline: 2px solid ' + cor + ';' : ''} border-radius: 0.5rem; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: ${rg.ok ? '#34d399' : '#f87171'};">Regra ${rg.id}</span>
-                            <span style="font-size: 0.75rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: ${rg.ok ? '#065f46' : '#991b1b'}; color: #fff;">
-                                ${rg.ok ? '<i class="fas fa-check"></i> OK' : '<i class="fas fa-times"></i> GLOSA'}
+                            <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: ${cor};">Regra ${rg.id}</span>
+                            <span style="font-size: 0.75rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: ${fundo}; color: #fff;">
+                                ${rg.ok ? '<i class="fas fa-check"></i> OK' : '<i class="fas fa-' + (res.confirmadas > 0 ? 'times' : 'exclamation-triangle') + '"></i> ' + selo + ' (' + seloNum + ')'}
                             </span>
                         </div>
                         <strong style="font-size: 0.85rem; color: #f1f5f9;">${rg.titulo}</strong>
                         <span style="font-size: 0.72rem; color: #94a3b8; line-height: 1.25;">${rg.descricao}</span>
-                        ${!rg.ok ? `<div style="font-size: 0.7rem; color: #fca5a5; font-weight: 600; margin-top: 0.25rem;">${rg.totalGlosas} registro(s) afetado(s)</div>` : ''}
+                        ${!rg.ok ? `<div style="font-size: 0.7rem; color: ${cor}; font-weight: 600; margin-top: 0.25rem;">${res.total} registro(s) — clique para ver</div>` : ''}
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
         `;
 
-        const visible = r.findings.filter(f => !filtroAtual || f.status === filtroAtual);
+        const visible = aplicarVisivel(r.findings);
         const pages = Math.max(1, Math.ceil(visible.length / tamanhoPagina));
         paginaAtual = Math.min(paginaAtual, pages - 1);
+
+        const basesHtml = `<details class="mf-audit-bases"><summary>Bases e Cobertura das Verificações (${(r.sources || []).length})</summary><ul>` +
+            (r.sources || []).map(s => '<li><strong>' + escapar(s.tipo + ' ' + s.competencia) + '</strong>: ' + escapar(s.estado) + ' — ' + escapar(s.fonte) + '</li>').join('') +
+            `</ul></details>`;
+
+        // Modo objetivo e sucinto: filtro de regra ativo mostra só as glosas daquela regra.
+        if (regraAtiva) {
+            const resAtiva = resumoRegra(regraAtiva);
+            const confAtiva = resAtiva.confirmadas > 0;
+            const seloAtivo = confAtiva ? 'GLOSA' : 'A CONFERIR';
+            const numAtivo = confAtiva ? resAtiva.confirmadas : resAtiva.pendencias;
+            const fundoAtivo = confAtiva
+                ? 'background: linear-gradient(135deg, rgba(69, 10, 10, 0.9), rgba(127, 29, 29, 0.95)); border: 1px solid #ef4444;'
+                : 'background: linear-gradient(135deg, rgba(69, 41, 10, 0.9), rgba(120, 53, 15, 0.95)); border: 1px solid #f59e0b;';
+            box.innerHTML =
+                `<div class="mf-audit-summary mf-nao_conforme" style="${fundoAtivo} color: #fef2f2;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+                        <span class="mf-badge" style="background: ${confAtiva ? '#ef4444' : '#f59e0b'}; color: ${confAtiva ? '#450a0a' : '#451a03'}; font-weight: 800;">REGRA ${regraAtiva.id} · ${seloAtivo} (${numAtivo})</span>
+                        <button type="button" class="btn-mf-export-excel" onclick="PenteFinoEngine.limparFiltroRegra()">← Ver todas as regras</button>
+                    </div>
+                    <h2 style="font-size: 1.15rem; margin: 0.5rem 0 0.25rem 0; color: #fff;">${escapar(regraAtiva.titulo)}</h2>
+                    <p style="margin: 0; opacity: 0.95; font-size: 0.88rem;">${visible.length} linha(s) no arquivo <strong>${escapar(r.arquivo)}</strong>${confAtiva ? '' : ' — nenhuma glosa confirmada, são pendências a conferir'}. ${escapar(regraAtiva.descricao)}</p>
+                </div>` +
+                `<div class="mf-table-section">
+                    <div class="mf-table-header">
+                        <h3>Glosas identificadas — Regra ${regraAtiva.id}</h3>
+                        <button type="button" class="btn-mf-export-excel" onclick="PenteFinoEngine.exportarExcel()">Exportar</button>
+                    </div>
+                    <div class="mf-table-wrapper">
+                        <table class="mf-table">
+                            <thead>
+                                <tr>
+                                    <th>Linha</th>
+                                    <th>Procedimento</th>
+                                    <th>Motivo</th>
+                                    <th>Esperado / Encontrado</th>
+                                </tr>
+                            </thead>
+                            <tbody>` +
+                            visible.slice(paginaAtual * tamanhoPagina, (paginaAtual + 1) * tamanhoPagina).map(f => `
+                                <tr>
+                                    <td><strong>${f.linha}</strong><br><span style="opacity:0.7;font-size:0.75rem;">${escapar(f.competencia)}</span></td>
+                                    <td>${escapar(f.procedimento)}</td>
+                                    <td>${escapar(f.mensagem)}${orientacaoHtml(f)}</td>
+                                    <td>${escapar(f.esperado)}<br><strong>${escapar(f.encontrado)}</strong></td>
+                                </tr>
+                            `).join('') +
+                            (visible.length ? '' : '<tr><td colspan="4">Nenhuma linha com glosa nesta regra.</td></tr>') +
+                            `</tbody>
+                        </table>
+                    </div>
+                    <div class="mf-audit-pagination">
+                        <button type="button" onclick="PenteFinoEngine.pagina(-1)" ${paginaAtual === 0 ? 'disabled' : ''}>Anterior</button>
+                        <span>Página ${paginaAtual + 1} de ${pages} • ${visible.length} linha(s)</span>
+                        <button type="button" onclick="PenteFinoEngine.pagina(1)" ${paginaAtual + 1 === pages ? 'disabled' : ''}>Próxima</button>
+                    </div>
+                </div>` +
+                basesHtml +
+                `<p class="mf-audit-footnote">Pente Fino ARGOS emitido em ${escapar(new Date(r.geradoEm).toLocaleString('pt-BR'))} • SHA-256 do arquivo: ${escapar(r.fingerprint)}</p>`;
+            return;
+        }
 
         box.innerHTML = bannerHtml + cards5RegrasHtml +
             `<div class="mf-kpis-grid">
@@ -731,9 +833,7 @@
                 <div class="mf-kpi-card mf-kpi-financial"><div><span class="kpi-lbl">Valor de referência (SA)</span><strong class="kpi-val">${fmtTotal(r.registrosValorizados ? r.valorReferenciaSa : null)}</strong><small>Base SIGTAP da competência</small></div></div>
                 <div class="mf-kpi-card mf-kpi-financial"><div><span class="kpi-lbl">Valor sob Risco de Glosa</span><strong class="kpi-val" style="color: ${r.valorNaoConformeSa > 0 ? '#ef4444' : '#94a3b8'};">${fmtTotal(r.registrosValorizados ? r.valorNaoConformeSa : null)}</strong><small>Referência linhas não-conformes</small></div></div>
             </div>` +
-            `<details class="mf-audit-bases" open><summary>Bases e Cobertura das Verificações</summary><ul>` +
-            r.sources.map(s => '<li><strong>' + escapar(s.tipo + ' ' + s.competencia) + '</strong>: ' + escapar(s.estado) + ' — ' + escapar(s.fonte) + '</li>').join('') +
-            `</ul></details>` +
+            basesHtml +
             `<div class="mf-table-section">
                 <div class="mf-table-header">
                     <h3>Diagnóstico Linha a Linha</h3>
@@ -763,7 +863,7 @@
                                 <td>${escapar(f.cnes)}<br>${escapar(mascararCns(f.cns))}</td>
                                 <td>${escapar(f.procedimento)}</td>
                                 <td class="mf-value-cell">${fmtMoeda(f.valorSa)}</td>
-                                <td>${escapar(f.mensagem)}</td>
+                                <td>${escapar(f.mensagem)}${orientacaoHtml(f)}</td>
                                 <td>${escapar(f.esperado)}<br>${escapar(f.encontrado)}</td>
                             </tr>
                         `).join('') +
@@ -782,7 +882,7 @@
 
     function exportarExcel() {
         if (!ultimoResultado) return;
-        const data = ultimoResultado.findings.map(f => Object.fromEntries(Object.entries({ ...f, cns: mascararCns(f.cns) }).map(([k, v]) => [k, typeof v === 'string' && /^[=+@-]/.test(v) ? "'" + v : v])));
+        const data = aplicarVisivel(ultimoResultado.findings).map(f => Object.fromEntries(Object.entries({ ...f, cns: mascararCns(f.cns) }).map(([k, v]) => [k, typeof v === 'string' && /^[=+@-]/.test(v) ? "'" + v : v])));
         if (typeof window !== 'undefined' && window.XLSX) {
             const wb = window.XLSX.utils.book_new();
             window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(data), 'Diagnostico_Pente_Fino');
@@ -812,6 +912,20 @@
         fecharModalResultados: () => document.getElementById('modalMalhaFinaResultados')?.classList.add('hidden'),
         pagina: delta => { paginaAtual += delta; renderizarResultados(); },
         filtrar: valor => { filtroAtual = valor; paginaAtual = 0; renderizarResultados(); },
+        filtrarRegra: codigo => {
+            filtroRegraAtual = codigoRegraValido(codigo) ? codigo : '';
+            if (filtroRegraAtual) filtroAtual = '';
+            paginaAtual = 0;
+            if (typeof document !== 'undefined' && ultimoResultado) renderizarResultados();
+        },
+        limparFiltroRegra: () => {
+            filtroRegraAtual = '';
+            paginaAtual = 0;
+            if (typeof document !== 'undefined' && ultimoResultado) renderizarResultados();
+        },
+        getFiltroRegra,
+        findingsDaRegra,
+        resumoRegra,
         loadBases
     };
 });

@@ -385,6 +385,7 @@ const UsersModule = {
                     return;
                 }
 
+                const nomeAntigoResponsavel = this.users[userIndex] ? this.users[userIndex].name : '';
                 const updatedUser = {
                     ...this.users[userIndex],
                     name: name,
@@ -419,6 +420,20 @@ const UsersModule = {
                 } else {
                     this.users[userIndex] = updatedUser;
                     this.saveUsersLocal();
+                }
+
+                // Propagar renomeação para os demais menus (responsáveis do BPA usam o nome).
+                // Guardas garantem que o salvamento do usuário nunca quebre por causa disso.
+                try {
+                    if (nomeAntigoResponsavel && nomeAntigoResponsavel !== name) {
+                        const g = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+                        const bpa = g.BpaModule;
+                        if (bpa && typeof bpa.renomearResponsavel === 'function') {
+                            await bpa.renomearResponsavel(nomeAntigoResponsavel, name);
+                        }
+                    }
+                } catch (propErr) {
+                    console.warn('Aviso: nome atualizado no usuário, mas não propagado ao BPA:', propErr);
                 }
 
                 // Se o usuário editou a si mesmo, atualizar a sessão ativa no navegador

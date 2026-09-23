@@ -320,6 +320,18 @@
     box-shadow: 0 0 10px #ef4444;
 }
 
+/* Regra com glosa é clicável: abre o diagnóstico filtrado naquela regra */
+.pf3d-rule-item.pf3d-rule-clickable:hover {
+    border-color: rgba(248, 113, 113, 0.8);
+    background: rgba(127, 29, 29, 0.35);
+    transform: translateY(-1px);
+}
+
+.pf3d-rule-item.pf3d-rule-clickable:focus-visible {
+    outline: 2px solid #f87171;
+    outline-offset: 2px;
+}
+
 .pf3d-rule-info {
     display: flex;
     flex-direction: column;
@@ -373,6 +385,21 @@
     background: rgba(239, 68, 68, 0.2);
     color: #f87171;
     border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.pf3d-rule-item.status-aviso {
+    border-color: rgba(251, 191, 36, 0.45);
+    background: rgba(120, 53, 15, 0.22);
+}
+.pf3d-rule-item.status-aviso::before {
+    background: #f59e0b;
+    box-shadow: 0 0 10px #f59e0b;
+}
+
+.badge-aviso {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.4);
 }
 
 /* Painel de Parecer Final */

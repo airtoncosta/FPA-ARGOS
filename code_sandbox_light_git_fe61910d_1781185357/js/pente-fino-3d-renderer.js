@@ -15,6 +15,14 @@
     'use strict';
 
     let audioCtx = null;
+    let ultimoC5 = null;
+    const CODIGOS_REGRAS = [
+        'regra1_lotacao_cnes',
+        'regra2_cbo_procedimento',
+        'regra3_cid_procedimento',
+        'regra4_servico_classificacao',
+        'regra5_cns_profissional'
+    ];
 
     // Síntese de áudio para feedback tátil/holográfico de alta tecnologia
     function playBeep(freq = 880, type = 'sine', duration = 0.08) {
@@ -178,6 +186,13 @@
             const badgeEl = document.getElementById(`pfBadge${i}`);
             if (ruleEl) {
                 ruleEl.className = 'pf3d-rule-item';
+                ruleEl.classList.remove('pf3d-rule-clickable');
+                ruleEl.removeAttribute('role');
+                ruleEl.removeAttribute('tabindex');
+                ruleEl.removeAttribute('title');
+                ruleEl.onclick = null;
+                ruleEl.onkeydown = null;
+                ruleEl.style.cursor = '';
             }
             if (badgeEl) {
                 badgeEl.className = 'pf3d-rule-badge badge-pending';
@@ -204,25 +219,52 @@
         }
     }
 
-    function atualizarEstadoRegra(indice, status, glosasCount = 0) {
+    function atualizarEstadoRegra(indice, status, confirmadas = 0, pendencias = 0) {
         const ruleEl = document.getElementById(`pfRule${indice}`);
         const badgeEl = document.getElementById(`pfBadge${indice}`);
         if (!ruleEl || !badgeEl) return;
+        const codigoRegra = CODIGOS_REGRAS[indice - 1] || '';
+
+        const limparClique = () => {
+            ruleEl.classList.remove('pf3d-rule-clickable');
+            ruleEl.removeAttribute('role');
+            ruleEl.removeAttribute('tabindex');
+            ruleEl.removeAttribute('title');
+            ruleEl.onclick = null;
+            ruleEl.onkeydown = null;
+            ruleEl.style.cursor = '';
+        };
 
         if (status === 'scanning') {
+            limparClique();
             ruleEl.className = 'pf3d-rule-item status-scanning';
             badgeEl.className = 'pf3d-rule-badge badge-scanning';
             badgeEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Varrendo...';
             playBeep(440 + indice * 80, 'sine', 0.06);
         } else if (status === 'ok') {
+            limparClique();
             ruleEl.className = 'pf3d-rule-item status-ok';
             badgeEl.className = 'pf3d-rule-badge badge-ok';
             badgeEl.innerHTML = '<i class="fas fa-check-circle"></i> Conforme';
             playBeep(660 + indice * 60, 'triangle', 0.08);
         } else if (status === 'glosa') {
-            ruleEl.className = 'pf3d-rule-item status-glosa';
-            badgeEl.className = 'pf3d-rule-badge badge-glosa';
-            badgeEl.innerHTML = `<i class="fas fa-times-circle"></i> Glosa (${glosasCount})`;
+            const soPendencia = confirmadas === 0;
+            ruleEl.className = 'pf3d-rule-item ' + (soPendencia ? 'status-aviso' : 'status-glosa') + ' pf3d-rule-clickable';
+            badgeEl.className = 'pf3d-rule-badge ' + (soPendencia ? 'badge-aviso' : 'badge-glosa');
+            badgeEl.innerHTML = soPendencia
+                ? `<i class="fas fa-exclamation-triangle"></i> A conferir (${pendencias})`
+                : `<i class="fas fa-times-circle"></i> Glosa (${confirmadas})`;
+            ruleEl.style.cursor = 'pointer';
+            ruleEl.setAttribute('role', 'button');
+            ruleEl.setAttribute('tabindex', '0');
+            ruleEl.setAttribute('title', soPendencia ? `Clique para ver as ${pendencias} linha(s) a conferir` : `Clique para ver as ${confirmadas} linha(s) com glosa`);
+            ruleEl.onclick = () => abrirDiagnosticoCompleto(codigoRegra);
+            ruleEl.onkeydown = (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    abrirDiagnosticoCompleto(codigoRegra);
+                }
+            };
             playBeep(240, 'sawtooth', 0.15);
         }
     }
@@ -261,6 +303,7 @@
         }
 
         const c5 = auditResult?.classificacao5Regras || window.PenteFinoEngine.classificar5Regras(auditResult);
+        ultimoC5 = c5;
         const regrasArray = [
             c5.regra1_lotacao_cnes,
             c5.regra2_cbo_procedimento,
@@ -279,7 +322,11 @@
             if (reg.ok) {
                 atualizarEstadoRegra(num, 'ok');
             } else {
-                atualizarEstadoRegra(num, 'glosa', reg.totalGlosas);
+                const engine = (typeof window !== 'undefined' && window.PenteFinoEngine) ? window.PenteFinoEngine : null;
+                const resumo = engine && typeof engine.resumoRegra === 'function'
+                    ? engine.resumoRegra(reg)
+                    : { confirmadas: (reg.glosas || []).filter(g => g.status === 'NAO_CONFORME').length, pendencias: (reg.glosas || []).filter(g => g.status !== 'NAO_CONFORME').length };
+                atualizarEstadoRegra(num, 'glosa', resumo.confirmadas, resumo.pendencias);
             }
             await new Promise(r => setTimeout(r, 200));
         }
@@ -412,9 +459,13 @@
         }
     }
 
-    function abrirDiagnosticoCompleto() {
+    function abrirDiagnosticoCompleto(filtroRegra) {
         fechar();
         const engine = (typeof window !== 'undefined' && window.PenteFinoEngine) ? window.PenteFinoEngine : (typeof globalThis !== 'undefined' && globalThis.PenteFinoEngine ? globalThis.PenteFinoEngine : null);
+        if (engine && filtroRegra && typeof engine.filtrarRegra === 'function') {
+            engine.filtrarRegra(filtroRegra);
+            return;
+        }
         if (engine && typeof engine.renderizarResultados === 'function') {
             engine.renderizarResultados();
         } else if (typeof document !== 'undefined') {
