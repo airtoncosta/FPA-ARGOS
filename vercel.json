@@ -45,6 +45,10 @@
     {
       "source": "/audit_data/:path*",
       "destination": "/code_sandbox_light_git_fe61910d_1781185357/audit_data/:path*"
+    },
+    {
+      "source": "/siasus_data/:path*",
+      "destination": "/code_sandbox_light_git_fe61910d_1781185357/siasus_data/:path*"
     }
   ]
 }

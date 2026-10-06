@@ -20,6 +20,9 @@ window.DownloadSistemaModule = (function () {
     async function init() {
         renderSkeleton();
         await carregarCatalogo();
+        // Atualização automática silenciosa via espelho live (corrige defasagem
+        // entre o JSON estático commitado e o GitHub atualizado diariamente).
+        atualizarViaEspelhoLiveSilencioso();
     }
 
     /**
@@ -28,7 +31,7 @@ window.DownloadSistemaModule = (function () {
     async function carregarCatalogo() {
         _isLoading = true;
         try {
-            const resp = await fetch('/api/siasus/versoes');
+            const resp = await fetch('/api/siasus/versoes', { cache: 'no-store' });
             if (resp.ok) {
                 const data = await resp.json();
                 if (data && data.catalogo) {
@@ -55,6 +58,38 @@ window.DownloadSistemaModule = (function () {
         _catalogo = _getCatalogoPadrao();
         _isLoading = false;
         renderView();
+        // Mesmo com fallback local, tenta o espelho live em segundo plano.
+        atualizarViaEspelhoLiveSilencioso();
+    }
+
+    /**
+     * Atualização AUTOMÁTICA silenciosa: consulta o README live do espelho
+     * oficial (atualizado diariamente via GitHub Actions) e, se houver
+     * versões mais novas que as carregadas, mescla e re-renderiza.
+     * É o que garante que o menu "Download Sistema" acompanhe o repositório
+     * https://github.com/RenatoKR/SIASUS sem depender de deploy ou de clique manual.
+     */
+    let _liveRefreshEmAndamento = false;
+    async function atualizarViaEspelhoLiveSilencioso() {
+        if (_liveRefreshEmAndamento) return;
+        _liveRefreshEmAndamento = true;
+        try {
+            const respMirror = await fetch('https://raw.githubusercontent.com/RenatoKR/SIASUS/main/README.md?t=' + Date.now(), { cache: 'no-store' });
+            if (!respMirror.ok) return;
+            const texto = await respMirror.text();
+            const antes = JSON.stringify((_catalogo && _catalogo.bdsia || []).map(b => b.arquivo));
+            _atualizarCatalogoPorTextoMirror(texto);
+            const depois = JSON.stringify((_catalogo && _catalogo.bdsia || []).map(b => b.arquivo));
+            if (antes !== depois) {
+                _catalogo.ultimaSincronizacao = new Date().toISOString();
+                _catalogo.statusDatasus = 'online';
+                renderView();
+            }
+        } catch (e) {
+            // Silencioso: mantém o catálogo já carregado (API/backend/estático).
+        } finally {
+            _liveRefreshEmAndamento = false;
+        }
     }
 
     /**
@@ -73,11 +108,38 @@ window.DownloadSistemaModule = (function () {
 
         let syncSucedido = false;
 
-        // 1. Tentar via endpoint backend
+        // 1. Tentar via endpoint backend (local server.js ou serverless Vercel).
+        //    O endpoint devolve o catálogo fresco no corpo da resposta.
         try {
-            const resp = await fetch('/api/siasus/sincronizar', { method: 'POST' });
+            const resp = await fetch('/api/siasus/sincronizar', { method: 'POST', cache: 'no-store' });
             if (resp.ok) {
-                syncSucedido = true;
+                try {
+                    const data = await resp.json();
+                    if (data && data.catalogo) {
+                        _catalogo = data.catalogo;
+                        syncSucedido = true;
+                    }
+                } catch (e) {}
+                // Se o backend só confirmou 202 sem corpo, recarrega via GET.
+                if (!syncSucedido) {
+                    try {
+                        const rv = await fetch('/api/siasus/versoes', { cache: 'no-store' });
+                        if (rv.ok) {
+                            const dv = await rv.json();
+                            if (dv && dv.catalogo) {
+                                _catalogo = dv.catalogo;
+                                syncSucedido = true;
+                            }
+                        }
+                    } catch (e) {}
+                }
+                if (syncSucedido) {
+                    // Garante que o espelho live (fonte mais fresca) seja mesclado por cima.
+                    try {
+                        const rm = await fetch('https://raw.githubusercontent.com/RenatoKR/SIASUS/main/README.md?t=' + Date.now(), { cache: 'no-store' });
+                        if (rm.ok) _atualizarCatalogoPorTextoMirror(await rm.text());
+                    } catch (e) {}
+                }
             }
         } catch (errBackend) {
             console.warn('[DownloadSistema] Endpoint backend indisponível, usando contingência client-side');
@@ -114,39 +176,112 @@ window.DownloadSistemaModule = (function () {
         }, 1000);
     }
 
+    function _fmtTamanhoMirror(raw, fallback) {
+        if (!raw) return fallback;
+        const m = String(raw).trim().match(/^([\d.,]+)\s*([MK])?/i);
+        if (!m) return fallback;
+        const num = m[1].replace(',', '.');
+        return ((m[2] || 'M').toUpperCase() === 'K') ? `${num} KB` : `${num} MB`;
+    }
+
     function _atualizarCatalogoPorTextoMirror(texto) {
         if (!_catalogo) _catalogo = _getCatalogoPadrao();
-        const bdsiaMatches = texto.match(/BDSIA\d{6}[a-z]?\.exe/gi);
-        if (bdsiaMatches && bdsiaMatches.length > 0) {
-            const set = new Set(bdsiaMatches);
-            const novos = Array.from(set).map(arq => {
+        if (!texto || typeof texto !== 'string') return;
+        // Parse linha a linha da tabela markdown para preservar tamanhos reais
+        // (ex: "| `BDSIA202609a.exe` | Setembro/2026 (rev. a) | 9.4M | ...").
+        const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        const bdsiaMap = new Map();
+        const bpaMap = new Map();
+        const linhas = texto.split('\n').filter(l => /\.exe/i.test(l));
+        for (const linha of linhas) {
+            const cols = linha.split('|').map(c => c.replace(/`/g, '').trim()).filter(Boolean);
+            if (!cols.length) continue;
+            const arqCol = cols.find(c => /\.exe$/i.test(c));
+            if (!arqCol) continue;
+            const arqMatch = arqCol.match(/(BPAMAG\d{4}\.exe|BDSIA\d{6}[a-z]?\.exe)/i);
+            if (!arqMatch) continue;
+            const arq = arqMatch[1];
+            const tamCol = cols.find(c => /^\d+([.,]\d+)?\s*[MK]$/i.test(c));
+            const compCol = cols.find(c => /rev\./i.test(c));
+            if (/^BDSIA/i.test(arq)) {
                 const match = arq.match(/^BDSIA(\d{4})(\d{2})([a-z]?)\.exe$/i);
-                if (!match) return null;
-                const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+                if (!match) continue;
                 const ano = parseInt(match[1], 10);
                 const mesNum = parseInt(match[2], 10);
                 const rev = (match[3] || 'a').toLowerCase();
                 const mesNome = (mesNum >= 1 && mesNum <= 12) ? meses[mesNum - 1] : `Mês ${mesNum}`;
+                const competencia = compCol || `${mesNome}/${ano} (rev. ${rev})`;
                 const ordem = (ano * 10000) + (mesNum * 100) + (rev.charCodeAt(0) - 97);
-                return {
+                if (!bdsiaMap.has(arq)) bdsiaMap.set(arq, {
                     arquivo: arq,
                     tipo: 'bdsia',
                     ano,
                     mes: mesNum,
                     mesNome,
                     revisao: rev,
-                    competencia: `${mesNome}/${ano} (rev. ${rev})`,
-                    tamanhoFormatado: '9.4 MB',
+                    competencia,
+                    titulo: `Tabelas BDSIA ${competencia}`,
+                    descricao: `Base de dados e tabelas nacionais do SIA/SUS para ${competencia}`,
+                    tamanhoFormatado: _fmtTamanhoMirror(tamCol, '9.4 MB'),
                     ordem,
                     urlDatasus: `http://ftp.datasus.gov.br/siasus/SIA/${arq}`,
                     urlEspelho: `https://github.com/RenatoKR/SIASUS/raw/main/bdsia/${arq}`
-                };
-            }).filter(Boolean);
-
-            if (novos.length > 0) {
-                novos.sort((a, b) => b.ordem - a.ordem);
-                _catalogo.bdsia = novos.slice(0, 6);
+                });
+            } else if (/^BPAMAG/i.test(arq)) {
+                const bm = arq.match(/^BPAMAG(\d{2})(\d{2})\.exe$/i);
+                if (!bm || parseInt(bm[1], 10) >= 20) continue;
+                const versao = `${bm[1]}.${bm[2]}`;
+                if (!bpaMap.has(arq)) bpaMap.set(arq, {
+                    arquivo: arq,
+                    tipo: 'bpa',
+                    versao,
+                    titulo: `BPA Magnético v${versao}`,
+                    descricao: 'Instalador oficial do Boletim de Produção Ambulatorial do SUS',
+                    tamanhoFormatado: _fmtTamanhoMirror(tamCol, '7.5 MB'),
+                    ordem: parseInt(bm[1], 10) * 100 + parseInt(bm[2], 10),
+                    isVigente: false,
+                    urlDatasus: `http://ftp.datasus.gov.br/siasus/BPA/${arq}`,
+                    urlEspelho: `https://github.com/RenatoKR/SIASUS/raw/main/bpa/${arq}`
+                });
             }
+        }
+        // Fallback para READMEs fora do padrão de tabela: extrai ao menos os nomes.
+        if (bdsiaMap.size === 0) {
+            const bdsiaMatches = texto.match(/BDSIA\d{6}[a-z]?\.exe/gi);
+            if (bdsiaMatches) {
+                const set = new Set(bdsiaMatches);
+                Array.from(set).forEach(arq => {
+                    const match = arq.match(/^BDSIA(\d{4})(\d{2})([a-z]?)\.exe$/i);
+                    if (!match) return;
+                    const ano = parseInt(match[1], 10);
+                    const mesNum = parseInt(match[2], 10);
+                    const rev = (match[3] || 'a').toLowerCase();
+                    const mesNome = (mesNum >= 1 && mesNum <= 12) ? meses[mesNum - 1] : `Mês ${mesNum}`;
+                    const ordem = (ano * 10000) + (mesNum * 100) + (rev.charCodeAt(0) - 97);
+                    if (!bdsiaMap.has(arq)) bdsiaMap.set(arq, {
+                        arquivo: arq,
+                        tipo: 'bdsia',
+                        ano,
+                        mes: mesNum,
+                        mesNome,
+                        revisao: rev,
+                        competencia: `${mesNome}/${ano} (rev. ${rev})`,
+                        tamanhoFormatado: '9.4 MB',
+                        ordem,
+                        urlDatasus: `http://ftp.datasus.gov.br/siasus/SIA/${arq}`,
+                        urlEspelho: `https://github.com/RenatoKR/SIASUS/raw/main/bdsia/${arq}`
+                    });
+                });
+            }
+        }
+        if (bdsiaMap.size > 0) {
+            const novos = Array.from(bdsiaMap.values()).sort((a, b) => b.ordem - a.ordem).slice(0, 6);
+            _catalogo.bdsia = novos;
+        }
+        if (bpaMap.size > 0) {
+            const novosBpa = Array.from(bpaMap.values()).sort((a, b) => b.ordem - a.ordem).slice(0, 5);
+            novosBpa.forEach((b, i) => { b.isVigente = (i === 0); });
+            _catalogo.bpa = novosBpa;
         }
     }
 
@@ -625,16 +760,28 @@ window.DownloadSistemaModule = (function () {
             ],
             bdsia: [
                 {
-                    arquivo: 'BDSIA202608a.exe',
+                    arquivo: 'BDSIA202609a.exe',
+                    tipo: 'bdsia',
+                    ano: 2026,
+                    mes: 9,
+                    mesNome: 'Setembro',
+                    revisao: 'a',
+                    competencia: 'Setembro/2026 (rev. a)',
+                    tamanhoFormatado: '9.4 MB',
+                    urlDatasus: 'http://ftp.datasus.gov.br/siasus/SIA/BDSIA202609a.exe',
+                    urlEspelho: 'https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202609a.exe'
+                },
+                {
+                    arquivo: 'BDSIA202608b.exe',
                     tipo: 'bdsia',
                     ano: 2026,
                     mes: 8,
                     mesNome: 'Agosto',
-                    revisao: 'a',
-                    competencia: 'Agosto/2026 (rev. a)',
-                    tamanhoFormatado: '9.4 MB',
-                    urlDatasus: 'http://ftp.datasus.gov.br/siasus/SIA/BDSIA202608a.exe',
-                    urlEspelho: 'https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202608a.exe'
+                    revisao: 'b',
+                    competencia: 'Agosto/2026 (rev. b)',
+                    tamanhoFormatado: '9.3 MB',
+                    urlDatasus: 'http://ftp.datasus.gov.br/siasus/SIA/BDSIA202608b.exe',
+                    urlEspelho: 'https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202608b.exe'
                 },
                 {
                     arquivo: 'BDSIA202607b.exe',
@@ -683,18 +830,6 @@ window.DownloadSistemaModule = (function () {
                     tamanhoFormatado: '9.0 MB',
                     urlDatasus: 'http://ftp.datasus.gov.br/siasus/SIA/BDSIA202605d.exe',
                     urlEspelho: 'https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202605d.exe'
-                },
-                {
-                    arquivo: 'BDSIA202604d.exe',
-                    tipo: 'bdsia',
-                    ano: 2026,
-                    mes: 4,
-                    mesNome: 'Abril',
-                    revisao: 'd',
-                    competencia: 'Abril/2026 (rev. d)',
-                    tamanhoFormatado: '8.9 MB',
-                    urlDatasus: 'http://ftp.datasus.gov.br/siasus/SIA/BDSIA202604d.exe',
-                    urlEspelho: 'https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202604d.exe'
                 }
             ],
             notasTecnicas: [
@@ -793,7 +928,7 @@ window.DownloadSistemaModule = (function () {
                 totalArquivosLocais: 7,
                 espacoOcupadoFormatado: '64.4 MB',
                 versaoVigenteBpa: 'BPAMAG0500.exe (v05.00)',
-                versaoVigenteBdsia: 'Agosto/2026 (rev. a)',
+                versaoVigenteBdsia: 'Setembro/2026 (rev. a)',
                 ultimaNotaTecnica: 'Setembro/2026 (nº 09/2026)',
                 totalNotasDisponiveis: 6
             }

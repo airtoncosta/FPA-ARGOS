@@ -1,7 +1,7 @@
 {
-  "ultimaSincronizacao": "2026-09-22T16:01:50.759Z",
-  "statusDatasus": "espelho",
-  "origem": "espelho_contingencia",
+  "ultimaSincronizacao": "2026-10-05T17:48:10.000Z",
+  "statusDatasus": "online",
+  "origem": "github_live",
   "bpa": [
     {
       "arquivo": "BPAMAG0500.exe",
@@ -18,18 +18,37 @@
   ],
   "bdsia": [
     {
-      "arquivo": "BDSIA202608a.exe",
+      "arquivo": "BDSIA202609a.exe",
+      "tipo": "bdsia",
+      "ano": 2026,
+      "mes": 9,
+      "mesNome": "Setembro",
+      "revisao": "a",
+      "competencia": "Setembro/2026 (rev. a)",
+      "titulo": "Tabelas BDSIA Setembro/2026 (rev. a)",
+      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Setembro/2026 (rev. a)",
+      "ordem": 20260900,
+      "tamanhoBytes": 9856614,
+      "tamanhoFormatado": "9.4 MB",
+      "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202609a.exe",
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202609a.exe",
+      "disponivelLocal": false
+    },
+    {
+      "arquivo": "BDSIA202608b.exe",
       "tipo": "bdsia",
       "ano": 2026,
       "mes": 8,
       "mesNome": "Agosto",
-      "revisao": "a",
-      "competencia": "Agosto/2026 (rev. a)",
-      "titulo": "Tabelas BDSIA Agosto/2026 (rev. a)",
-      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Agosto/2026 (rev. a)",
-      "ordem": 20260800,
-      "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202608a.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202608a.exe",
+      "revisao": "b",
+      "competencia": "Agosto/2026 (rev. b)",
+      "titulo": "Tabelas BDSIA Agosto/2026 (rev. b)",
+      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Agosto/2026 (rev. b)",
+      "ordem": 20260801,
+      "tamanhoBytes": 9751757,
+      "tamanhoFormatado": "9.3 MB",
+      "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202608b.exe",
+      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202608b.exe",
       "disponivelLocal": false
     },
     {
@@ -43,6 +62,8 @@
       "titulo": "Tabelas BDSIA Julho/2026 (rev. b)",
       "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Julho/2026 (rev. b)",
       "ordem": 20260701,
+      "tamanhoBytes": 9856614,
+      "tamanhoFormatado": "9.4 MB",
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202607b.exe",
       "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202607b.exe",
       "disponivelLocal": false
@@ -58,6 +79,8 @@
       "titulo": "Tabelas BDSIA Julho/2026 (rev. a)",
       "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Julho/2026 (rev. a)",
       "ordem": 20260700,
+      "tamanhoBytes": 9542041,
+      "tamanhoFormatado": "9.1 MB",
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202607a.exe",
       "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202607a.exe",
       "disponivelLocal": false
@@ -73,6 +96,8 @@
       "titulo": "Tabelas BDSIA Junho/2026 (rev. b)",
       "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Junho/2026 (rev. b)",
       "ordem": 20260601,
+      "tamanhoBytes": 9646899,
+      "tamanhoFormatado": "9.2 MB",
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202606b.exe",
       "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202606b.exe",
       "disponivelLocal": false
@@ -88,23 +113,10 @@
       "titulo": "Tabelas BDSIA Maio/2026 (rev. d)",
       "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Maio/2026 (rev. d)",
       "ordem": 20260503,
+      "tamanhoBytes": 9437184,
+      "tamanhoFormatado": "9.0 MB",
       "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202605d.exe",
       "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202605d.exe",
-      "disponivelLocal": false
-    },
-    {
-      "arquivo": "BDSIA202604d.exe",
-      "tipo": "bdsia",
-      "ano": 2026,
-      "mes": 4,
-      "mesNome": "Abril",
-      "revisao": "d",
-      "competencia": "Abril/2026 (rev. d)",
-      "titulo": "Tabelas BDSIA Abril/2026 (rev. d)",
-      "descricao": "Base de dados e tabelas nacionais do SIA/SUS para Abril/2026 (rev. d)",
-      "ordem": 20260403,
-      "urlDatasus": "http://ftp.datasus.gov.br/siasus/SIA/BDSIA202604d.exe",
-      "urlEspelho": "https://github.com/RenatoKR/SIASUS/raw/main/bdsia/BDSIA202604d.exe",
       "disponivelLocal": false
     }
   ],
@@ -227,7 +239,7 @@
     "espacoOcupadoBytes": 0,
     "espacoOcupadoFormatado": "0 B",
     "versaoVigenteBpa": "BPAMAG0500.exe",
-    "versaoVigenteBdsia": "Agosto/2026 (rev. a)",
+    "versaoVigenteBdsia": "Setembro/2026 (rev. a)",
     "ultimaNotaTecnica": "Setembro/2026",
     "totalNotasDisponiveis": 6
   }
