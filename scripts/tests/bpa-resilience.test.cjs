@@ -80,3 +80,60 @@ test('resiliência: falha de rede (Failed to fetch) ao consultar configuracoes c
     assert.equal(b.persistenceMode, 'local');
     assert.ok(b.getUnidadesSistema().length > 0);
 });
+
+test('resiliência: ADM nunca tem upload.disabled = true e openUploadModal abre normalmente', async () => {
+    const { b, ctx } = setup({ username: 'airton', name: 'Airton', role: 'ADM' });
+    let modalOpened = false;
+    let alertCalled = false;
+    ctx.alert = () => { alertCalled = true; };
+    ctx.document.getElementById = id => {
+        if (id === 'modalUploadBpa') {
+            return {
+                classList: {
+                    remove(cls) { if (cls === 'hidden') modalOpened = true; },
+                    add() {}
+                }
+            };
+        }
+        return {
+            id,
+            style: {},
+            classList: { add() {}, remove() {}, toggle() {} },
+            textContent: '',
+            innerHTML: '',
+            disabled: false,
+            appendChild() {}
+        };
+    };
+
+    b.accessLoadError = 'Falha na rede';
+    b.openUploadModal();
+    assert.equal(alertCalled, false, 'ADM não deve receber alerta de bloqueio');
+    assert.equal(modalOpened, true, 'Modal de upload deve abrir para ADM');
+
+    // assertUploadAccess também não deve disparar erro para ADM
+    assert.doesNotThrow(() => {
+        b.assertUploadAccess({ cnes: '2387412', estabelecimentoNome: 'HOSPITAL MARIA SOCORRO BRANDAO' });
+    });
+});
+
+test('resiliência: erro qualquer do Supabase para ADM faz fallback local transparente sem setar accessLoadError', async () => {
+    const { b, ctx } = setup({ username: 'airton', name: 'Airton', role: 'ADM' });
+    ctx.window.SupabaseConfig = {
+        isConnected: () => true,
+        getClient: () => ({
+            from: () => ({
+                select: () => ({
+                    in: async () => ({ error: { message: '500 Internal Server Error', code: '500' } }),
+                    order: async () => ({ error: { message: '500 Internal Server Error', code: '500' } })
+                })
+            })
+        })
+    };
+    b.renderAll = () => {};
+    await b.loadProducoes();
+
+    assert.equal(b.accessLoadError, '', 'ADM não deve receber mensagem de erro bloqueante');
+    assert.equal(b.persistenceMode, 'local', 'Deve migrar para contingência local');
+    assert.ok(b.getUnidadesSistema().length > 0, 'Unidades devem continuar disponíveis');
+});

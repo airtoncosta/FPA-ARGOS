@@ -705,8 +705,10 @@ const BpaModule = {
     },
 
     canAccessProducao(record) {
-        if (!record || this.accessLoadError || !this.getCurrentUser().username) return false;
-        return this.isAdminOrFrancileide() || this.getUnidadesSistema().some(u => this.matchesUnit(record, u));
+        if (!record || !this.getCurrentUser().username) return false;
+        const privileged = this.isAdminOrFrancileide();
+        if (this.accessLoadError && !privileged) return false;
+        return privileged || this.getUnidadesSistema().some(u => this.matchesUnit(record, u));
     },
 
     getAccessibleProducoes() {
@@ -714,10 +716,13 @@ const BpaModule = {
     },
 
     assertUploadAccess(data) {
-        if (this.accessLoadError || !this.getCurrentUser().username) throw new Error('Acesso indisponível. Entre novamente e recarregue as unidades.');
+        const privileged = this.isAdminOrFrancileide();
+        if (!this.getCurrentUser().username || (this.accessLoadError && !privileged)) {
+            throw new Error('Acesso indisponível. Entre novamente e recarregue as unidades.');
+        }
         const record = { cnes: data.cnes, estabelecimento_nome: data.estabelecimentoNome };
         const unit = this.getUnidadesSistema().find(u => this.matchesUnit(record, u));
-        if (!this.isAdminOrFrancileide() && !unit) throw new Error('Você só pode anexar produções das unidades atribuídas a você.');
+        if (!privileged && !unit) throw new Error('Você só pode anexar produções das unidades atribuídas a você.');
         if (unit && data.estabelecimentoNome && this.normalizeIdentity(unit.nome) !== this.normalizeIdentity(data.estabelecimentoNome)) {
             throw new Error('A unidade selecionada não corresponde ao CNES do arquivo. Confira antes de enviar.');
         }
@@ -1936,7 +1941,7 @@ const BpaModule = {
                 }
 
                 if (config && config.error) {
-                    if (this.isNetworkError(config.error) || this.isMissingProducoesTable(config.error)) {
+                    if (this.isNetworkError(config.error) || this.isMissingProducoesTable(config.error) || this.isAdminOrFrancileide()) {
                         canUseCloud = false;
                     } else {
                         throw config.error;
@@ -1992,7 +1997,7 @@ const BpaModule = {
 
                 const failure = results.find(r => r.error);
                 if (failure) {
-                    if (this.isMissingProducoesTable(failure.error) || this.isNetworkError(failure.error)) {
+                    if (this.isMissingProducoesTable(failure.error) || this.isNetworkError(failure.error) || this.isAdminOrFrancileide()) {
                         this.persistenceMode = 'local';
                     } else {
                         throw failure.error;
@@ -2011,9 +2016,17 @@ const BpaModule = {
             localStorage.setItem(this.storageKey, JSON.stringify(loaded));
         } catch (error) {
             if (loadId !== this.loadId || username !== this.getCurrentUser().username) return;
-            this.accessLoadError = 'Não foi possível carregar suas unidades e produções. Recarregue para tentar novamente.';
-            loaded = [];
-            console.error('Falha ao carregar BPA:', error.message);
+            const privileged = this.isAdminOrFrancileide();
+            if (privileged) {
+                console.warn('Falha na consulta remota BPA para ADM; operando em modo local resiliente:', error.message);
+                this.persistenceMode = 'local';
+                this.accessLoadError = '';
+                loaded = this.readLocalProducoes();
+            } else {
+                this.accessLoadError = 'Não foi possível carregar suas unidades e produções. Recarregue para tentar novamente.';
+                loaded = [];
+                console.error('Falha ao carregar BPA:', error.message);
+            }
         }
 
         // HIGIENIZAÇÃO AUTOMÁTICA: Tomografia é exame realizado pelo Hospital Maria Socorro Brandão, não estabelecimento isolado
@@ -3109,12 +3122,18 @@ const BpaModule = {
             return;
         }
         const privileged = this.isAdminOrFrancileide();
-        const units = this.accessLoadError ? [] : this.getUnidadesSistema();
+        const units = (this.accessLoadError && !privileged) ? [] : this.getUnidadesSistema();
         const scope = document.getElementById('bpaAccessScope');
-        if (scope) scope.textContent = this.accessLoadError || (privileged ? 'Visão geral • Todas as unidades' : units.length ? 'Minhas unidades • ' + units.length + ' atribuída(s) a você' : 'Nenhuma unidade atribuída. Solicite o vínculo ao ADM ou à Francileide.');
-        if (scope && !this.accessLoadError && this.persistenceMode === 'local') scope.textContent += ' • Arquivos salvos neste navegador';
+        if (scope) {
+            if (this.accessLoadError && !privileged) {
+                scope.textContent = this.accessLoadError;
+            } else {
+                scope.textContent = privileged ? 'Visão geral • Todas as unidades' : (units.length ? 'Minhas unidades • ' + units.length + ' atribuída(s) a você' : 'Nenhuma unidade atribuída. Solicite o vínculo ao ADM ou à Francileide.');
+                if (this.persistenceMode === 'local') scope.textContent += ' • Arquivos salvos neste navegador';
+            }
+        }
         const upload = document.getElementById('btnNovoEnvioBpa');
-        if (upload) upload.disabled = !!this.accessLoadError || (!privileged && !units.length);
+        if (upload) upload.disabled = (!privileged && !!this.accessLoadError) || (!privileged && !units.length);
 
         // Controle de visibilidade nos perfis de Gerentes vs Gestão (ADM/Francileide)
         const respGroup = document.getElementById('bpaGroupResponsavelFilter');
@@ -4257,11 +4276,12 @@ const BpaModule = {
        ========================================================= */
     openUploadModal(prefillEstab = '', prefillCnes = '', prefillTipo = '') {
         const units = this.getUnidadesSistema();
-        if (this.accessLoadError || !this.getCurrentUser().username || (!this.isAdminOrFrancileide() && !units.length)) {
+        const privileged = this.isAdminOrFrancileide();
+        if (!this.getCurrentUser().username || (!privileged && (this.accessLoadError || !units.length))) {
             alert('Você ainda não tem unidades disponíveis para envio. Solicite a atribuição ao ADM ou à Francileide.');
             return;
         }
-        if (prefillEstab && !this.isAdminOrFrancileide() && !units.some(u => this.matchesUnit({ cnes: prefillCnes, estabelecimento_nome: prefillEstab }, u))) return;
+        if (prefillEstab && !privileged && !units.some(u => this.matchesUnit({ cnes: prefillCnes, estabelecimento_nome: prefillEstab }, u))) return;
         this.uploadTarget = prefillEstab ? { nome: prefillEstab, cnes: prefillCnes } : null;
         const modal = document.getElementById('modalUploadBpa');
         if (!modal) return;
