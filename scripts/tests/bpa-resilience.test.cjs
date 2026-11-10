@@ -137,3 +137,84 @@ test('resiliência: erro qualquer do Supabase para ADM faz fallback local transp
     assert.equal(b.persistenceMode, 'local', 'Deve migrar para contingência local');
     assert.ok(b.getUnidadesSistema().length > 0, 'Unidades devem continuar disponíveis');
 });
+
+test('resiliência: saveProducao sobrevive a QuotaExceededError no localStorage', async () => {
+    const { b, ctx } = setup({ username: 'airton', name: 'Airton', role: 'ADM' });
+    // Forçar QuotaExceededError ao tentar gravar no localStorage
+    ctx.localStorage.setItem = (key, val) => {
+        if (key.includes('argos_producoes_bpa')) {
+            const err = new Error("Failed to execute 'setItem' on 'Storage': Setting the value of 'argos_producoes_bpa' exceeded the quota.");
+            err.name = 'QuotaExceededError';
+            throw err;
+        }
+    };
+    ctx.window.SupabaseConfig = {
+        isConnected: () => false
+    };
+
+    let rec = null;
+    await assert.doesNotReject(async () => {
+        rec = await b.saveProducao({
+            nomeArquivo: 'PAECOELE.OUT',
+            estabelecimentoNome: 'HOSPITAL MARIA SOCORRO BRANDAO',
+            cnes: '2387412',
+            competencia: '10/2026',
+            tipoBpa: 'BPA-I',
+            conteudo: 'CONTEUDO_GRANDE'.repeat(100),
+            tamanhoBytes: 140000,
+            status_auditoria: 'COM_APONTAMENTOS',
+            total_apontamentos: 320
+        });
+    }, 'saveProducao não deve quebrar com QuotaExceededError');
+
+    assert.ok(rec, 'Registro deve ser criado com sucesso mesmo com quota cheia');
+    assert.equal(rec.nome_arquivo, 'PAECOELE.OUT');
+});
+
+test('resiliência: saveProducao recupera de PGRST204 (colunas de auditoria inexistentes no schema do Supabase)', async () => {
+    const { b, ctx } = setup({ username: 'airton', name: 'Airton', role: 'ADM' });
+    let attempts = 0;
+    let finalInserted = null;
+    ctx.window.SupabaseConfig = {
+        isConnected: () => true,
+        getClient: () => ({
+            from: table => {
+                assert.equal(table, 'producoes_bpa');
+                return {
+                    insert: rows => ({
+                        select: async () => {
+                            attempts++;
+                            const row = rows[0];
+                            if (row.auditado_em || row.status_auditoria) {
+                                return {
+                                    error: {
+                                        code: 'PGRST204',
+                                        message: "Could not find the 'auditado_em' column of 'producoes_bpa' in the schema cache"
+                                    }
+                                };
+                            }
+                            finalInserted = row;
+                            return { data: [{ ...row, id: 'uuid-gravado-nuvem' }] };
+                        }
+                    })
+                };
+            }
+        })
+    };
+
+    const rec = await b.saveProducao({
+        nomeArquivo: 'PAECOELE.OUT',
+        estabelecimentoNome: 'HOSPITAL MARIA SOCORRO BRANDAO',
+        cnes: '2387412',
+        competencia: '10/2026',
+        tipoBpa: 'BPA-I',
+        conteudo: 'TESTE',
+        status_auditoria: 'COM_APONTAMENTOS',
+        total_apontamentos: 320,
+        auditado_em: new Date().toISOString()
+    });
+
+    assert.equal(attempts, 2, 'Deve ter tentado e recuperado no retry');
+    assert.equal(rec.id, 'uuid-gravado-nuvem', 'Deve ter gravado com sucesso no Supabase');
+    assert.equal(rec._localOnly, undefined, 'Não deve ser localOnly');
+});

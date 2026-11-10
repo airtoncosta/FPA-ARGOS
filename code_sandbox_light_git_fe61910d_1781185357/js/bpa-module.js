@@ -1840,6 +1840,47 @@ const BpaModule = {
                code === 'ENOTFOUND' || code === 'ETIMEDOUT';
     },
 
+    safeSetItem(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (e) {
+            const isQuota = e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || String(e.message || '').includes('quota'));
+            if (!isQuota) {
+                console.warn('Erro ao salvar em localStorage:', e);
+                return false;
+            }
+            console.warn('Quota de localStorage atingida ao salvar chave:', key);
+            try {
+                // Tenta liberar espaço compactando produções antigas em cache (remove o texto bruto de produções sincronizadas)
+                if (key === this.storageKey || key === this.localProducoesKey) {
+                    const parsed = JSON.parse(value || '[]');
+                    if (Array.isArray(parsed)) {
+                        const compact = parsed.map(p => {
+                            if (!p._localOnly) {
+                                const { conteudo_arquivo, ...rest } = p;
+                                return rest;
+                            }
+                            return p;
+                        });
+                        localStorage.setItem(key, JSON.stringify(compact));
+                        return true;
+                    }
+                }
+            } catch (innerErr) {
+                try {
+                    localStorage.removeItem('argos_custom_logo');
+                    localStorage.setItem(key, value);
+                    return true;
+                } catch (_finalErr) {
+                    console.warn('Persistência local secundária adiada por cota do navegador:', _finalErr.message);
+                    return false;
+                }
+            }
+            return false;
+        }
+    },
+
     readLocalProducoes() {
         const originalText = localStorage.getItem(this.localProducoesKey);
         const original = JSON.parse(originalText || '[]');
@@ -1854,11 +1895,12 @@ const BpaModule = {
     },
 
     persistLocalProducao(record, remove = false) {
+        if (!record || !record.id) return;
         const all = this.readLocalProducoes();
         const updated = all.filter(p => p.id !== record.id);
         if (!remove) updated.unshift({ ...record, _localOnly: true });
         // Preserva produções de outras unidades/contas ao salvar um único registro.
-        localStorage.setItem(this.localProducoesKey, JSON.stringify(updated));
+        this.safeSetItem(this.localProducoesKey, JSON.stringify(updated));
     },
 
     lerOutbox() {
@@ -1871,12 +1913,12 @@ const BpaModule = {
         try {
             const fila = this.lerOutbox().filter(r => r && r.id !== record.id);
             fila.unshift({ ...record });
-            localStorage.setItem(this.outboxKey, JSON.stringify(fila));
+            this.safeSetItem(this.outboxKey, JSON.stringify(fila));
         } catch (e) {}
     },
     removerDaOutbox(id) {
         try {
-            localStorage.setItem(this.outboxKey, JSON.stringify(this.lerOutbox().filter(r => r && r.id !== id)));
+            this.safeSetItem(this.outboxKey, JSON.stringify(this.lerOutbox().filter(r => r && r.id !== id)));
         } catch (e) {}
     },
     async reenviarOutbox() {
@@ -1888,7 +1930,16 @@ const BpaModule = {
             try {
                 const paraNuvem = { ...rec };
                 delete paraNuvem._localOnly;
-                const { data, error } = await client.from('producoes_bpa').insert([paraNuvem]).select();
+                let { data, error } = await client.from('producoes_bpa').insert([paraNuvem]).select();
+                if (error && (error.code === 'PGRST204' || String(error.message || '').includes('schema cache'))) {
+                    delete paraNuvem.status_auditoria;
+                    delete paraNuvem.total_apontamentos;
+                    delete paraNuvem.auditado_em;
+                    delete paraNuvem.fingerprint;
+                    const retry = await client.from('producoes_bpa').insert([paraNuvem]).select();
+                    data = retry.data;
+                    error = retry.error;
+                }
                 if (error) throw error;
                 if (data && data[0] && data[0].id && data[0].id !== rec.id) {
                     const idx = (this.producoes || []).findIndex(p => p.id === rec.id);
@@ -2193,17 +2244,28 @@ const BpaModule = {
         // Salvar no Supabase se disponível; em falha, guarda na outbox para reenvio (nunca perde o envio)
         let salvoNaNuvem = false;
         try {
-            if (this.persistenceMode !== 'local' && window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
+            if (window.SupabaseConfig && window.SupabaseConfig.isConnected()) {
                 const client = window.SupabaseConfig.getClient();
-                if (!client) throw new Error('Conexão indisponível.');
-                const paraNuvem = { ...newRecord };
-                delete paraNuvem._localOnly;
-                const { data, error } = await client.from('producoes_bpa').insert([paraNuvem]).select();
-                if (error) throw error;
-                if (data && data[0]) {
-                    newRecord.id = data[0].id;
+                if (client) {
+                    const paraNuvem = { ...newRecord };
+                    delete paraNuvem._localOnly;
+                    let { data, error } = await client.from('producoes_bpa').insert([paraNuvem]).select();
+                    if (error && (error.code === 'PGRST204' || String(error.message || '').includes('schema cache'))) {
+                        delete paraNuvem.status_auditoria;
+                        delete paraNuvem.total_apontamentos;
+                        delete paraNuvem.auditado_em;
+                        delete paraNuvem.fingerprint;
+                        const retry = await client.from('producoes_bpa').insert([paraNuvem]).select();
+                        data = retry.data;
+                        error = retry.error;
+                    }
+                    if (error) throw error;
+                    if (data && data[0]) {
+                        newRecord.id = data[0].id;
+                    }
+                    salvoNaNuvem = true;
+                    this.persistenceMode = 'cloud';
                 }
-                salvoNaNuvem = true;
             }
         } catch (e) {
             console.warn('Falha ao salvar na nuvem; envio guardado para reenvio:', e.message);
@@ -2229,7 +2291,7 @@ const BpaModule = {
 
         // Salvar localmente
         this.producoes.unshift(newRecord);
-        localStorage.setItem(this.storageKey, JSON.stringify(this.producoes));
+        this.safeSetItem(this.storageKey, JSON.stringify(this.producoes));
 
         // Atualizar visualização
         this.populateCompetenciaFilter();
