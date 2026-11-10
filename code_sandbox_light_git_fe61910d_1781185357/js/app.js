@@ -3777,6 +3777,9 @@ function bindSupabase() {
             divResult.style.backgroundColor = '#dcfce7';
             divResult.style.color = '#166534';
             divResult.innerHTML = `<i class="fas fa-check-circle"></i> ${res.message}`;
+            if (window.BpaModule && typeof window.BpaModule.loadProducoes === 'function') {
+                window.BpaModule.loadProducoes().catch(() => {});
+            }
         } else {
             divResult.style.backgroundColor = '#fee2e2';
             divResult.style.color = '#991b1b';
@@ -3786,6 +3789,9 @@ function bindSupabase() {
 
     btnSalvar.addEventListener('click', () => {
         modal.classList.add('hidden');
+        if (window.BpaModule && typeof window.BpaModule.loadProducoes === 'function') {
+            window.BpaModule.loadProducoes().catch(() => {});
+        }
     });
 }
 

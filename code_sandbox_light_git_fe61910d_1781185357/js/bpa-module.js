@@ -482,7 +482,7 @@ const BpaModule = {
        CATÁLOGO DINÂMICO DE UNIDADES DO SISTEMA + CASOS ISOLADOS
        ========================================================= */
     getUnidadesSistema() {
-        if (this.accessLoadError) return [];
+        if (this.accessLoadError && !this.isAdminOrFrancileide()) return [];
 
         // As 21 Unidades Executoras oficiais da Produção BPA de Bacabal (conforme tabela municipal de faturamento)
         const unidadesOficiais = [
@@ -1822,6 +1822,19 @@ const BpaModule = {
             && String(error.message || '').includes('producoes_bpa');
     },
 
+    isNetworkError(error) {
+        if (!error) return false;
+        const msg = String(error.message || error || '').toLowerCase();
+        const code = String(error.code || '');
+        if (code === '42501' || msg.includes('negado') || msg.includes('permissão') || msg.includes('permission')) {
+            return false;
+        }
+        return msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') ||
+               msg.includes('connection') || msg.includes('offline') || msg.includes('abort') ||
+               msg.includes('failed') || code === 'PGRST000' || code === 'ECONNREFUSED' ||
+               code === 'ENOTFOUND' || code === 'ETIMEDOUT';
+    },
+
     readLocalProducoes() {
         const originalText = localStorage.getItem(this.localProducoesKey);
         const original = JSON.parse(originalText || '[]');
@@ -1901,53 +1914,90 @@ const BpaModule = {
         this.currentResponsavelFiltro = '';
         try {
             const connected = window.SupabaseConfig && window.SupabaseConfig.isConnected();
-            if (connected) {
-                const client = window.SupabaseConfig.getClient();
-                if (!client) throw new Error('Não foi possível conectar para consultar suas unidades.');
-                const config = await client.from('configuracoes').select('chave,valor').in('chave', ['bpa_responsaveis', 'bpa_modalidades', 'bpa_unidades_manuais']);
-                if (config.error) throw config.error;
-                let foundCloudManuais = false;
-                for (const row of config.data || []) {
-                    const value = typeof row.valor === 'string' ? JSON.parse(row.valor) : row.valor;
-                    if (row.chave === 'bpa_unidades_manuais') {
-                        foundCloudManuais = true;
-                        if (Array.isArray(value)) {
-                            localStorage.setItem(this.unidadesManuaisKey, JSON.stringify(value));
-                        }
-                    } else if (row.chave === 'bpa_responsaveis') {
-                        if (value && typeof value === 'object' && !Array.isArray(value)) {
-                            localStorage.setItem(this.responsaveisKey, JSON.stringify(value));
-                        }
-                    } else if (row.chave === 'bpa_modalidades') {
-                        if (value && typeof value === 'object' && !Array.isArray(value)) {
-                            localStorage.setItem(this.modalidadesKey, JSON.stringify(value));
+            let canUseCloud = !!connected;
+            let client = null;
+            if (canUseCloud) {
+                try {
+                    client = window.SupabaseConfig.getClient();
+                } catch (e) {
+                    client = null;
+                }
+                if (!client) {
+                    canUseCloud = false;
+                }
+            }
+
+            if (canUseCloud && client) {
+                let config = null;
+                try {
+                    config = await client.from('configuracoes').select('chave,valor').in('chave', ['bpa_responsaveis', 'bpa_modalidades', 'bpa_unidades_manuais']);
+                } catch (netErr) {
+                    config = { error: netErr };
+                }
+
+                if (config && config.error) {
+                    if (this.isNetworkError(config.error) || this.isMissingProducoesTable(config.error)) {
+                        canUseCloud = false;
+                    } else {
+                        throw config.error;
+                    }
+                } else if (config && config.data) {
+                    let foundCloudManuais = false;
+                    for (const row of config.data || []) {
+                        const value = typeof row.valor === 'string' ? JSON.parse(row.valor) : row.valor;
+                        if (row.chave === 'bpa_unidades_manuais') {
+                            foundCloudManuais = true;
+                            if (Array.isArray(value)) {
+                                localStorage.setItem(this.unidadesManuaisKey, JSON.stringify(value));
+                            }
+                        } else if (row.chave === 'bpa_responsaveis') {
+                            if (value && typeof value === 'object' && !Array.isArray(value)) {
+                                localStorage.setItem(this.responsaveisKey, JSON.stringify(value));
+                            }
+                        } else if (row.chave === 'bpa_modalidades') {
+                            if (value && typeof value === 'object' && !Array.isArray(value)) {
+                                localStorage.setItem(this.modalidadesKey, JSON.stringify(value));
+                            }
                         }
                     }
-                }
-                // Se as unidades manuais ainda não existiam na nuvem, inicializar com a base oficial (APAE)
-                if (!foundCloudManuais && this.isAdminOrFrancileide()) {
-                    const currentManuais = this.getUnidadesManuais();
-                    if (currentManuais && currentManuais.length > 0) {
-                        this.saveUnidadesManuais(currentManuais).catch(e => console.warn('Sync inicial manuais:', e));
+                    // Se as unidades manuais ainda não existiam na nuvem, inicializar com a base oficial (APAE)
+                    if (!foundCloudManuais && this.isAdminOrFrancileide()) {
+                        const currentManuais = this.getUnidadesManuais();
+                        if (currentManuais && currentManuais.length > 0) {
+                            this.saveUnidadesManuais(currentManuais).catch(e => console.warn('Sync inicial manuais:', e));
+                        }
                     }
+                    try { await this.reenviarOutbox(); } catch (e) { console.warn('Outbox BPA adiada:', e.message); }
                 }
-                try { await this.reenviarOutbox(); } catch (e) { console.warn('Outbox BPA adiada:', e.message); }
+            }
+
+            if (canUseCloud && client) {
                 const unidades = this.getUnidadesSistema();
                 let results = [];
-                if (this.isAdminOrFrancileide()) {
-                    results = [await client.from('producoes_bpa').select('*').order('criado_em', { ascending: false })];
-                } else if (unidades.length) {
-                    const cnes = unidades.map(u => u.cnes).filter(Boolean);
-                    const nomes = unidades.map(u => u.nome);
-                    results = await Promise.all([
-                        client.from('producoes_bpa').select('*').in('cnes', cnes),
-                        client.from('producoes_bpa').select('*').in('estabelecimento_nome', nomes).is('cnes', null),
-                        client.from('producoes_bpa').select('*').in('estabelecimento_nome', nomes).eq('cnes', '')
-                    ]);
+                try {
+                    if (this.isAdminOrFrancileide()) {
+                        results = [await client.from('producoes_bpa').select('*').order('criado_em', { ascending: false })];
+                    } else if (unidades.length) {
+                        const cnes = unidades.map(u => u.cnes).filter(Boolean);
+                        const nomes = unidades.map(u => u.nome);
+                        results = await Promise.all([
+                            client.from('producoes_bpa').select('*').in('cnes', cnes),
+                            client.from('producoes_bpa').select('*').in('estabelecimento_nome', nomes).is('cnes', null),
+                            client.from('producoes_bpa').select('*').in('estabelecimento_nome', nomes).eq('cnes', '')
+                        ]);
+                    }
+                } catch (netErr2) {
+                    results = [{ error: netErr2 }];
                 }
+
                 const failure = results.find(r => r.error);
-                if (failure && !this.isMissingProducoesTable(failure.error)) throw failure.error;
-                if (failure) this.persistenceMode = 'local';
+                if (failure) {
+                    if (this.isMissingProducoesTable(failure.error) || this.isNetworkError(failure.error)) {
+                        this.persistenceMode = 'local';
+                    } else {
+                        throw failure.error;
+                    }
+                }
                 const cloud = failure ? [] : results.flatMap(r => r.data || []);
                 const local = this.readLocalProducoes();
                 loaded = [...new Map([...local, ...cloud].map(p => [p.id, p])).values()];

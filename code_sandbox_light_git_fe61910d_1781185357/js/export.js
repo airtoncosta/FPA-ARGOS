@@ -790,7 +790,9 @@ const PDFExport = {
                         rows.push([
                             cells[0].textContent.trim(),
                             cells[1].textContent.trim().replace(/[\u2011\s]+/g, '-'),
-                            cells[2].textContent.trim(),
+                            (typeof extrairDescricaoProcedimentoPdf === 'function'
+                                ? extrairDescricaoProcedimentoPdf(cells[2].innerHTML)
+                                : cells[2].textContent.trim()),
                             cells[3].textContent.trim(),
                             cells[4].textContent.trim(),
                             cells[5].textContent.trim(),

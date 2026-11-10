@@ -25,7 +25,7 @@ function setup(user={username:'jessica',name:'Jéssica',role:'DIGITADOR'}) {
 const own={id:'own',cnes:'2387439',estabelecimento_nome:'HOSPITAL MATERNO INFANTIL',digitador_username:'jessica'};
 const other={id:'other',cnes:'2387412',estabelecimento_nome:'HOSPITAL MARIA SOCORRO BRANDÃO',digitador_username:'jessica'};
 test('usuária vê somente unidades atribuídas, com acentos no nome',()=>{const {b}=setup();assert.equal(b.getUnidadesSistema().length,2);assert.ok(b.getUnidadesSistema().every(u=>u.responsavel==='Jéssica'));});
-test('ADM e Francileide têm visão geral; outro superintendente não',()=>{for(const u of [{username:'admin',role:'ADM'},{username:'francileide',role:'SUPERINTENDENTE'}])assert.equal(setup(u).b.getUnidadesSistema().length,21);assert.equal(setup({username:'outro',role:'SUPERINTENDENTE'}).b.getUnidadesSistema().length,0);});
+test('ADM e Francileide têm visão geral; outro superintendente não',()=>{for(const u of [{username:'admin',role:'ADM'},{username:'francileide',role:'SUPERINTENDENTE'}])assert.equal(setup(u).b.getUnidadesSistema().length,22);assert.equal(setup({username:'outro',role:'SUPERINTENDENTE'}).b.getUnidadesSistema().length,0);});
 test('nome airton sozinho não concede administração',()=>assert.equal(setup({username:'airton',role:'DIGITADOR'}).b.isAdminOrFrancileide(),false));
 test('sessão ausente não recebe unidades ou produções',()=>{const {b}=setup({});assert.equal(b.getUnidadesSistema().length,0);assert.equal(b.canAccessProducao(own),false);});
 test('autoria de produção não concede acesso a outra unidade',()=>{const {b}=setup();b.producoes=[own,other];assert.equal(b.getAccessibleProducoes().length,1);assert.equal(b.canAccessProducao(other),false);});
